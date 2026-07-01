@@ -27,17 +27,88 @@
 ```text
 Before writing code, first output:
 1. Stage goal.
-2. Files/directories you plan to modify.
-3. Files/directories you will NOT modify.
-4. A short self-review against docs/product_design.md.
-5. What you are intentionally deferring.
+2. Proposed git branch name for this stage, using `stage-X-short-name`, `feature/short-name`, `fix/short-name`, or `refactor/short-name`.
+3. Current git branch and whether you need to create/switch to the proposed branch.
+4. Files/directories you plan to modify.
+5. Files/directories you will NOT modify.
+6. A short self-review against docs/product_design.md.
+7. What you are intentionally deferring.
 
-Then implement only the requested stage.
-Do not change unrelated files.
-Do not add auto-trading or broker write actions.
+Then:
+- Create or switch to the proposed branch before editing files.
+- Implement only the requested stage.
+- Do not change unrelated files.
+- Do not add auto-trading or broker write actions.
+
+At the end, provide exact commands for:
+- verification/tests
+- git status
+- git add
+- git commit
+- git push -u origin <branch-name>
+
+Do not run `git commit` or `git push` unless I explicitly ask.
+```
+
+### 0.2 Git Branch / Commit / GitHub Push Overlay：每次开发都附加
+
+```text
+Git workflow requirements:
+- Do not work directly on main.
+- Before editing files, check the current branch.
+- If the current branch is main, create a new branch for the requested stage or feature.
+- Use branch names like:
+  - stage-0-project-setup
+  - stage-1-backend-database
+  - stage-2-rule-engine
+  - stage-3-api-contracts
+  - stage-4-frontend-shell
+  - stage-5-pre-trade-checklist
+  - stage-6-open-trade-management
+  - stage-7-post-trade-review
+  - feature/rules-library
+  - fix/api-error-envelope
+  - refactor/rule-engine
+- If there are uncommitted changes before switching branches, stop and ask me what to do.
+- Keep one stage or one feature per branch.
+- At the end, do not commit or push automatically unless I explicitly ask.
+- Instead, provide exact commands for me to run:
+  1. git status
+  2. verification commands
+  3. git add ...
+  4. git commit -m "..."
+  5. git push -u origin <branch-name>
+```
+
+Recommended stage-start commands for Codex:
+
+```bash
+git status --short
+git branch --show-current
+git checkout -b stage-X-short-name
+```
+
+Recommended final command block format:
+
+```bash
+# Verify
+python -m pytest
+npm run build
+
+# Inspect
+git status
+
+# Commit
+git add <changed-files>
+git commit -m "type(scope): concise summary"
+
+# Push branch to GitHub
+git push -u origin <branch-name>
 ```
 
 ---
+
+
 
 ## 1. 给 Codex 的项目总指令
 
@@ -61,6 +132,7 @@ Important principles:
 - Build the app stage by stage.
 - Do not jump ahead unless I explicitly ask.
 - Keep the code simple, readable, and testable.
+- Before coding, check the current git branch and create or switch to a stage-specific branch. Do not work directly on main.
 - Before coding, list the files/directories you will NOT modify in this stage.
 - Before coding, briefly self-review the plan against product_design.md and explain what will be implemented and what will be deferred.
 - At the end of each stage, summarize:
@@ -68,7 +140,7 @@ Important principles:
   - how to run
   - tests added
   - what I should learn from this stage
-  - suggested git commit message
+  - exact git status / git add / git commit / git push commands for this branch
 
 Recommended stack:
 - Backend: FastAPI + SQLite + SQLAlchemy + Alembic + Pydantic + PyYAML
@@ -87,6 +159,11 @@ We are building a local web app called Trading Discipline Copilot.
 Please follow docs/product_design.md and docs/codex_implementation_plan.md.
 Start with Stage 0 only.
 
+Before editing files:
+- Check the current git branch.
+- If on main, create a new branch named `stage-0-project-setup`.
+- Do not work directly on main.
+
 Requirements:
 - Create the project structure.
 - Add README.md.
@@ -100,7 +177,7 @@ At the end, summarize:
 - changed files
 - commands to run
 - what I should learn from this stage
-- suggested git commit message
+- exact git status / git add / git commit / git push commands
 ```
 
 ---
@@ -109,6 +186,7 @@ At the end, summarize:
 
 ```text
 Continue to Stage 1 only. Do not jump ahead.
+Before editing files, create or switch to branch `stage-1-backend-database` if needed. Do not work directly on main.
 
 Goal:
 Implement backend data models and SQLite persistence for Trading Discipline Copilot.
@@ -167,7 +245,7 @@ At the end, summarize:
 - how to run Alembic migration
 - how to run tests
 - what I should learn from this stage
-- suggested git commit message
+- exact git status / git add / git commit / git push commands
 ```
 
 ---
@@ -176,6 +254,7 @@ At the end, summarize:
 
 ```text
 Continue to Stage 2 only. Do not jump ahead.
+Before editing files, create or switch to branch `stage-2-rule-engine` if needed. Do not work directly on main.
 
 Goal:
 Turn the trading discipline rules into machine-readable YAML and implement the first rule engine.
@@ -211,7 +290,7 @@ At the end, summarize:
 - how the rule engine works
 - how to run tests
 - what I should learn from this stage
-- suggested git commit message
+- exact git status / git add / git commit / git push commands
 ```
 
 ---
@@ -220,6 +299,7 @@ At the end, summarize:
 
 ```text
 Continue to Stage 3 only. Do not jump ahead.
+Before editing files, create or switch to branch `stage-3-api-contracts` if needed. Do not work directly on main.
 
 Goal:
 Expose backend APIs needed by the frontend.
@@ -261,7 +341,7 @@ At the end, include:
 - example curl commands
 - how to run tests
 - what I should learn about REST API design
-- suggested git commit message
+- exact git status / git add / git commit / git push commands
 ```
 
 ---
@@ -270,6 +350,7 @@ At the end, include:
 
 ```text
 Continue to Stage 4 only. Do not jump ahead.
+Before editing files, create or switch to branch `stage-4-frontend-shell` if needed. Do not work directly on main.
 
 Goal:
 Create the React + TypeScript frontend shell for Trading Discipline Copilot.
@@ -295,7 +376,7 @@ At the end, summarize:
 - how to run frontend
 - how frontend talks to backend
 - what React concepts I should learn here
-- suggested git commit message
+- exact git status / git add / git commit / git push commands
 ```
 
 ---
@@ -304,6 +385,7 @@ At the end, summarize:
 
 ```text
 Continue to Stage 5 only. Do not jump ahead.
+Before editing files, create or switch to branch `stage-5-pre-trade-checklist` if needed. Do not work directly on main.
 
 Goal:
 Implement the New Trade Checklist page, which is the most important MVP feature.
@@ -352,7 +434,7 @@ At the end, summarize:
 - how rule alerts are rendered
 - how to test manually in the browser
 - what I should learn from this stage
-- suggested git commit message
+- exact git status / git add / git commit / git push commands
 ```
 
 ---
@@ -361,6 +443,7 @@ At the end, summarize:
 
 ```text
 Continue to Stage 6 only. Do not jump ahead.
+Before editing files, create or switch to branch `stage-6-open-trade-management` if needed. Do not work directly on main.
 
 Goal:
 Implement Open Trade Management for trades that are already open.
@@ -408,7 +491,7 @@ At the end, summarize:
 - whether local state, Context, or Zustand is being used and why
 - manual testing steps
 - what I should learn from this stage
-- suggested git commit message
+- exact git status / git add / git commit / git push commands
 ```
 
 ---
@@ -417,6 +500,7 @@ At the end, summarize:
 
 ```text
 Continue to Stage 7 only. Do not jump ahead.
+Before editing files, create or switch to branch `stage-7-post-trade-review` if needed. Do not work directly on main.
 
 Goal:
 Implement post-trade review and discipline scoring.
@@ -460,7 +544,7 @@ At the end, summarize:
 - tests added
 - why trade quality is different from PnL
 - what I should learn from this stage
-- suggested git commit message
+- exact git status / git add / git commit / git push commands
 ```
 
 ---
@@ -469,6 +553,7 @@ At the end, summarize:
 
 ```text
 Continue to Stage 8 only. Do not jump ahead.
+Before editing files, create or switch to branch `stage-8-dashboard-daily-summary` if needed. Do not work directly on main.
 
 Goal:
 Implement Dashboard and Daily Discipline Summary.
@@ -493,7 +578,7 @@ At the end, summarize:
 - how dashboard cards are rendered
 - how to test with sample trades
 - what I should learn from this stage
-- suggested git commit message
+- exact git status / git add / git commit / git push commands
 ```
 
 ---
@@ -502,6 +587,7 @@ At the end, summarize:
 
 ```text
 Continue to Stage 9 only. Do not jump ahead.
+Before editing files, create or switch to branch `stage-9-rules-library` if needed. Do not work directly on main.
 
 Goal:
 Implement the Rules Library page so the trading rules are visible and searchable.
@@ -529,7 +615,7 @@ At the end, summarize:
 - how YAML rules become UI cards
 - how filters work
 - what I should learn from this stage
-- suggested git commit message
+- exact git status / git add / git commit / git push commands
 ```
 
 ---
@@ -538,6 +624,7 @@ At the end, summarize:
 
 ```text
 Continue to Stage 10 only. Do not jump ahead.
+Before editing files, create or switch to branch `stage-10-csv-import-preview` if needed. Do not work directly on main.
 
 Goal:
 Add a CSV import workflow for future semi-automated review, without connecting to any real broker or placing trades.
@@ -566,7 +653,7 @@ At the end, summarize:
 - how import works
 - why this is for review only, not auto-trading
 - what I should learn from this stage
-- suggested git commit message
+- exact git status / git add / git commit / git push commands
 ```
 
 ---
@@ -575,6 +662,7 @@ At the end, summarize:
 
 ```text
 Continue to Stage 11 only. Do not jump ahead.
+Before editing files, create or switch to branch `stage-11-polish-tests-readme` if needed. Do not work directly on main.
 
 Goal:
 Polish the MVP so it is maintainable and useful as a long-term learning project.
@@ -611,7 +699,7 @@ At the end, summarize:
 - final test commands
 - known limitations
 - what I learned across the whole project
-- suggested git commit message
+- exact git status / git add / git commit / git push commands
 ```
 
 ---
@@ -716,16 +804,35 @@ What we should build in the next stage.
 ## 18. Git Commit 总结 Prompt
 
 ```text
-Please summarize the current stage for a git commit.
+Please summarize the current stage for git commit and GitHub push.
 
 Give me:
-1. git status interpretation
-2. files changed grouped by purpose
-3. one recommended commit message
-4. one slightly more detailed commit message option
-5. commands to run before committing
+1. current branch interpretation and whether it matches this stage
+2. git status interpretation
+3. files changed grouped by purpose
+4. one recommended conventional commit message
+5. one slightly more detailed commit message option
+6. commands to run before committing
+7. exact commands to commit and push this branch to GitHub
 
-Do not run git commands for me unless I explicitly ask.
+Use this final format:
+
+```bash
+# Verify
+[tests/build commands]
+
+# Inspect
+git status
+
+# Commit
+git add [files]
+git commit -m "type(scope): summary"
+
+# Push branch to GitHub
+git push -u origin [current-branch]
+```
+
+Do not run `git commit` or `git push` unless I explicitly ask.
 ```
 
 ---
@@ -924,6 +1031,7 @@ Engineering mode requirements:
 - Work one stage at a time.
 - Keep scope small and production-like.
 - Do not jump ahead.
+- Before coding, check the current git branch and create or switch to a stage-specific branch. Do not work directly on main.
 - Before coding, list files/directories that you will NOT modify in this stage.
 - Before coding, self-review your plan against product_design.md and state what is deferred.
 - Separate API routes, schemas, services, database, and rule engine logic.
@@ -932,7 +1040,7 @@ Engineering mode requirements:
 - Do not put all UI logic into App.tsx.
 - Use clear error handling.
 - Add docs or learning_log updates when behavior changes.
-- At the end, explain engineering tradeoffs, changed files, verification commands, tests, and suggested conventional commit message.
+- At the end, explain engineering tradeoffs, changed files, verification commands, tests, and exact git status / git add / git commit / git push commands.
 
 This project is a discipline tool, not an auto-trading bot.
 Do not implement automated order execution.
@@ -962,6 +1070,8 @@ Engineering requirements:
 - Update docs/learning_log.md with what I should learn.
 
 Before coding:
+- check the current git branch;
+- create or switch to a stage-specific branch if needed;
 - briefly state the plan;
 - list files/directories you will modify;
 - list files/directories you will NOT modify;
@@ -973,7 +1083,7 @@ After coding, summarize:
 - tests added or updated
 - engineering concepts I should learn
 - trading discipline concepts encoded
-- suggested git commit message
+- exact git status / git add / git commit / git push commands
 ```
 
 ---
