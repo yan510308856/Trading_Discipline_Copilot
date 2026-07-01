@@ -40,3 +40,50 @@ The source documents initially lived at the project root rather than in `docs/`.
 ### Next stage
 
 Stage 1 will add the FastAPI foundation, SQLAlchemy models, SQLite persistence, Alembic migrations, and a minimal database test.
+
+## Stage 1 - Backend models and SQLite persistence
+
+### Date
+
+2026-07-01
+
+### What changed
+
+- Added a minimal FastAPI application with a health endpoint.
+- Defined SQLAlchemy models for trades, alerts, reviews, and checklist answers.
+- Added Pydantic schemas to validate service-layer inputs and outputs.
+- Configured local SQLite sessions and Alembic migrations.
+- Added a service that persists a new trade in the `planned` state.
+
+### Commands I ran
+
+```bash
+cd backend
+alembic upgrade head
+pytest
+```
+
+### Tests
+
+- Health endpoint returns an OK response.
+- Initial migration creates all four domain tables and Alembic metadata.
+- Trade service persists and reloads a planned trade.
+
+### Engineering concepts learned
+
+- SQLAlchemy models describe storage; Pydantic schemas validate data crossing boundaries.
+- A database session groups persistence work into a transaction.
+- Alembic migrations version the schema instead of silently rebuilding it at startup.
+- A service keeps business operations separate from HTTP routes.
+
+### Trading discipline concepts encoded
+
+A trade begins as a plan. Alerts, checklist answers, and a review belong to that trade record, creating the foundation for the full discipline lifecycle.
+
+### Bugs / debugging notes
+
+The migration test uses an isolated temporary SQLite file, so tests never modify the developer's local database.
+
+### Next stage
+
+Stage 2 will encode selected discipline rules in YAML and evaluate them with a tested rule engine.
