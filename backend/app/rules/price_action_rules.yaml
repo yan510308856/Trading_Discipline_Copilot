@@ -1,0 +1,155 @@
+version: 1
+rules:
+  - id: every_order_must_have_stop_loss
+    name: Every planned order must have a stop loss
+    category: risk_control
+    stage: pre_trade
+    severity: blocker
+    trigger:
+      status: planned
+    conditions:
+      - field: stop_loss
+        operator: missing
+    message: A planned trade must have a structural stop loss before entry.
+    checklist:
+      - Is the stop loss set?
+      - Does it mark the point where the setup is invalid?
+    discipline_sentence: No stop loss, no trade.
+    enabled: true
+
+  - id: no_reverse_trade_immediately_after_stop_loss
+    name: Do not reverse immediately after a stop loss
+    category: emotional_control
+    stage: pre_trade
+    severity: blocker
+    trigger:
+      status: planned
+    conditions:
+      - field: recent_stop_loss
+        operator: equals
+        value: true
+      - field: is_immediate_reverse
+        operator: equals
+        value: true
+    message: Pause and reassess before reversing immediately after a stop loss.
+    checklist:
+      - Is the reverse supported by a new setup?
+      - Have you paused long enough to avoid a revenge trade?
+    discipline_sentence: A stop is information, not an invitation to retaliate.
+    enabled: true
+
+  - id: breakout_needs_follow_through
+    name: A breakout needs follow-through
+    category: price_action
+    stage: pre_trade
+    severity: warning
+    trigger:
+      setup: breakout
+    conditions:
+      - field: follow_through_confirmed
+        operator: equals
+        value: false
+    message: The breakout does not yet have confirmed follow-through.
+    checklist:
+      - Was the breakout bar strong?
+      - Did the next price action confirm the breakout?
+    discipline_sentence: The breakout is not the signal; follow-through is confirmation.
+    enabled: true
+
+  - id: trading_range_second_leg_trap
+    name: Avoid the trading-range second-leg trap
+    category: trading_range
+    stage: pre_trade
+    severity: warning
+    trigger:
+      market_context: trading_range
+    conditions:
+      - field: second_leg_entry
+        operator: equals
+        value: true
+    message: A second-leg entry inside a trading range has elevated trap risk.
+    checklist:
+      - Is price near the edge or in the middle of the range?
+      - Is there room before the opposite side of the range?
+    discipline_sentence: In a range, assume disappointment before continuation.
+    enabled: true
+
+  - id: trading_range_big_bar_reversal_risk
+    name: Treat big bars in a trading range as reversal risk
+    category: trading_range
+    stage: pre_trade
+    severity: warning
+    trigger:
+      market_context: trading_range
+    conditions:
+      - field: big_bar_entry
+        operator: equals
+        value: true
+    message: Chasing a large bar inside a trading range carries reversal risk.
+    checklist:
+      - Are you buying high or selling low in the range?
+      - Can you wait for a pullback or confirmation?
+    discipline_sentence: A big bar in a range often creates urgency, not edge.
+    enabled: true
+
+  - id: take_profit_and_let_runner_run
+    name: Take partial profit at one R and keep a runner
+    category: trade_management
+    stage: in_trade
+    severity: reminder
+    trigger:
+      status: open
+    conditions:
+      - field: current_r
+        operator: greater_than_or_equal
+        value: 1
+      - field: partial_taken
+        operator: equals
+        value: false
+    message: The trade has reached 1R; consider taking partial profit and keeping a runner.
+    checklist:
+      - Has partial profit been recorded?
+      - Is the remaining position sized and protected appropriately?
+    discipline_sentence: Pay yourself at the planned milestone, then let the runner work.
+    enabled: true
+
+  - id: green_trade_should_not_go_red
+    name: Do not let a green trade turn red without review
+    category: trade_management
+    stage: in_trade
+    severity: reminder
+    trigger:
+      status: open
+    conditions:
+      - field: mfe_r
+        operator: greater_than
+        value: 0
+      - field: current_r
+        operator: less_than
+        value: 0
+    message: This trade was profitable and is now below entry; reassess the management plan.
+    checklist:
+      - Is the original setup still valid?
+      - Should the stop have been advanced by structure?
+    discipline_sentence: Protect earned opportunity without smothering the trade.
+    enabled: true
+
+  - id: runner_must_have_protection
+    name: An active runner must have protection
+    category: trade_management
+    stage: in_trade
+    severity: warning
+    trigger:
+      status: open
+    conditions:
+      - field: runner_active
+        operator: equals
+        value: true
+      - field: runner_stop
+        operator: missing
+    message: The active runner does not have a protective stop.
+    checklist:
+      - Is the runner stop recorded?
+      - Does the stop protect profit without ignoring market structure?
+    discipline_sentence: A runner earns freedom only after its risk is protected.
+    enabled: true
