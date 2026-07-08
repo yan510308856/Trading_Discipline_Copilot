@@ -240,6 +240,85 @@ def test_review_veto_scores_zero_and_flags_bad_winner(api_client: TestClient) ->
     assert response.json()["veto_reason"]
 
 
+def test_daily_summary_aggregates_mistakes_and_lessons(
+    api_client: TestClient,
+) -> None:
+    first = create_trade(api_client)
+    api_client.post(f"/trades/{first['id']}/open", json={})
+    api_client.post(
+        f"/trades/{first['id']}/close",
+        json={"exit_price": 5020, "exit_reason": "target_hit"},
+    )
+    api_client.post(
+        f"/trades/{first['id']}/review",
+        json={
+            "exit_price": 5020,
+            "exit_reason": "target_hit",
+            "followed_plan": "partial",
+            "mistake_tags": [
+                "green_trade_to_red_without_review",
+                "revenge_reverse_after_stop",
+            ],
+            "lesson": "Pause after a stopped trade.",
+        },
+    )
+
+    second = create_trade(api_client)
+    api_client.post(f"/trades/{second['id']}/open", json={})
+    api_client.post(
+        f"/trades/{second['id']}/close",
+        json={"exit_price": 4990, "exit_reason": "stop_hit"},
+    )
+    api_client.post(
+        f"/trades/{second['id']}/review",
+        json={
+            "exit_price": 4990,
+            "exit_reason": "stop_hit",
+            "followed_plan": "yes",
+            "mistake_tags": ["green_trade_to_red_without_review"],
+            "lesson": "Protect open profit earlier.",
+        },
+    )
+
+    response = api_client.get("/summary/daily")
+    summary = response.json()
+
+    assert response.status_code == 200
+    assert summary["total_trades"] == 2
+    assert summary["net_r"] == 1.0
+    assert summary["average_discipline_score"] == 70.0
+    assert summary["warning_violation_count"] == 3
+    assert summary["green_to_red_count"] == 2
+    assert summary["revenge_trade_count"] == 1
+    assert summary["most_frequent_mistakes"] == [
+        {"tag": "green_trade_to_red_without_review", "count": 2},
+        {"tag": "revenge_reverse_after_stop", "count": 1},
+    ]
+    assert set(summary["lessons"]) == {
+        "Pause after a stopped trade.",
+        "Protect open profit earlier.",
+    }
+
+
+def test_daily_summary_empty_state_for_date_without_trades(
+    api_client: TestClient,
+) -> None:
+    response = api_client.get("/summary/daily?date=2000-01-01")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "date": "2000-01-01",
+        "total_trades": 0,
+        "net_r": 0.0,
+        "average_discipline_score": None,
+        "warning_violation_count": 0,
+        "green_to_red_count": 0,
+        "revenge_trade_count": 0,
+        "most_frequent_mistakes": [],
+        "lessons": [],
+    }
+
+
 def test_only_closed_trade_can_be_reviewed(api_client: TestClient) -> None:
     created = create_trade(api_client)
 
