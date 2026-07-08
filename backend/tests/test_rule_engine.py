@@ -1,0 +1,105 @@
+from app.services.rule_engine import RuleEngine, evaluate_trade, load_rules
+
+
+def alert_ids(result: dict) -> set[str]:
+    return {alert["rule_id"] for alert in result["alerts"]}
+
+
+def test_yaml_contains_all_mvp_rules() -> None:
+    rule_ids = {rule["id"] for rule in load_rules()}
+
+    assert rule_ids == {
+        "every_order_must_have_stop_loss",
+        "no_reverse_trade_immediately_after_stop_loss",
+        "breakout_needs_follow_through",
+        "trading_range_second_leg_trap",
+        "trading_range_big_bar_reversal_risk",
+        "take_profit_and_let_runner_run",
+        "green_trade_should_not_go_red",
+        "runner_must_have_protection",
+    }
+
+
+def test_missing_stop_loss_blocks_planned_trade() -> None:
+    result = evaluate_trade({"status": "planned", "stop_loss": None})
+
+    assert result["status"] == "blocked"
+    assert alert_ids(result) == {"every_order_must_have_stop_loss"}
+    assert result["alerts"][0]["severity"] == "blocker"
+    assert result["alerts"][0]["checklist"]
+    assert result["alerts"][0]["discipline_sentence"]
+
+
+def test_breakout_without_follow_through_returns_warning() -> None:
+    result = evaluate_trade(
+        {
+            "status": "planned",
+            "stop_loss": 4990,
+            "setup": "breakout",
+            "follow_through_confirmed": False,
+        }
+    )
+
+    assert result["status"] == "warning"
+    assert alert_ids(result) == {"breakout_needs_follow_through"}
+    assert result["alerts"][0]["severity"] == "warning"
+
+
+def test_open_trade_at_one_r_returns_partial_profit_reminder() -> None:
+    result = evaluate_trade(
+        {"status": "open", "current_r": 1, "partial_taken": False}
+    )
+
+    assert result["status"] == "warning"
+    assert alert_ids(result) == {"take_profit_and_let_runner_run"}
+    assert result["alerts"][0]["severity"] == "reminder"
+
+
+def test_active_runner_without_stop_returns_warning() -> None:
+    result = evaluate_trade(
+        {"status": "open", "runner_active": True, "runner_stop": None}
+    )
+
+    assert result["status"] == "warning"
+    assert alert_ids(result) == {"runner_must_have_protection"}
+
+
+def test_trade_without_violations_is_allowed() -> None:
+    result = evaluate_trade(
+        {
+            "status": "planned",
+            "stop_loss": 4990,
+            "setup": "breakout",
+            "follow_through_confirmed": True,
+        }
+    )
+
+    assert result == {"status": "allowed", "alerts": []}
+
+
+def test_compare_field_condition_compares_two_trade_values() -> None:
+    rules = [
+        {
+            "id": "long_target_below_entry",
+            "severity": "blocker",
+            "trigger": {"direction": "long"},
+            "conditions": [
+                {
+                    "field": "target_1",
+                    "operator": "less_than_field",
+                    "compare_field": "planned_entry",
+                }
+            ],
+            "message": "A long target must be above entry.",
+            "checklist": ["Is the target above entry?"],
+            "discipline_sentence": "Validate price direction before submitting.",
+            "enabled": True,
+        }
+    ]
+
+    result = RuleEngine(rules).evaluate(
+        {"direction": "long", "planned_entry": 5000, "target_1": 4990}
+    )
+
+    assert result["status"] == "blocked"
+    assert alert_ids(result) == {"long_target_below_entry"}
