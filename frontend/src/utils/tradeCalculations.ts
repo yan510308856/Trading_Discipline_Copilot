@@ -22,3 +22,32 @@ export function calculateRiskReward(
     targetR: risk > 0 ? targetDistance / risk : Number.NaN,
   };
 }
+
+export function calculateCurrentR(
+  direction: Direction,
+  entry: number,
+  initialStop: number,
+  currentPrice: number,
+): number {
+  const risk =
+    direction === "long" ? entry - initialStop : initialStop - entry;
+  if (risk <= 0) return Number.NaN;
+
+  return direction === "long"
+    ? (currentPrice - entry) / risk
+    : (entry - currentPrice) / risk;
+}
+
+export function calculatePositionBreakdown(
+  initialQuantity: number | null,
+  partialExitQuantity: number,
+): { initial: number | null; taken: number; runner: number | null } {
+  return {
+    initial: initialQuantity,
+    taken: partialExitQuantity,
+    runner:
+      initialQuantity === null
+        ? null
+        : Math.max(initialQuantity - partialExitQuantity, 0),
+  };
+}

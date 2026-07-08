@@ -71,6 +71,33 @@ export interface Trade extends TradeCreatePayload {
   status: "planned" | "open" | "closed" | "cancelled";
   created_at: string;
   updated_at: string;
+  actual_entry: number | null;
+  current_stop: number | null;
+  current_price: number | null;
+  runner_active: boolean;
+  runner_stop: number | null;
+  partial_taken: boolean;
+  partial_exit_quantity: number;
+  exit_price: number | null;
+  exit_reason: string | null;
+  final_r: number | null;
+}
+
+export interface TradePatchPayload {
+  current_stop?: number | null;
+  current_price?: number | null;
+  runner_enabled?: boolean;
+  runner_active?: boolean;
+  runner_stop?: number | null;
+  partial_taken?: boolean;
+  partial_exit_quantity?: number;
+  notes?: string | null;
+}
+
+export interface TradeClosePayload {
+  exit_price: number;
+  exit_reason: string;
+  final_r?: number | null;
 }
 
 export interface RuleAlert {

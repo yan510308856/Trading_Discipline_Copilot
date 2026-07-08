@@ -16,10 +16,19 @@ def test_health_check() -> None:
 
 
 def test_migration_creates_core_tables(database_session: Session) -> None:
-    table_names = set(inspect(database_session.bind).get_table_names())
+    inspector = inspect(database_session.bind)
+    table_names = set(inspector.get_table_names())
 
     assert {"trades", "alerts", "reviews", "checklist_answers"} <= table_names
     assert "alembic_version" in table_names
+    trade_columns = {column["name"] for column in inspector.get_columns("trades")}
+    assert {
+        "current_stop",
+        "current_price",
+        "runner_stop",
+        "partial_taken",
+        "partial_exit_quantity",
+    } <= trade_columns
 
 
 def test_create_planned_trade(database_session: Session) -> None:

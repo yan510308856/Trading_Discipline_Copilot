@@ -39,7 +39,26 @@ def update_trade(
     database: Session, trade_id: int, trade_data: schemas.TradePatch
 ) -> models.Trade:
     trade = get_trade(database, trade_id)
-    for field, value in trade_data.model_dump(exclude_unset=True).items():
+    updates = trade_data.model_dump(exclude_unset=True)
+    partial_quantity = updates.get("partial_exit_quantity")
+    if (
+        partial_quantity is not None
+        and trade.position_size is not None
+        and partial_quantity > trade.position_size
+    ):
+        raise APIError(
+            422,
+            "INVALID_PARTIAL_QUANTITY",
+            "Partial exit quantity cannot exceed the initial position size.",
+            {
+                "partial_exit_quantity": partial_quantity,
+                "position_size": trade.position_size,
+            },
+        )
+    if partial_quantity is not None:
+        updates["partial_taken"] = partial_quantity > 0
+
+    for field, value in updates.items():
         setattr(trade, field, value)
     database.commit()
     database.refresh(trade)
@@ -66,6 +85,7 @@ def open_trade(
         if trade_data.actual_entry is None
         else trade_data.actual_entry
     )
+    trade.current_stop = trade.stop_loss
     trade.status = "open"
     database.commit()
     database.refresh(trade)
