@@ -1456,3 +1456,151 @@ textarea {
     grid-template-columns: 30% 1fr 28%;
   }
 }
+
+.dashboard-summary {
+  margin-top: 22px;
+  padding: 25px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+}
+
+.section-heading,
+.daily-summary-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 22px;
+  margin-bottom: 22px;
+}
+
+.top-mistake-badge {
+  max-width: 360px;
+  padding: 7px 10px;
+  color: #795a1f;
+  background: #f5e7c4;
+  border-radius: 999px;
+  font-size: 11px;
+  text-transform: capitalize;
+}
+
+.summary-card-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.summary-metric-card {
+  display: grid;
+  gap: 9px;
+  min-height: 105px;
+  padding: 18px;
+  background: #edf3ef;
+  border: 1px solid #d7e1da;
+  border-radius: 12px;
+}
+
+.summary-metric-card span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.summary-metric-card strong {
+  align-self: end;
+  color: var(--forest);
+  font-size: clamp(24px, 3vw, 34px);
+}
+
+.daily-summary-page {
+  max-width: 1050px;
+  margin: 0 auto;
+}
+
+.daily-summary-heading h2 {
+  max-width: 720px;
+  font-size: clamp(32px, 4vw, 48px);
+}
+
+.daily-summary-heading label {
+  display: grid;
+  flex: 0 0 190px;
+  gap: 7px;
+  color: #526159;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.daily-review-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.daily-detail-card {
+  padding: 24px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+}
+
+.frequency-list,
+.lesson-list {
+  margin: 20px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.frequency-list {
+  display: grid;
+  gap: 9px;
+  counter-reset: mistakes;
+}
+
+.frequency-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 14px;
+  background: #f4f0e5;
+  border-radius: 9px;
+  text-transform: capitalize;
+}
+
+.frequency-list strong {
+  color: #8a6222;
+}
+
+.lesson-list {
+  display: grid;
+  gap: 10px;
+}
+
+.lesson-list li {
+  padding: 13px 14px;
+  color: #46564f;
+  background: #edf3ef;
+  border-left: 3px solid #4b806a;
+  border-radius: 8px;
+  line-height: 1.5;
+}
+
+@media (max-width: 760px) {
+  .section-heading,
+  .daily-summary-heading {
+    display: grid;
+  }
+
+  .summary-card-grid,
+  .daily-review-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .daily-summary-heading label {
+    width: 100%;
+  }
+}

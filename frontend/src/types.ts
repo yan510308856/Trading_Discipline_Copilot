@@ -17,6 +17,23 @@ export interface HealthResponse {
   status: "ok";
 }
 
+export interface MistakeFrequency {
+  tag: string;
+  count: number;
+}
+
+export interface DailySummaryData {
+  date: string;
+  total_trades: number;
+  net_r: number;
+  average_discipline_score: number | null;
+  warning_violation_count: number;
+  green_to_red_count: number;
+  revenge_trade_count: number;
+  most_frequent_mistakes: MistakeFrequency[];
+  lessons: string[];
+}
+
 export type ConnectionState = "checking" | "connected" | "unavailable";
 
 export type Market =

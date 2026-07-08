@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime, time, timezone
-
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from app import models, schemas
@@ -156,23 +154,3 @@ def cancel_trade(database: Session, trade_id: int) -> models.Trade:
     database.commit()
     database.refresh(trade)
     return trade
-
-
-def daily_summary(database: Session, summary_date: date | None = None) -> dict:
-    selected_date = summary_date or datetime.now(timezone.utc).date()
-    start = datetime.combine(selected_date, time.min, tzinfo=timezone.utc)
-    end = datetime.combine(selected_date, time.max, tzinfo=timezone.utc)
-    statement = select(
-        func.count(models.Trade.id),
-        func.coalesce(func.sum(models.Trade.final_r), 0.0),
-        func.avg(models.Trade.discipline_score),
-    ).where(models.Trade.created_at.between(start, end))
-    total, net_r, average_score = database.execute(statement).one()
-    return {
-        "date": selected_date.isoformat(),
-        "total_trades": total,
-        "net_r": float(net_r),
-        "average_discipline_score": (
-            float(average_score) if average_score is not None else None
-        ),
-    }

@@ -1,14 +1,17 @@
 """HTTP routes for trades, rules, reviews, and summaries."""
 
-from typing import Annotated, Any
+from __future__ import annotations
 
-from fastapi import APIRouter, Depends, status
+from datetime import date
+from typing import Annotated, Any, Optional
+
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy import inspect
 from sqlalchemy.orm import Session
 
 from app import models, schemas
 from app.database import get_db
-from app.services import review_service, trade_service
+from app.services import review_service, summary_service, trade_service
 from app.services.rule_engine import evaluate_trade, load_rules
 
 
@@ -99,5 +102,8 @@ def create_review(
 
 
 @router.get("/summary/daily", response_model=schemas.DailySummary)
-def get_daily_summary(database: Database) -> dict:
-    return trade_service.daily_summary(database)
+def get_daily_summary(
+    database: Database,
+    summary_date: Optional[date] = Query(default=None, alias="date"),
+) -> dict:
+    return summary_service.daily_summary(database, summary_date)

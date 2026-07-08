@@ -187,11 +187,21 @@ class RuleEvaluationResult(BaseModel):
     alerts: list[RuleAlert]
 
 
+class MistakeFrequency(BaseModel):
+    tag: str
+    count: int
+
+
 class DailySummary(BaseModel):
     date: str
     total_trades: int
     net_r: float
     average_discipline_score: Optional[float]
+    warning_violation_count: int
+    green_to_red_count: int
+    revenge_trade_count: int
+    most_frequent_mistakes: list[MistakeFrequency]
+    lessons: list[str]
 
 
 class ChecklistAnswerCreate(BaseModel):
