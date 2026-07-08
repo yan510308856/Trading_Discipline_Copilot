@@ -340,6 +340,21 @@ def test_get_rules(api_client: TestClient) -> None:
 
     assert response.status_code == 200
     assert len(response.json()) == 8
+    assert set(response.json()[0]) == {
+        "id",
+        "name",
+        "category",
+        "stage",
+        "severity",
+        "trigger",
+        "conditions",
+        "message",
+        "checklist",
+        "avoid",
+        "discipline_sentence",
+        "enabled",
+    }
+    assert all(rule["avoid"] for rule in response.json())
 
 
 def test_validation_and_business_errors_use_standard_envelope(

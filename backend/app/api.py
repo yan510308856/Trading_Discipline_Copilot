@@ -64,7 +64,7 @@ def cancel_trade(trade_id: int, database: Database) -> models.Trade:
     return trade_service.cancel_trade(database, trade_id)
 
 
-@router.get("/rules", response_model=list[dict[str, Any]])
+@router.get("/rules", response_model=list[schemas.RuleDefinition])
 def get_rules() -> list[dict[str, Any]]:
     return load_rules()
 
