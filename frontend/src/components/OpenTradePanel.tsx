@@ -298,7 +298,7 @@ function TradeCard({ trade, onUpdated, defaultExpanded }: TradeCardProps) {
           <button className="danger-button" disabled={isSaving || numberOrNull(exitPrice) === null} onClick={() => {
             const price = numberOrNull(exitPrice);
             if (price !== null) {
-              void runAction(() => closeTrade(trade.id, { exit_price: price, exit_reason: exitReason, final_r: currentR }));
+              void runAction(() => closeTrade(trade.id, { exit_price: price, exit_reason: exitReason }));
             }
           }}>Exit Trade</button>
         </div>

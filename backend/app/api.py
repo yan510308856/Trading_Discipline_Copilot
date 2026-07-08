@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from app import models, schemas
 from app.database import get_db
-from app.services import trade_service
+from app.services import review_service, trade_service
 from app.services.rule_engine import evaluate_trade, load_rules
 
 
@@ -95,7 +95,7 @@ def evaluate_rules(
 def create_review(
     trade_id: int, review_data: schemas.ReviewRequest, database: Database
 ) -> models.Review:
-    return trade_service.create_review(database, trade_id, review_data)
+    return review_service.create_review(database, trade_id, review_data)
 
 
 @router.get("/summary/daily", response_model=schemas.DailySummary)

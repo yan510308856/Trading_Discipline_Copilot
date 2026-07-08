@@ -28,6 +28,7 @@ export type Market =
   | "other";
 
 export type Direction = "long" | "short";
+export type FollowedPlan = "yes" | "partial" | "no";
 export type RuleStatus = "allowed" | "warning" | "blocked";
 export type RuleSeverity = "blocker" | "warning" | "reminder";
 
@@ -71,6 +72,8 @@ export interface Trade extends TradeCreatePayload {
   status: "planned" | "open" | "closed" | "cancelled";
   created_at: string;
   updated_at: string;
+  opened_at: string | null;
+  closed_at: string | null;
   actual_entry: number | null;
   current_stop: number | null;
   current_price: number | null;
@@ -81,6 +84,10 @@ export interface Trade extends TradeCreatePayload {
   exit_price: number | null;
   exit_reason: string | null;
   final_r: number | null;
+  followed_plan: FollowedPlan | null;
+  discipline_score: number | null;
+  has_review: boolean;
+  review: Review | null;
 }
 
 export interface TradePatchPayload {
@@ -97,7 +104,33 @@ export interface TradePatchPayload {
 export interface TradeClosePayload {
   exit_price: number;
   exit_reason: string;
-  final_r?: number | null;
+}
+
+export interface ReviewPayload {
+  exit_price: number;
+  exit_reason: string;
+  followed_plan: FollowedPlan;
+  mistake_tags: string[];
+  positive_actions: string[];
+  lesson: string | null;
+  notes: string | null;
+}
+
+export type TradeClassification =
+  | "good_trade_winner"
+  | "good_trade_loser"
+  | "bad_trade_winner"
+  | "bad_trade_loser";
+
+export interface Review extends Omit<ReviewPayload, "exit_price" | "exit_reason"> {
+  id: number;
+  trade_id: number;
+  created_at: string;
+  discipline_score: number;
+  score_band: string;
+  triggered_rules: string[];
+  veto_reason: string | null;
+  trade_classification: TradeClassification;
 }
 
 export interface RuleAlert {

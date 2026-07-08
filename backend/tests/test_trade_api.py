@@ -71,16 +71,52 @@ def test_open_and_close_trade(api_client: TestClient) -> None:
     )
     closed = api_client.post(
         f"/trades/{created['id']}/close",
-        json={"exit_price": 5021, "exit_reason": "target_hit", "final_r": 2.0},
+        json={"exit_price": 5023, "exit_reason": "target_hit"},
     )
 
     assert opened.status_code == 200
     assert opened.json()["status"] == "open"
     assert opened.json()["actual_entry"] == 5001
     assert opened.json()["current_stop"] == 4990
+    assert opened.json()["opened_at"] is not None
+    assert opened.json()["closed_at"] is None
     assert closed.status_code == 200
     assert closed.json()["status"] == "closed"
     assert closed.json()["final_r"] == 2.0
+    assert closed.json()["opened_at"] is not None
+    assert closed.json()["closed_at"] is not None
+
+
+def test_close_calculates_final_r_for_short_trade(api_client: TestClient) -> None:
+    payload = planned_trade_payload() | {
+        "direction": "short",
+        "stop_loss": 5010,
+        "target_1": 4980,
+    }
+    created = api_client.post("/trades", json=payload).json()
+    api_client.post(f"/trades/{created['id']}/open", json={})
+
+    response = api_client.post(
+        f"/trades/{created['id']}/close",
+        json={"exit_price": 4980, "exit_reason": "target_hit"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["final_r"] == 2.0
+
+
+def test_close_rejects_zero_risk_distance(api_client: TestClient) -> None:
+    payload = planned_trade_payload() | {"stop_loss": 5000}
+    created = api_client.post("/trades", json=payload).json()
+    api_client.post(f"/trades/{created['id']}/open", json={})
+
+    response = api_client.post(
+        f"/trades/{created['id']}/close",
+        json={"exit_price": 5020, "exit_reason": "target_hit"},
+    )
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "INVALID_RISK_DISTANCE"
 
 
 def test_patch_persists_open_trade_management_fields(api_client: TestClient) -> None:
@@ -139,24 +175,85 @@ def test_cancel_trade(api_client: TestClient) -> None:
     assert response.json()["status"] == "cancelled"
 
 
-def test_create_review_and_daily_summary(api_client: TestClient) -> None:
+def test_create_review_scores_and_classifies_closed_trade(
+    api_client: TestClient,
+) -> None:
     created = create_trade(api_client)
+    api_client.post(f"/trades/{created['id']}/open", json={})
+    api_client.post(
+        f"/trades/{created['id']}/close",
+        json={"exit_price": 5020, "exit_reason": "target_hit"},
+    )
     review = api_client.post(
         f"/trades/{created['id']}/review",
         json={
-            "followed_plan": True,
-            "discipline_score": 90,
-            "mistake_tags": [],
+            "exit_price": 5020,
+            "exit_reason": "target_hit",
+            "followed_plan": "partial",
+            "mistake_tags": ["chased_breakout_without_ft"],
+            "positive_actions": ["followed_planned_stop"],
             "lesson": "Waited for confirmation.",
+            "notes": "The exit followed structure.",
         },
     )
     summary = api_client.get("/summary/daily")
 
     assert review.status_code == 201
     assert review.json()["trade_id"] == created["id"]
+    assert review.json()["discipline_score"] == 100
+    assert review.json()["score_band"] == "High discipline"
+    assert review.json()["trade_classification"] == "good_trade_winner"
+    assert review.json()["veto_reason"] is None
+    assert "completed_post_trade_review" in review.json()["positive_actions"]
+    stored_trade = api_client.get(f"/trades/{created['id']}").json()
+    assert stored_trade["has_review"] is True
+    assert stored_trade["final_r"] == 2.0
+    assert stored_trade["review"]["discipline_score"] == 100
     assert summary.status_code == 200
     assert summary.json()["total_trades"] == 1
-    assert summary.json()["average_discipline_score"] == 90
+    assert summary.json()["average_discipline_score"] == 100
+
+
+def test_review_veto_scores_zero_and_flags_bad_winner(api_client: TestClient) -> None:
+    created = create_trade(api_client)
+    api_client.post(f"/trades/{created['id']}/open", json={})
+    api_client.post(
+        f"/trades/{created['id']}/close",
+        json={"exit_price": 5020, "exit_reason": "target_hit"},
+    )
+
+    response = api_client.post(
+        f"/trades/{created['id']}/review",
+        json={
+            "exit_price": 5020,
+            "exit_reason": "target_hit",
+            "followed_plan": "no",
+            "mistake_tags": ["no_stop_loss"],
+            "positive_actions": ["completed_pre_trade_checklist"],
+            "lesson": "Never enter without defined risk.",
+        },
+    )
+
+    assert response.status_code == 201
+    assert response.json()["discipline_score"] == 0
+    assert response.json()["trade_classification"] == "bad_trade_winner"
+    assert response.json()["veto_reason"]
+
+
+def test_only_closed_trade_can_be_reviewed(api_client: TestClient) -> None:
+    created = create_trade(api_client)
+
+    response = api_client.post(
+        f"/trades/{created['id']}/review",
+        json={
+            "exit_price": 5020,
+            "exit_reason": "target_hit",
+            "followed_plan": "yes",
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "INVALID_TRADE_STATE"
 
 
 def test_get_rules(api_client: TestClient) -> None:

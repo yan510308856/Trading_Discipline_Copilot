@@ -1,5 +1,7 @@
 """Consistent application errors for API and business failures."""
 
+from __future__ import annotations
+
 from typing import Any
 
 

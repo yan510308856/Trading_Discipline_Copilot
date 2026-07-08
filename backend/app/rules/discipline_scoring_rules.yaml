@@ -1,0 +1,37 @@
+base_score: 100
+min_score: 0
+max_score: 100
+good_trade_min_score: 70
+
+veto_rules:
+  - tag: no_stop_loss
+    score: 0
+    reason: Placing a trade without a stop loss breaks the minimum risk-control rule.
+  - tag: revenge_reverse_after_stop_without_new_setup
+    score: 0
+    reason: Reversing after a stop without a new setup is an emotion-driven trade.
+
+penalties:
+  revenge_reverse_after_stop: -30
+  green_trade_to_red_without_review: -25
+  chased_breakout_without_ft: -20
+  tr_extreme_chasing: -20
+  no_trade_plan: -20
+  oversized_position: -20
+  no_post_trade_review: -10
+
+bonuses:
+  completed_pre_trade_checklist: 10
+  followed_planned_stop: 10
+  took_partial_or_protected_runner: 10
+  completed_post_trade_review: 10
+
+score_bands:
+  - min: 90
+    label: High discipline
+  - min: 70
+    label: Acceptable with minor issues
+  - min: 50
+    label: Discipline needs review
+  - min: 0
+    label: High-risk emotional trade
