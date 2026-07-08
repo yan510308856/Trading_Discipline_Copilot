@@ -1,5 +1,7 @@
 """Market-data abstraction reserved for future live quote providers."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import Protocol
 

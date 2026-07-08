@@ -1,9 +1,11 @@
 """Trade persistence and lifecycle operations."""
 
+from __future__ import annotations
+
 from datetime import date, datetime, time, timezone
 
 from sqlalchemy import func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app import models, schemas
 from app.errors import APIError
@@ -20,7 +22,12 @@ def create_planned_trade(database: Session, trade_data: schemas.TradeCreate) -> 
 
 
 def list_trades(database: Session) -> list[models.Trade]:
-    return list(database.scalars(select(models.Trade).order_by(models.Trade.id.desc())))
+    statement = (
+        select(models.Trade)
+        .options(selectinload(models.Trade.review))
+        .order_by(models.Trade.id.desc())
+    )
+    return list(database.scalars(statement))
 
 
 def get_trade(database: Session, trade_id: int) -> models.Trade:
@@ -75,6 +82,39 @@ def _require_status(trade: models.Trade, expected: str, action: str) -> None:
         )
 
 
+def calculate_final_r(trade: models.Trade, exit_price: float) -> float:
+    """Calculate R from entry, initial stop, direction, and exit price."""
+
+    entry_price = (
+        trade.actual_entry
+        if trade.actual_entry is not None
+        else trade.planned_entry
+    )
+    initial_risk = (
+        entry_price - trade.stop_loss
+        if trade.direction == "long"
+        else trade.stop_loss - entry_price
+    )
+    if initial_risk <= 0:
+        raise APIError(
+            422,
+            "INVALID_RISK_DISTANCE",
+            "Stop loss must define positive risk before Final R can be calculated.",
+            {
+                "trade_id": trade.id,
+                "entry_price": entry_price,
+                "stop_loss": trade.stop_loss,
+            },
+        )
+
+    price_change = (
+        exit_price - entry_price
+        if trade.direction == "long"
+        else entry_price - exit_price
+    )
+    return round(price_change / initial_risk, 4)
+
+
 def open_trade(
     database: Session, trade_id: int, trade_data: schemas.TradeOpen
 ) -> models.Trade:
@@ -87,6 +127,7 @@ def open_trade(
     )
     trade.current_stop = trade.stop_loss
     trade.status = "open"
+    trade.opened_at = models.utc_now()
     database.commit()
     database.refresh(trade)
     return trade
@@ -99,8 +140,9 @@ def close_trade(
     _require_status(trade, "open", "closed")
     trade.exit_price = trade_data.exit_price
     trade.exit_reason = trade_data.exit_reason
-    trade.final_r = trade_data.final_r
+    trade.final_r = calculate_final_r(trade, trade_data.exit_price)
     trade.status = "closed"
+    trade.closed_at = models.utc_now()
     trade.runner_active = False
     database.commit()
     database.refresh(trade)
@@ -114,27 +156,6 @@ def cancel_trade(database: Session, trade_id: int) -> models.Trade:
     database.commit()
     database.refresh(trade)
     return trade
-
-
-def create_review(
-    database: Session, trade_id: int, review_data: schemas.ReviewRequest
-) -> models.Review:
-    trade = get_trade(database, trade_id)
-    if trade.review is not None:
-        raise APIError(
-            409,
-            "REVIEW_ALREADY_EXISTS",
-            "This trade already has a review.",
-            {"trade_id": trade_id},
-        )
-
-    review = models.Review(trade_id=trade_id, **review_data.model_dump())
-    trade.followed_plan = review_data.followed_plan
-    trade.discipline_score = review_data.discipline_score
-    database.add(review)
-    database.commit()
-    database.refresh(review)
-    return review
 
 
 def daily_summary(database: Session, summary_date: date | None = None) -> dict:

@@ -11,6 +11,31 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 Market = Literal["futures", "stocks", "crypto", "forex", "options", "other"]
 Direction = Literal["long", "short"]
 TradeStatus = Literal["planned", "open", "closed", "cancelled"]
+FollowedPlan = Literal["yes", "partial", "no"]
+TradeClassification = Literal[
+    "good_trade_winner",
+    "good_trade_loser",
+    "bad_trade_winner",
+    "bad_trade_loser",
+]
+
+
+class ReviewSummary(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    trade_id: int
+    created_at: datetime
+    followed_plan: FollowedPlan
+    discipline_score: int = Field(ge=0, le=100)
+    mistake_tags: list[str]
+    positive_actions: list[str]
+    lesson: Optional[str]
+    notes: Optional[str]
+    score_band: str
+    triggered_rules: list[str]
+    veto_reason: Optional[str]
+    trade_classification: TradeClassification
 
 
 class TradeCreate(BaseModel):
@@ -37,6 +62,8 @@ class TradeRead(TradeCreate):
     id: int
     created_at: datetime
     updated_at: datetime
+    opened_at: Optional[datetime]
+    closed_at: Optional[datetime]
     status: TradeStatus
     current_stop: Optional[float]
     current_price: Optional[float]
@@ -46,8 +73,10 @@ class TradeRead(TradeCreate):
     exit_price: Optional[float]
     exit_reason: Optional[str]
     final_r: Optional[float]
-    followed_plan: Optional[bool]
+    followed_plan: Optional[FollowedPlan]
     discipline_score: Optional[int]
+    has_review: bool
+    review: Optional[ReviewSummary]
 
 
 class TradePatch(BaseModel):
@@ -105,7 +134,6 @@ class TradeOpen(BaseModel):
 class TradeClose(BaseModel):
     exit_price: float
     exit_reason: str = Field(min_length=1, max_length=128)
-    final_r: Optional[float] = None
 
 
 class AlertCreate(BaseModel):
@@ -123,26 +151,18 @@ class AlertRead(AlertCreate):
     acknowledged: bool
 
 
-class ReviewCreate(BaseModel):
-    trade_id: int
-    followed_plan: bool
-    discipline_score: Optional[int] = Field(default=None, ge=0, le=100)
-    mistake_tags: list[str] = Field(default_factory=list)
-    lesson: Optional[str] = None
-
-
-class ReviewRead(ReviewCreate):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: int
-    created_at: datetime
+class ReviewRead(ReviewSummary):
+    pass
 
 
 class ReviewRequest(BaseModel):
-    followed_plan: bool
-    discipline_score: Optional[int] = Field(default=None, ge=0, le=100)
+    exit_price: float
+    exit_reason: str = Field(min_length=1, max_length=128)
+    followed_plan: FollowedPlan
     mistake_tags: list[str] = Field(default_factory=list)
+    positive_actions: list[str] = Field(default_factory=list)
     lesson: Optional[str] = None
+    notes: Optional[str] = None
 
 
 class RuleEvaluationRequest(BaseModel):

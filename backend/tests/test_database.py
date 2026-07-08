@@ -28,7 +28,20 @@ def test_migration_creates_core_tables(database_session: Session) -> None:
         "runner_stop",
         "partial_taken",
         "partial_exit_quantity",
+        "opened_at",
+        "closed_at",
     } <= trade_columns
+    review_columns = {
+        column["name"] for column in inspector.get_columns("reviews")
+    }
+    assert {
+        "positive_actions",
+        "notes",
+        "score_band",
+        "triggered_rules",
+        "veto_reason",
+        "trade_classification",
+    } <= review_columns
 
 
 def test_create_planned_trade(database_session: Session) -> None:

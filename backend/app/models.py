@@ -23,6 +23,12 @@ class Trade(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, onupdate=utc_now
     )
+    opened_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    closed_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     symbol: Mapped[str] = mapped_column(String(32), index=True)
     market: Mapped[str] = mapped_column(String(32))
     direction: Mapped[str] = mapped_column(String(8))
@@ -46,7 +52,7 @@ class Trade(Base):
     exit_price: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     exit_reason: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
     final_r: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-    followed_plan: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
+    followed_plan: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)
     discipline_score: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
@@ -59,6 +65,10 @@ class Trade(Base):
     review: Mapped[Optional["Review"]] = relationship(
         back_populates="trade", cascade="all, delete-orphan", uselist=False
     )
+
+    @property
+    def has_review(self) -> bool:
+        return self.review is not None
 
 
 class Alert(Base):
@@ -83,10 +93,16 @@ class Review(Base):
         ForeignKey("trades.id", ondelete="CASCADE"), unique=True
     )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
-    followed_plan: Mapped[bool] = mapped_column(Boolean)
+    followed_plan: Mapped[str] = mapped_column(String(16))
     discipline_score: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     mistake_tags: Mapped[list[str]] = mapped_column(JSON, default=list)
+    positive_actions: Mapped[list[str]] = mapped_column(JSON, default=list)
     lesson: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    score_band: Mapped[str] = mapped_column(String(64))
+    triggered_rules: Mapped[list[str]] = mapped_column(JSON, default=list)
+    veto_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    trade_classification: Mapped[str] = mapped_column(String(32))
 
     trade: Mapped[Trade] = relationship(back_populates="review")
 

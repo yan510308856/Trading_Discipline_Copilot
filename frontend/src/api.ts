@@ -1,6 +1,8 @@
 import type {
   APIErrorEnvelope,
   HealthResponse,
+  Review,
+  ReviewPayload,
   RuleEvaluationResult,
   Trade,
   TradeClosePayload,
@@ -107,5 +109,15 @@ export function closeTrade(
   return apiRequest<Trade>(`/trades/${tradeId}/close`, {
     method: "POST",
     body: JSON.stringify(closeData),
+  });
+}
+
+export function createReview(
+  tradeId: number,
+  review: ReviewPayload,
+): Promise<Review> {
+  return apiRequest<Review>(`/trades/${tradeId}/review`, {
+    method: "POST",
+    body: JSON.stringify(review),
   });
 }
