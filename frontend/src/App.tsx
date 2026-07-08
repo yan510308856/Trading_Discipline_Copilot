@@ -1,13 +1,14 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { DailySummary } from "./components/DailySummary";
 import { Dashboard } from "./components/Dashboard";
 import { OpenTradePanel } from "./components/OpenTradePanel";
 import { PostTradeReview } from "./components/PostTradeReview";
-import { RuleAlertPanel } from "./components/RuleAlertPanel";
+import { OpenTradeAlerts } from "./components/OpenTradeAlerts";
 import { RulesLibrary } from "./components/RulesLibrary";
 import { TradeChecklist } from "./components/TradeChecklist";
 import type { NavigationItem, PageId } from "./types";
+import { hashForPage, pageFromHash } from "./utils/navigation";
 
 const navigation: NavigationItem[] = [
   { id: "dashboard", label: "Dashboard", shortLabel: "Home" },
@@ -22,7 +23,7 @@ const navigation: NavigationItem[] = [
 const pages: Record<PageId, React.ReactNode> = {
   dashboard: <Dashboard />,
   "trade-checklist": <TradeChecklist />,
-  "rule-alerts": <RuleAlertPanel />,
+  "rule-alerts": <OpenTradeAlerts />,
   "open-trades": <OpenTradePanel />,
   "post-trade-review": <PostTradeReview />,
   "daily-summary": <DailySummary />,
@@ -30,7 +31,20 @@ const pages: Record<PageId, React.ReactNode> = {
 };
 
 export default function App() {
-  const [activePage, setActivePage] = useState<PageId>("dashboard");
+  const [activePage, setActivePage] = useState<PageId>(() =>
+    pageFromHash(window.location.hash),
+  );
+
+  useEffect(() => {
+    const restorePageFromUrl = () => setActivePage(pageFromHash(window.location.hash));
+    window.addEventListener("hashchange", restorePageFromUrl);
+    return () => window.removeEventListener("hashchange", restorePageFromUrl);
+  }, []);
+
+  function navigateTo(page: PageId) {
+    setActivePage(page);
+    window.location.hash = hashForPage(page);
+  }
 
   return (
     <div className="app-shell">
@@ -48,7 +62,7 @@ export default function App() {
             <button
               key={item.id}
               className={activePage === item.id ? "nav-item active" : "nav-item"}
-              onClick={() => setActivePage(item.id)}
+              onClick={() => navigateTo(item.id)}
               aria-current={activePage === item.id ? "page" : undefined}
             >
               <span className="nav-initial" aria-hidden="true">

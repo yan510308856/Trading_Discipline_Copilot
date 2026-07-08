@@ -221,6 +221,25 @@ class RuleEvaluationResult(BaseModel):
     alerts: list[RuleAlert]
 
 
+class QuoteRefreshError(BaseModel):
+    symbol: str
+    message: str
+
+
+class QuoteRefreshResult(BaseModel):
+    trades: list[TradeRead]
+    errors: list[QuoteRefreshError]
+    source: Literal["finnhub", "manual"]
+
+
+class OpenTradeAttention(BaseModel):
+    trade: TradeRead
+    current_r: Optional[float]
+    status: Literal["allowed", "warning", "blocked"]
+    primary_alert: Optional[RuleAlert]
+    alerts: list[RuleAlert]
+
+
 class MistakeFrequency(BaseModel):
     tag: str
     count: int

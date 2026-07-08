@@ -2,6 +2,8 @@ import type {
   APIErrorEnvelope,
   DailySummaryData,
   HealthResponse,
+  OpenTradeAttention,
+  QuoteRefreshResult,
   Review,
   ReviewPayload,
   RuleDefinition,
@@ -70,6 +72,16 @@ export function getDailySummary(date?: string): Promise<DailySummaryData> {
 
 export function getRules(): Promise<RuleDefinition[]> {
   return apiRequest<RuleDefinition[]>("/rules");
+}
+
+export function refreshOpenPrices(): Promise<QuoteRefreshResult> {
+  return apiRequest<QuoteRefreshResult>("/market-data/refresh-open", {
+    method: "POST",
+  });
+}
+
+export function getOpenTradeAttention(): Promise<OpenTradeAttention[]> {
+  return apiRequest<OpenTradeAttention[]>("/rules/open-attention");
 }
 
 export function evaluateRules(

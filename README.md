@@ -16,6 +16,7 @@ or predict market direction.
 - Pre-trade form with blocker, warning, and reminder rules loaded from YAML.
 - Planned and open trade lifecycle stored in SQLite.
 - Open-trade R tracking, stop management, partial-profit recording, and runners.
+- Optional Finnhub quotes for open US stock positions; the API key stays server-side.
 - Post-trade discipline scoring with YAML-configured bonuses, penalties, and vetoes.
 - Persistent post-trade history with date and review-status filters.
 - Confirmed trade deletion with cascading cleanup of owned records.
@@ -34,6 +35,8 @@ or another installation that provides Docker Compose.
 From the repository root:
 
 ```bash
+cp .env.example .env
+# Edit .env and set FINNHUB_API_KEY. Never commit that file.
 docker compose up --build
 ```
 
@@ -212,13 +215,15 @@ docker-compose.yml      Local two-container application
 - Price-action rules: `backend/app/rules/price_action_rules.yaml`
 - Discipline scoring: `backend/app/rules/discipline_scoring_rules.yaml`
 - Frontend API base: set `VITE_API_BASE_URL` when not using the default `/api`
+- Finnhub quote key: set `FINNHUB_API_KEY` in the root `.env`; automatic quotes
+  currently apply only to trades whose market is `stocks`.
 
 ## Known limitations
 
-- No broker connection, market-data feed, order execution, or automated trading.
+- No broker connection, order execution, or automated trading.
 - No authentication or multi-user support; this is a local single-user tool.
 - No CSV import because Stage 10 was skipped.
-- Current prices and partial exits are entered manually.
+- Non-stock prices and all partial exits are entered manually.
 - Weighted Final R requires position size when a trade has partial exits.
 - SQLite timestamps are stored for the local MVP; timezone/reporting policy
   should be made explicit before multi-region deployment.

@@ -187,6 +187,20 @@ export interface RuleEvaluationResult {
   alerts: RuleAlert[];
 }
 
+export interface QuoteRefreshResult {
+  trades: Trade[];
+  errors: Array<{ symbol: string; message: string }>;
+  source: "finnhub" | "manual";
+}
+
+export interface OpenTradeAttention {
+  trade: Trade;
+  current_r: number | null;
+  status: RuleStatus;
+  primary_alert: RuleAlert | null;
+  alerts: RuleAlert[];
+}
+
 export interface APIErrorEnvelope {
   error: {
     code: string;

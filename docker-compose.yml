@@ -4,6 +4,7 @@ services:
       context: ./backend
     environment:
       DATABASE_URL: sqlite:////data/trading_discipline.db
+      FINNHUB_API_KEY: ${FINNHUB_API_KEY:-}
     ports:
       - "8000:8000"
     volumes:

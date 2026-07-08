@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from app import models, schemas
 from app.database import get_db
-from app.services import review_service, summary_service, trade_service
+from app.services import market_data, review_service, summary_service, trade_service
 from app.services.rule_engine import evaluate_trade, load_rules
 
 
@@ -97,6 +97,20 @@ def get_rules() -> list[dict[str, Any]]:
     return load_rules()
 
 
+@router.post(
+    "/market-data/refresh-open", response_model=schemas.QuoteRefreshResult
+)
+def refresh_open_market_data(database: Database) -> dict[str, Any]:
+    provider = market_data.configured_market_data_provider()
+    trades, errors = market_data.refresh_open_trade_prices(database, provider)
+    source = (
+        "finnhub"
+        if isinstance(provider, market_data.FinnhubMarketDataProvider)
+        else "manual"
+    )
+    return {"trades": trades, "errors": errors, "source": source}
+
+
 def _model_values(trade: models.Trade) -> dict[str, Any]:
     return {
         column.key: getattr(trade, column.key)
@@ -130,6 +144,37 @@ def evaluate_rules(
                 )
         database.commit()
     return result
+
+
+@router.get(
+    "/rules/open-attention", response_model=list[schemas.OpenTradeAttention]
+)
+def get_open_trade_attention(database: Database) -> list[dict[str, Any]]:
+    priorities = {"blocker": 3, "warning": 2, "reminder": 1}
+    attention: list[dict[str, Any]] = []
+    trades = trade_service.list_trades(database, "open", 500, 0)
+    for trade in trades:
+        current_r = (
+            trade_service.calculate_final_r(trade, trade.current_price)
+            if trade.current_price is not None
+            else None
+        )
+        result = evaluate_trade(_model_values(trade) | {"current_r": current_r})
+        alerts = sorted(
+            result["alerts"],
+            key=lambda alert: priorities[alert["severity"]],
+            reverse=True,
+        )
+        attention.append(
+            {
+                "trade": trade,
+                "current_r": current_r,
+                "status": result["status"],
+                "primary_alert": alerts[0] if alerts else None,
+                "alerts": alerts,
+            }
+        )
+    return attention
 
 
 @router.post(

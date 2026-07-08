@@ -1,0 +1,17 @@
+import { describe, expect, it } from "vitest";
+
+import { hashForPage, pageFromHash } from "./navigation";
+
+describe("page navigation", () => {
+  it("restores a known page from the URL hash", () => {
+    expect(pageFromHash("#post-trade-review")).toBe("post-trade-review");
+  });
+
+  it("falls back to the dashboard for an unknown hash", () => {
+    expect(pageFromHash("#unknown-page")).toBe("dashboard");
+  });
+
+  it("creates a stable URL hash for a page", () => {
+    expect(hashForPage("rule-alerts")).toBe("#rule-alerts");
+  });
+});
