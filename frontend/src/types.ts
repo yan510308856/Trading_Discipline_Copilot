@@ -117,10 +117,22 @@ export interface Trade extends TradeCreatePayload {
   exit_price: number | null;
   exit_reason: string | null;
   final_r: number | null;
+  mfe_r: number | null;
+  mae_r: number | null;
   followed_plan: FollowedPlan | null;
   discipline_score: number | null;
   has_review: boolean;
   review: Review | null;
+  executions: TradeExecution[];
+}
+
+export interface TradeExecution {
+  id: number;
+  trade_id: number;
+  executed_at: string;
+  execution_type: "partial" | "final";
+  price: number;
+  quantity: number | null;
 }
 
 export interface TradePatchPayload {
@@ -129,8 +141,6 @@ export interface TradePatchPayload {
   runner_enabled?: boolean;
   runner_active?: boolean;
   runner_stop?: number | null;
-  partial_taken?: boolean;
-  partial_exit_quantity?: number;
   notes?: string | null;
 }
 
@@ -140,8 +150,6 @@ export interface TradeClosePayload {
 }
 
 export interface ReviewPayload {
-  exit_price: number;
-  exit_reason: string;
   followed_plan: FollowedPlan;
   mistake_tags: string[];
   positive_actions: string[];
@@ -155,7 +163,7 @@ export type TradeClassification =
   | "bad_trade_winner"
   | "bad_trade_loser";
 
-export interface Review extends Omit<ReviewPayload, "exit_price" | "exit_reason"> {
+export interface Review extends ReviewPayload {
   id: number;
   trade_id: number;
   created_at: string;

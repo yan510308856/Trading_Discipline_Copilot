@@ -38,6 +38,17 @@ class ReviewSummary(BaseModel):
     trade_classification: TradeClassification
 
 
+class TradeExecutionRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    trade_id: int
+    executed_at: datetime
+    execution_type: Literal["partial", "final"]
+    price: float
+    quantity: Optional[float]
+
+
 class TradeCreate(BaseModel):
     symbol: str = Field(min_length=1, max_length=32)
     market: Market
@@ -73,10 +84,13 @@ class TradeRead(TradeCreate):
     exit_price: Optional[float]
     exit_reason: Optional[str]
     final_r: Optional[float]
+    mfe_r: Optional[float]
+    mae_r: Optional[float]
     followed_plan: Optional[FollowedPlan]
     discipline_score: Optional[int]
     has_review: bool
     review: Optional[ReviewSummary]
+    executions: list[TradeExecutionRead]
 
 
 class TradePatch(BaseModel):
@@ -95,8 +109,6 @@ class TradePatch(BaseModel):
     runner_enabled: Optional[bool] = None
     runner_active: Optional[bool] = None
     runner_stop: Optional[float] = None
-    partial_taken: Optional[bool] = None
-    partial_exit_quantity: Optional[float] = Field(default=None, ge=0)
     position_size: Optional[float] = Field(default=None, gt=0)
     risk_per_trade: Optional[float] = Field(default=None, ge=0)
     notes: Optional[str] = None
@@ -136,6 +148,15 @@ class TradeClose(BaseModel):
     exit_reason: str = Field(min_length=1, max_length=128)
 
 
+class PartialExitCreate(BaseModel):
+    price: float
+    quantity: float = Field(gt=0)
+
+
+class ChecklistAnswerBatch(BaseModel):
+    answers: dict[str, bool]
+
+
 class AlertCreate(BaseModel):
     trade_id: int
     rule_id: str
@@ -156,8 +177,6 @@ class ReviewRead(ReviewSummary):
 
 
 class ReviewRequest(BaseModel):
-    exit_price: float
-    exit_reason: str = Field(min_length=1, max_length=128)
     followed_plan: FollowedPlan
     mistake_tags: list[str] = Field(default_factory=list)
     positive_actions: list[str] = Field(default_factory=list)

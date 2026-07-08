@@ -52,6 +52,8 @@ class Trade(Base):
     exit_price: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     exit_reason: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
     final_r: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    mfe_r: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    mae_r: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     followed_plan: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)
     discipline_score: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -64,6 +66,11 @@ class Trade(Base):
     )
     review: Mapped[Optional["Review"]] = relationship(
         back_populates="trade", cascade="all, delete-orphan", uselist=False
+    )
+    executions: Mapped[list["TradeExecution"]] = relationship(
+        back_populates="trade",
+        cascade="all, delete-orphan",
+        order_by="TradeExecution.executed_at",
     )
 
     @property
@@ -118,3 +125,18 @@ class ChecklistAnswer(Base):
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     trade: Mapped[Trade] = relationship(back_populates="checklist_answers")
+
+
+class TradeExecution(Base):
+    __tablename__ = "trade_executions"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    trade_id: Mapped[int] = mapped_column(
+        ForeignKey("trades.id", ondelete="CASCADE"), index=True
+    )
+    executed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    execution_type: Mapped[str] = mapped_column(String(16))
+    price: Mapped[float] = mapped_column(Float)
+    quantity: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+
+    trade: Mapped[Trade] = relationship(back_populates="executions")

@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 
-import { APIError, createTrade, evaluateRules } from "../api";
+import {
+  APIError,
+  createTrade,
+  evaluateRules,
+  saveChecklistAnswers,
+} from "../api";
 import type {
   RuleAlert,
   RuleEvaluationResult,
@@ -223,6 +228,22 @@ export function TradeChecklist() {
     setRequestError("");
     try {
       const trade = await createTrade(payload);
+      await saveChecklistAnswers(trade.id, {
+        follow_through_confirmed: form.follow_through_confirmed,
+        recent_stop_loss: form.recent_stop_loss,
+        is_immediate_reverse: form.is_immediate_reverse,
+        second_leg_entry: form.second_leg_entry,
+        big_bar_entry: form.big_bar_entry,
+        runner_enabled: form.runner_enabled,
+      });
+      await evaluateRules({
+        trade_id: trade.id,
+        follow_through_confirmed: form.follow_through_confirmed,
+        recent_stop_loss: form.recent_stop_loss,
+        is_immediate_reverse: form.is_immediate_reverse,
+        second_leg_entry: form.second_leg_entry,
+        big_bar_entry: form.big_bar_entry,
+      });
       setSuccessMessage(`Trade plan #${trade.id} for ${trade.symbol} was created.`);
     } catch (error) {
       setRequestError(

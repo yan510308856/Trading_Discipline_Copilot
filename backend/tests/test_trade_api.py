@@ -1,4 +1,8 @@
 from fastapi.testclient import TestClient
+from sqlalchemy import func, select
+from sqlalchemy.orm import Session
+
+from app import models
 
 
 def planned_trade_payload() -> dict:
@@ -105,18 +109,13 @@ def test_close_calculates_final_r_for_short_trade(api_client: TestClient) -> Non
     assert response.json()["final_r"] == 2.0
 
 
-def test_close_rejects_zero_risk_distance(api_client: TestClient) -> None:
+def test_open_rejects_zero_risk_distance(api_client: TestClient) -> None:
     payload = planned_trade_payload() | {"stop_loss": 5000}
     created = api_client.post("/trades", json=payload).json()
-    api_client.post(f"/trades/{created['id']}/open", json={})
-
-    response = api_client.post(
-        f"/trades/{created['id']}/close",
-        json={"exit_price": 5020, "exit_reason": "target_hit"},
-    )
+    response = api_client.post(f"/trades/{created['id']}/open", json={})
 
     assert response.status_code == 422
-    assert response.json()["error"]["code"] == "INVALID_RISK_DISTANCE"
+    assert response.json()["error"]["code"] == "INVALID_PRICE_STRUCTURE"
 
 
 def test_patch_persists_open_trade_management_fields(api_client: TestClient) -> None:
@@ -128,8 +127,6 @@ def test_patch_persists_open_trade_management_fields(api_client: TestClient) -> 
         json={
             "current_price": 5010,
             "current_stop": 5000,
-            "partial_taken": True,
-            "partial_exit_quantity": 1,
             "runner_active": True,
             "runner_stop": 4998,
         },
@@ -138,25 +135,75 @@ def test_patch_persists_open_trade_management_fields(api_client: TestClient) -> 
     assert response.status_code == 200
     assert response.json()["current_price"] == 5010
     assert response.json()["current_stop"] == 5000
-    assert response.json()["partial_taken"] is True
-    assert response.json()["partial_exit_quantity"] == 1
+    assert response.json()["mfe_r"] == 1.0
+    assert response.json()["mae_r"] == 1.0
     assert response.json()["runner_active"] is True
     assert response.json()["runner_stop"] == 4998
 
 
 def test_partial_quantity_cannot_exceed_position_size(api_client: TestClient) -> None:
     created = create_trade(api_client)
+    api_client.post(f"/trades/{created['id']}/open", json={})
 
-    response = api_client.patch(
-        f"/trades/{created['id']}", json={"partial_exit_quantity": 2}
+    response = api_client.post(
+        f"/trades/{created['id']}/partial-exits",
+        json={"price": 5010, "quantity": 2},
     )
 
     assert response.status_code == 422
     assert response.json()["error"]["code"] == "INVALID_PARTIAL_QUANTITY"
 
 
-def test_open_trade_preserves_explicit_zero_entry(api_client: TestClient) -> None:
+def test_partial_exit_prices_produce_weighted_final_r(api_client: TestClient) -> None:
+    payload = planned_trade_payload() | {"position_size": 2}
+    created = api_client.post("/trades", json=payload).json()
+    api_client.post(f"/trades/{created['id']}/open", json={})
+
+    partial = api_client.post(
+        f"/trades/{created['id']}/partial-exits",
+        json={"price": 5010, "quantity": 1},
+    )
+    closed = api_client.post(
+        f"/trades/{created['id']}/close",
+        json={"exit_price": 5020, "exit_reason": "target_hit"},
+    )
+
+    assert partial.status_code == 201
+    assert partial.json()["partial_exit_quantity"] == 1
+    assert len(partial.json()["executions"]) == 1
+    assert closed.json()["final_r"] == 1.5
+    assert [item["execution_type"] for item in closed.json()["executions"]] == [
+        "partial",
+        "final",
+    ]
+
+
+def test_rule_alerts_and_checklist_answers_are_persisted(
+    api_client: TestClient, database_session: Session
+) -> None:
     created = create_trade(api_client)
+    checklist = api_client.post(
+        f"/trades/{created['id']}/checklist",
+        json={"answers": {"follow_through_confirmed": False}},
+    )
+    evaluation = api_client.post(
+        "/rules/evaluate",
+        json={"trade_id": created["id"], "follow_through_confirmed": False},
+    )
+
+    assert checklist.status_code == 200
+    assert evaluation.status_code == 200
+    assert database_session.scalar(select(func.count(models.ChecklistAnswer.id))) == 1
+    assert database_session.scalar(select(func.count(models.Alert.id))) == 1
+
+
+def test_open_trade_preserves_explicit_zero_entry(api_client: TestClient) -> None:
+    payload = planned_trade_payload() | {
+        "planned_entry": 0,
+        "stop_loss": -10,
+        "target_1": 20,
+    }
+    created = api_client.post("/trades", json=payload).json()
 
     response = api_client.post(
         f"/trades/{created['id']}/open", json={"actual_entry": 0}
@@ -175,6 +222,38 @@ def test_cancel_trade(api_client: TestClient) -> None:
     assert response.json()["status"] == "cancelled"
 
 
+def test_delete_trade_cascades_owned_records(
+    api_client: TestClient, database_session: Session
+) -> None:
+    created = create_trade(api_client)
+    api_client.post(
+        f"/trades/{created['id']}/checklist",
+        json={"answers": {"follow_through_confirmed": True}},
+    )
+    api_client.post(
+        "/rules/evaluate",
+        json={"trade_id": created["id"], "follow_through_confirmed": False},
+    )
+    api_client.post(f"/trades/{created['id']}/open", json={})
+    api_client.post(
+        f"/trades/{created['id']}/close",
+        json={"exit_price": 5020, "exit_reason": "target_hit"},
+    )
+    api_client.post(
+        f"/trades/{created['id']}/review",
+        json={"followed_plan": "yes"},
+    )
+
+    response = api_client.delete(f"/trades/{created['id']}")
+
+    assert response.status_code == 204
+    assert api_client.get(f"/trades/{created['id']}").status_code == 404
+    assert database_session.scalar(select(func.count(models.Review.id))) == 0
+    assert database_session.scalar(select(func.count(models.Alert.id))) == 0
+    assert database_session.scalar(select(func.count(models.ChecklistAnswer.id))) == 0
+    assert database_session.scalar(select(func.count(models.TradeExecution.id))) == 0
+
+
 def test_create_review_scores_and_classifies_closed_trade(
     api_client: TestClient,
 ) -> None:
@@ -187,8 +266,6 @@ def test_create_review_scores_and_classifies_closed_trade(
     review = api_client.post(
         f"/trades/{created['id']}/review",
         json={
-            "exit_price": 5020,
-            "exit_reason": "target_hit",
             "followed_plan": "partial",
             "mistake_tags": ["chased_breakout_without_ft"],
             "positive_actions": ["followed_planned_stop"],
@@ -225,8 +302,6 @@ def test_review_veto_scores_zero_and_flags_bad_winner(api_client: TestClient) ->
     response = api_client.post(
         f"/trades/{created['id']}/review",
         json={
-            "exit_price": 5020,
-            "exit_reason": "target_hit",
             "followed_plan": "no",
             "mistake_tags": ["no_stop_loss"],
             "positive_actions": ["completed_pre_trade_checklist"],
@@ -252,8 +327,6 @@ def test_daily_summary_aggregates_mistakes_and_lessons(
     api_client.post(
         f"/trades/{first['id']}/review",
         json={
-            "exit_price": 5020,
-            "exit_reason": "target_hit",
             "followed_plan": "partial",
             "mistake_tags": [
                 "green_trade_to_red_without_review",
@@ -272,8 +345,6 @@ def test_daily_summary_aggregates_mistakes_and_lessons(
     api_client.post(
         f"/trades/{second['id']}/review",
         json={
-            "exit_price": 4990,
-            "exit_reason": "stop_hit",
             "followed_plan": "yes",
             "mistake_tags": ["green_trade_to_red_without_review"],
             "lesson": "Protect open profit earlier.",
@@ -325,8 +396,6 @@ def test_only_closed_trade_can_be_reviewed(api_client: TestClient) -> None:
     response = api_client.post(
         f"/trades/{created['id']}/review",
         json={
-            "exit_price": 5020,
-            "exit_reason": "target_hit",
             "followed_plan": "yes",
         },
     )
@@ -339,7 +408,7 @@ def test_get_rules(api_client: TestClient) -> None:
     response = api_client.get("/rules")
 
     assert response.status_code == 200
-    assert len(response.json()) == 8
+    assert len(response.json()) == 12
     assert set(response.json()[0]) == {
         "id",
         "name",

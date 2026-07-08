@@ -4,10 +4,11 @@ import {
   APIError,
   closeTrade,
   evaluateRules,
-  getTrades,
   openTrade,
   patchTrade,
+  recordPartialExit,
 } from "../api";
+import { useTrades } from "../hooks/useTrades";
 import type {
   RuleEvaluationResult,
   Trade,
@@ -19,11 +20,13 @@ import {
 } from "../utils/tradeCalculations";
 import { PriceLadder } from "./PriceLadder";
 import { RuleAlertPanel } from "./RuleAlertPanel";
+import { DeleteTradeButton } from "./DeleteTradeButton";
 
 interface TradeCardProps {
   trade: Trade;
   onUpdated: (trade: Trade) => void;
   defaultExpanded: boolean;
+  onDeleted: (tradeId: number) => void;
 }
 
 function numberOrNull(value: string): number | null {
@@ -40,7 +43,7 @@ function errorMessage(error: unknown): string {
     : "The trade update failed. Confirm that the backend is running.";
 }
 
-function TradeCard({ trade, onUpdated, defaultExpanded }: TradeCardProps) {
+function TradeCard({ trade, onUpdated, defaultExpanded, onDeleted }: TradeCardProps) {
   const [actualEntry, setActualEntry] = useState(
     trade.actual_entry?.toString() ?? trade.planned_entry.toString(),
   );
@@ -53,11 +56,8 @@ function TradeCard({ trade, onUpdated, defaultExpanded }: TradeCardProps) {
   const [runnerStop, setRunnerStop] = useState(
     trade.runner_stop?.toString() ?? "",
   );
-  const [partialQuantity, setPartialQuantity] = useState(
-    trade.partial_exit_quantity > 0
-      ? trade.partial_exit_quantity.toString()
-      : "",
-  );
+  const [partialQuantity, setPartialQuantity] = useState("");
+  const [partialPrice, setPartialPrice] = useState("");
   const [note, setNote] = useState(trade.notes ?? "");
   const [exitPrice, setExitPrice] = useState("");
   const [exitReason, setExitReason] = useState("manual_exit");
@@ -85,10 +85,12 @@ function TradeCard({ trade, onUpdated, defaultExpanded }: TradeCardProps) {
     trade.partial_exit_quantity,
   );
   const parsedPartialQuantity = numberOrNull(partialQuantity);
+  const parsedPartialPrice = numberOrNull(partialPrice);
   const partialQuantityIsValid =
     parsedPartialQuantity !== null &&
     parsedPartialQuantity >= 0 &&
-    (trade.position_size === null || parsedPartialQuantity <= trade.position_size);
+    (trade.position_size === null ||
+      parsedPartialQuantity < trade.position_size - trade.partial_exit_quantity);
 
   useEffect(() => {
     if (trade.status !== "open") return;
@@ -139,6 +141,23 @@ function TradeCard({ trade, onUpdated, defaultExpanded }: TradeCardProps) {
     return runAction(() => patchTrade(trade.id, updates));
   }
 
+  async function savePartialExit() {
+    if (parsedPartialQuantity === null || parsedPartialPrice === null) return;
+    setIsSaving(true);
+    setError("");
+    try {
+      onUpdated(
+        await recordPartialExit(trade.id, parsedPartialPrice, parsedPartialQuantity),
+      );
+      setPartialPrice("");
+      setPartialQuantity("");
+    } catch (requestError) {
+      setError(errorMessage(requestError));
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
   if (trade.status === "planned") {
     return (
       <details className="trade-accordion planned-trade-card" open={defaultExpanded}>
@@ -175,6 +194,7 @@ function TradeCard({ trade, onUpdated, defaultExpanded }: TradeCardProps) {
           </button>
         </div>
         {error && <p className="form-message error-message">{error}</p>}
+        <DeleteTradeButton trade={trade} onDeleted={onDeleted} />
         </article>
       </details>
     );
@@ -237,15 +257,16 @@ function TradeCard({ trade, onUpdated, defaultExpanded }: TradeCardProps) {
             }
           }}>Move Stop to Breakeven</button>
           <label className="partial-quantity-field">
+            Partial exit price
+            <input aria-label={`Partial exit price for ${trade.symbol}`} type="number" step="any" value={partialPrice} onChange={(event) => setPartialPrice(event.target.value)} />
+          </label>
+          <label className="partial-quantity-field">
             Quantity taken
             <input aria-label={`Partial quantity for ${trade.symbol}`} type="number" min="0" step="any" value={partialQuantity} onChange={(event) => setPartialQuantity(event.target.value)} />
           </label>
-          <button className="secondary-button" disabled={isSaving || !partialQuantityIsValid} onClick={() => {
-            if (parsedPartialQuantity !== null) {
-              void update({
-                partial_exit_quantity: parsedPartialQuantity,
-                partial_taken: parsedPartialQuantity > 0,
-              });
+          <button className="secondary-button" disabled={isSaving || !partialQuantityIsValid || parsedPartialPrice === null} onClick={() => {
+            if (parsedPartialQuantity !== null && parsedPartialPrice !== null) {
+              void savePartialExit();
             }
           }}>Record Partial Profit</button>
         </div>
@@ -305,35 +326,26 @@ function TradeCard({ trade, onUpdated, defaultExpanded }: TradeCardProps) {
       </section>
 
       {error && <p className="form-message error-message">{error}</p>}
+      <DeleteTradeButton trade={trade} onDeleted={onDeleted} />
       </article>
     </details>
   );
 }
 
 export function OpenTradePanel() {
-  const [trades, setTrades] = useState<Trade[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    void getTrades()
-      .then((loadedTrades) => {
-        setTrades(
-          loadedTrades
-            .filter(
-              (trade) => trade.status === "planned" || trade.status === "open",
-            )
-            .sort((left, right) => {
-              const statusDifference =
-                Number(right.status === "open") - Number(left.status === "open");
-              return statusDifference || right.id - left.id;
-            }),
-        );
-        setError("");
-      })
-      .catch((requestError) => setError(errorMessage(requestError)))
-      .finally(() => setIsLoading(false));
-  }, []);
+  const loaded = useTrades();
+  const { setTrades, isLoading, error } = loaded;
+  const trades = useMemo(
+    () =>
+      loaded.trades
+        .filter((trade) => trade.status === "planned" || trade.status === "open")
+        .sort((left, right) => {
+          const statusDifference =
+            Number(right.status === "open") - Number(left.status === "open");
+          return statusDifference || right.id - left.id;
+        }),
+    [loaded.trades],
+  );
 
   function replaceTrade(updatedTrade: Trade) {
     setTrades((current) =>
@@ -369,6 +381,9 @@ export function OpenTradePanel() {
             key={trade.id}
             trade={trade}
             onUpdated={replaceTrade}
+            onDeleted={(tradeId) =>
+              setTrades((current) => current.filter((item) => item.id !== tradeId))
+            }
             defaultExpanded={index === 0}
           />
         ))}

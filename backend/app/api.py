@@ -20,8 +20,13 @@ Database = Annotated[Session, Depends(get_db)]
 
 
 @router.get("/trades", response_model=list[schemas.TradeRead])
-def list_trades(database: Database) -> list[models.Trade]:
-    return trade_service.list_trades(database)
+def list_trades(
+    database: Database,
+    trade_status: Optional[schemas.TradeStatus] = Query(default=None, alias="status"),
+    limit: int = Query(default=100, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+) -> list[models.Trade]:
+    return trade_service.list_trades(database, trade_status, limit, offset)
 
 
 @router.post(
@@ -59,9 +64,32 @@ def close_trade(
     return trade_service.close_trade(database, trade_id, trade_data)
 
 
+@router.post(
+    "/trades/{trade_id}/partial-exits",
+    response_model=schemas.TradeRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def record_partial_exit(
+    trade_id: int, exit_data: schemas.PartialExitCreate, database: Database
+) -> models.Trade:
+    return trade_service.record_partial_exit(database, trade_id, exit_data)
+
+
 @router.post("/trades/{trade_id}/cancel", response_model=schemas.TradeRead)
 def cancel_trade(trade_id: int, database: Database) -> models.Trade:
     return trade_service.cancel_trade(database, trade_id)
+
+
+@router.delete("/trades/{trade_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_trade(trade_id: int, database: Database) -> None:
+    trade_service.delete_trade(database, trade_id)
+
+
+@router.post("/trades/{trade_id}/checklist", response_model=schemas.TradeRead)
+def save_checklist(
+    trade_id: int, checklist: schemas.ChecklistAnswerBatch, database: Database
+) -> models.Trade:
+    return trade_service.save_checklist_answers(database, trade_id, checklist.answers)
 
 
 @router.get("/rules", response_model=list[schemas.RuleDefinition])
@@ -87,7 +115,21 @@ def evaluate_rules(
         trade_values = _model_values(trade) | request_values
     else:
         trade_values = {"status": "planned"} | request_values
-    return evaluate_trade(trade_values)
+    result = evaluate_trade(trade_values)
+    if trade_id is not None:
+        existing_rule_ids = {alert.rule_id for alert in trade.alerts}
+        for alert in result["alerts"]:
+            if alert["rule_id"] not in existing_rule_ids:
+                database.add(
+                    models.Alert(
+                        trade_id=trade.id,
+                        rule_id=alert["rule_id"],
+                        severity=alert["severity"],
+                        message=alert["message"],
+                    )
+                )
+        database.commit()
+    return result
 
 
 @router.post(

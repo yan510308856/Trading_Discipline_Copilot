@@ -55,6 +55,7 @@ async function apiRequest<T>(
     );
   }
 
+  if (response.status === 204) return undefined as T;
   return response.json() as Promise<T>;
 }
 
@@ -89,8 +90,24 @@ export function createTrade(trade: TradeCreatePayload): Promise<Trade> {
   });
 }
 
-export function getTrades(): Promise<Trade[]> {
-  return apiRequest<Trade[]>("/trades");
+export function saveChecklistAnswers(
+  tradeId: number,
+  answers: Record<string, boolean>,
+): Promise<Trade> {
+  return apiRequest<Trade>(`/trades/${tradeId}/checklist`, {
+    method: "POST",
+    body: JSON.stringify({ answers }),
+  });
+}
+
+export function getTrades(status?: Trade["status"]): Promise<Trade[]> {
+  const query = new URLSearchParams({ limit: "500" });
+  if (status) query.set("status", status);
+  return apiRequest<Trade[]>(`/trades?${query.toString()}`);
+}
+
+export function deleteTrade(tradeId: number): Promise<void> {
+  return apiRequest<void>(`/trades/${tradeId}`, { method: "DELETE" });
 }
 
 export function patchTrade(
@@ -120,6 +137,17 @@ export function closeTrade(
   return apiRequest<Trade>(`/trades/${tradeId}/close`, {
     method: "POST",
     body: JSON.stringify(closeData),
+  });
+}
+
+export function recordPartialExit(
+  tradeId: number,
+  price: number,
+  quantity: number,
+): Promise<Trade> {
+  return apiRequest<Trade>(`/trades/${tradeId}/partial-exits`, {
+    method: "POST",
+    body: JSON.stringify({ price, quantity }),
   });
 }
 

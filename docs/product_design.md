@@ -290,7 +290,7 @@ runner 仍然打开，但没有保护性止损。请设置 runner stop。
 
 目标：不只记录盈亏，还记录执行质量。
 
-输入字段：
+平仓时记录的只读成交事实：
 
 ```yaml
 exit_price: number
@@ -303,7 +303,12 @@ exit_reason:
   - time_exit
   - emotional_exit
   - other
-final_r: number
+final_r: number  # 后端根据 execution 自动计算
+```
+
+复盘输入字段：
+
+```yaml
 followed_plan: yes | no | partial
 mistake_tags:
   - no_stop

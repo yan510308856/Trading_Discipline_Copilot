@@ -97,6 +97,70 @@ rules:
     discipline_sentence: A big bar in a range often creates urgency, not edge.
     enabled: true
 
+  - id: inside_bar_triangle_breakout_setup
+    name: Treat inside bars and triangles as breakout-mode setups
+    category: price_action
+    stage: pre_trade
+    severity: reminder
+    trigger:
+      setup: inside_bar_triangle
+    conditions: []
+    message: Define the breakout direction, invalidation point, and follow-through before entry.
+    checklist:
+      - Is the pattern still compressed rather than already expanded?
+      - Will you wait for a clear breakout and follow-through?
+    avoid: Predicting direction while price remains compressed.
+    discipline_sentence: Compression is context; the breakout still needs confirmation.
+    enabled: true
+
+  - id: yesterday_high_low_two_failed_breakouts
+    name: Reassess repeated failed breakouts at yesterday's high or low
+    category: key_levels
+    stage: pre_trade
+    severity: warning
+    trigger:
+      setup: failed_breakout
+    conditions: []
+    message: A failed-breakout setup at a key level needs explicit confirmation before another attempt.
+    checklist:
+      - Is this near yesterday's high or low?
+      - Have repeated breakout attempts already failed?
+    avoid: Repeating the same breakout entry after the market has rejected it.
+    discipline_sentence: Repeated failure at a key level is information, not bad luck.
+    enabled: true
+
+  - id: breakout_gap_no_retest_strength
+    name: A gap without a retest can signal breakout strength
+    category: price_action
+    stage: pre_trade
+    severity: reminder
+    trigger:
+      setup: gap_open
+    conditions: []
+    message: A breakout gap that does not retest may be strong; plan the entry without chasing it.
+    checklist:
+      - Is the gap holding beyond the breakout point?
+      - Is there a structured entry and protected runner plan?
+    avoid: Chasing strength without a defined invalidation point.
+    discipline_sentence: Strength can persist, but urgency is not an entry plan.
+    enabled: true
+
+  - id: signal_context_over_shape
+    name: Market context matters more than signal-bar shape
+    category: context
+    stage: pre_trade
+    severity: warning
+    trigger:
+      market_context: uncertain
+    conditions: []
+    message: The market context is uncertain; a familiar candle shape alone is not enough.
+    checklist:
+      - What market structure supports this signal?
+      - Is the setup aligned with trend, range, or breakout context?
+    avoid: Trading a recognizable shape without structural context.
+    discipline_sentence: Read the market first and the signal bar second.
+    enabled: true
+
   - id: take_profit_and_let_runner_run
     name: Take partial profit at one R and keep a runner
     category: trade_management
