@@ -12,6 +12,7 @@ def planned_trade_payload() -> dict:
         "stop_loss": 4990,
         "target_1": 5020,
         "runner_enabled": True,
+        "position_size": 1,
     }
 
 
@@ -76,9 +77,46 @@ def test_open_and_close_trade(api_client: TestClient) -> None:
     assert opened.status_code == 200
     assert opened.json()["status"] == "open"
     assert opened.json()["actual_entry"] == 5001
+    assert opened.json()["current_stop"] == 4990
     assert closed.status_code == 200
     assert closed.json()["status"] == "closed"
     assert closed.json()["final_r"] == 2.0
+
+
+def test_patch_persists_open_trade_management_fields(api_client: TestClient) -> None:
+    created = create_trade(api_client)
+    api_client.post(f"/trades/{created['id']}/open", json={})
+
+    response = api_client.patch(
+        f"/trades/{created['id']}",
+        json={
+            "current_price": 5010,
+            "current_stop": 5000,
+            "partial_taken": True,
+            "partial_exit_quantity": 1,
+            "runner_active": True,
+            "runner_stop": 4998,
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["current_price"] == 5010
+    assert response.json()["current_stop"] == 5000
+    assert response.json()["partial_taken"] is True
+    assert response.json()["partial_exit_quantity"] == 1
+    assert response.json()["runner_active"] is True
+    assert response.json()["runner_stop"] == 4998
+
+
+def test_partial_quantity_cannot_exceed_position_size(api_client: TestClient) -> None:
+    created = create_trade(api_client)
+
+    response = api_client.patch(
+        f"/trades/{created['id']}", json={"partial_exit_quantity": 2}
+    )
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "INVALID_PARTIAL_QUANTITY"
 
 
 def test_open_trade_preserves_explicit_zero_entry(api_client: TestClient) -> None:

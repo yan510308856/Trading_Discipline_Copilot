@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { calculateRiskReward } from "./tradeCalculations";
+import {
+  calculateCurrentR,
+  calculatePositionBreakdown,
+  calculateRiskReward,
+} from "./tradeCalculations";
 
 describe("calculateRiskReward", () => {
   it("calculates risk and target R for a long trade", () => {
@@ -24,5 +28,32 @@ describe("calculateRiskReward", () => {
 
     expect(result.risk).toBe(-10);
     expect(Number.isNaN(result.targetR)).toBe(true);
+  });
+});
+
+describe("calculateCurrentR", () => {
+  it("calculates current R for long and short trades", () => {
+    expect(calculateCurrentR("long", 5000, 4990, 5010)).toBe(1);
+    expect(calculateCurrentR("short", 5000, 5010, 4980)).toBe(2);
+  });
+
+  it("returns NaN when the original risk is invalid", () => {
+    expect(Number.isNaN(calculateCurrentR("long", 5000, 5010, 5020))).toBe(
+      true,
+    );
+  });
+});
+
+describe("calculatePositionBreakdown", () => {
+  it("derives the runner quantity from initial and exited quantity", () => {
+    expect(calculatePositionBreakdown(3, 1)).toEqual({
+      initial: 3,
+      taken: 1,
+      runner: 2,
+    });
+  });
+
+  it("never returns a negative runner quantity", () => {
+    expect(calculatePositionBreakdown(1, 2).runner).toBe(0);
   });
 });

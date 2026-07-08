@@ -3,7 +3,9 @@ import type {
   HealthResponse,
   RuleEvaluationResult,
   Trade,
+  TradeClosePayload,
   TradeCreatePayload,
+  TradePatchPayload,
 } from "./types";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "/api";
@@ -71,5 +73,39 @@ export function createTrade(trade: TradeCreatePayload): Promise<Trade> {
   return apiRequest<Trade>("/trades", {
     method: "POST",
     body: JSON.stringify(trade),
+  });
+}
+
+export function getTrades(): Promise<Trade[]> {
+  return apiRequest<Trade[]>("/trades");
+}
+
+export function patchTrade(
+  tradeId: number,
+  updates: TradePatchPayload,
+): Promise<Trade> {
+  return apiRequest<Trade>(`/trades/${tradeId}`, {
+    method: "PATCH",
+    body: JSON.stringify(updates),
+  });
+}
+
+export function openTrade(
+  tradeId: number,
+  actualEntry: number | null,
+): Promise<Trade> {
+  return apiRequest<Trade>(`/trades/${tradeId}/open`, {
+    method: "POST",
+    body: JSON.stringify({ actual_entry: actualEntry }),
+  });
+}
+
+export function closeTrade(
+  tradeId: number,
+  closeData: TradeClosePayload,
+): Promise<Trade> {
+  return apiRequest<Trade>(`/trades/${tradeId}/close`, {
+    method: "POST",
+    body: JSON.stringify(closeData),
   });
 }

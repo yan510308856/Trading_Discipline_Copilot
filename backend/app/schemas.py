@@ -38,6 +38,11 @@ class TradeRead(TradeCreate):
     created_at: datetime
     updated_at: datetime
     status: TradeStatus
+    current_stop: Optional[float]
+    current_price: Optional[float]
+    runner_stop: Optional[float]
+    partial_taken: bool
+    partial_exit_quantity: float
     exit_price: Optional[float]
     exit_reason: Optional[str]
     final_r: Optional[float]
@@ -54,10 +59,15 @@ class TradePatch(BaseModel):
     planned_entry: Optional[float] = None
     actual_entry: Optional[float] = None
     stop_loss: Optional[float] = None
+    current_stop: Optional[float] = None
+    current_price: Optional[float] = None
     target_1: Optional[float] = None
     target_2: Optional[float] = None
     runner_enabled: Optional[bool] = None
     runner_active: Optional[bool] = None
+    runner_stop: Optional[float] = None
+    partial_taken: Optional[bool] = None
+    partial_exit_quantity: Optional[float] = Field(default=None, ge=0)
     position_size: Optional[float] = Field(default=None, gt=0)
     risk_per_trade: Optional[float] = Field(default=None, ge=0)
     notes: Optional[str] = None
