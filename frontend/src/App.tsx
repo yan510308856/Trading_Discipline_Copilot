@@ -68,7 +68,7 @@ export default function App() {
             <p className="eyebrow">Trading Discipline Copilot</p>
             <h1>{navigation.find((item) => item.id === activePage)?.label}</h1>
           </div>
-          <span className="stage-label">Stage 8 · Daily discipline summary</span>
+          <span className="stage-label">Stage 9 · Rules library</span>
         </header>
         {pages[activePage]}
       </main>

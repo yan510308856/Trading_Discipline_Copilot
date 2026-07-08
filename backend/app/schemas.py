@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Literal, Optional
+from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -180,6 +180,21 @@ class RuleAlert(BaseModel):
     message: str
     checklist: list[str]
     discipline_sentence: str
+
+
+class RuleDefinition(BaseModel):
+    id: str
+    name: str
+    category: str
+    stage: Literal["pre_trade", "in_trade", "post_trade"]
+    severity: Literal["blocker", "warning", "reminder"]
+    trigger: dict[str, Any]
+    conditions: list[dict[str, Any]]
+    message: str
+    checklist: list[str]
+    avoid: str
+    discipline_sentence: str
+    enabled: bool
 
 
 class RuleEvaluationResult(BaseModel):

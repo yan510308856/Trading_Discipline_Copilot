@@ -4,6 +4,7 @@ import type {
   HealthResponse,
   Review,
   ReviewPayload,
+  RuleDefinition,
   RuleEvaluationResult,
   Trade,
   TradeClosePayload,
@@ -64,6 +65,10 @@ export function getHealth(): Promise<HealthResponse> {
 export function getDailySummary(date?: string): Promise<DailySummaryData> {
   const query = date ? `?date=${encodeURIComponent(date)}` : "";
   return apiRequest<DailySummaryData>(`/summary/daily${query}`);
+}
+
+export function getRules(): Promise<RuleDefinition[]> {
+  return apiRequest<RuleDefinition[]>("/rules");
 }
 
 export function evaluateRules(

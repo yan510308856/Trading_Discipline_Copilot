@@ -14,6 +14,7 @@ rules:
     checklist:
       - Is the stop loss set?
       - Does it mark the point where the setup is invalid?
+    avoid: Entering any trade before defining its invalidation point.
     discipline_sentence: No stop loss, no trade.
     enabled: true
 
@@ -35,6 +36,7 @@ rules:
     checklist:
       - Is the reverse supported by a new setup?
       - Have you paused long enough to avoid a revenge trade?
+    avoid: Treating a stop loss as a signal to reverse immediately.
     discipline_sentence: A stop is information, not an invitation to retaliate.
     enabled: true
 
@@ -53,6 +55,7 @@ rules:
     checklist:
       - Was the breakout bar strong?
       - Did the next price action confirm the breakout?
+    avoid: Chasing a breakout before follow-through confirms it.
     discipline_sentence: The breakout is not the signal; follow-through is confirmation.
     enabled: true
 
@@ -71,6 +74,7 @@ rules:
     checklist:
       - Is price near the edge or in the middle of the range?
       - Is there room before the opposite side of the range?
+    avoid: Entering a second leg in the middle of a trading range.
     discipline_sentence: In a range, assume disappointment before continuation.
     enabled: true
 
@@ -89,6 +93,7 @@ rules:
     checklist:
       - Are you buying high or selling low in the range?
       - Can you wait for a pullback or confirmation?
+    avoid: Chasing an emotional big bar at a trading-range extreme.
     discipline_sentence: A big bar in a range often creates urgency, not edge.
     enabled: true
 
@@ -110,6 +115,7 @@ rules:
     checklist:
       - Has partial profit been recorded?
       - Is the remaining position sized and protected appropriately?
+    avoid: Holding the full position after the planned profit milestone.
     discipline_sentence: Pay yourself at the planned milestone, then let the runner work.
     enabled: true
 
@@ -131,6 +137,7 @@ rules:
     checklist:
       - Is the original setup still valid?
       - Should the stop have been advanced by structure?
+    avoid: Letting open profit become a loss without deliberate reassessment.
     discipline_sentence: Protect earned opportunity without smothering the trade.
     enabled: true
 
@@ -151,5 +158,6 @@ rules:
     checklist:
       - Is the runner stop recorded?
       - Does the stop protect profit without ignoring market structure?
+    avoid: Leaving a runner active without a protective stop.
     discipline_sentence: A runner earns freedom only after its risk is protected.
     enabled: true

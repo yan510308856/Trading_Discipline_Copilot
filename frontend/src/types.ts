@@ -48,6 +48,22 @@ export type Direction = "long" | "short";
 export type FollowedPlan = "yes" | "partial" | "no";
 export type RuleStatus = "allowed" | "warning" | "blocked";
 export type RuleSeverity = "blocker" | "warning" | "reminder";
+export type RuleStage = "pre_trade" | "in_trade" | "post_trade";
+
+export interface RuleDefinition {
+  id: string;
+  name: string;
+  category: string;
+  stage: RuleStage;
+  severity: RuleSeverity;
+  trigger: Record<string, unknown>;
+  conditions: Array<Record<string, unknown>>;
+  message: string;
+  checklist: string[];
+  avoid: string;
+  discipline_sentence: string;
+  enabled: boolean;
+}
 
 export interface TradeFormState {
   symbol: string;
