@@ -1406,6 +1406,16 @@ textarea {
   background: #81352f;
 }
 
+.delete-trade-action {
+  margin-top: 24px;
+}
+
+.trade-accordion > .delete-trade-action {
+  margin-top: 0;
+  padding: 18px clamp(24px, 4vw, 42px);
+  border-top: 1px solid var(--line);
+}
+
 .empty-state {
   padding: 36px;
   color: var(--muted);

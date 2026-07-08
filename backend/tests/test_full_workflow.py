@@ -60,10 +60,13 @@ def test_complete_trade_discipline_workflow(api_client: TestClient) -> None:
         f"/trades/{created['id']}",
         json={
             "current_price": 5010,
-            "partial_exit_quantity": 0.5,
             "runner_active": True,
             "runner_stop": 5000,
         },
+    ).json()
+    managed = api_client.post(
+        f"/trades/{created['id']}/partial-exits",
+        json={"price": 5010, "quantity": 0.5},
     ).json()
     assert managed["partial_taken"] is True
     assert managed["runner_active"] is True
@@ -74,13 +77,11 @@ def test_complete_trade_discipline_workflow(api_client: TestClient) -> None:
         json={"exit_price": 5020, "exit_reason": "target_hit"},
     ).json()
     assert closed["status"] == "closed"
-    assert closed["final_r"] == 2
+    assert closed["final_r"] == 1.5
 
     review = api_client.post(
         f"/trades/{created['id']}/review",
         json={
-            "exit_price": 5020,
-            "exit_reason": "target_hit",
             "followed_plan": "yes",
             "mistake_tags": [],
             "positive_actions": [
@@ -98,5 +99,5 @@ def test_complete_trade_discipline_workflow(api_client: TestClient) -> None:
     summary = api_client.get("/summary/daily").json()
     assert stored["has_review"] is True
     assert summary["total_trades"] == 1
-    assert summary["net_r"] == 2
+    assert summary["net_r"] == 1.5
     assert summary["average_discipline_score"] == 100

@@ -14,10 +14,22 @@ def test_yaml_contains_all_mvp_rules() -> None:
         "breakout_needs_follow_through",
         "trading_range_second_leg_trap",
         "trading_range_big_bar_reversal_risk",
+        "inside_bar_triangle_breakout_setup",
+        "yesterday_high_low_two_failed_breakouts",
+        "breakout_gap_no_retest_strength",
+        "signal_context_over_shape",
         "take_profit_and_let_runner_run",
         "green_trade_should_not_go_red",
         "runner_must_have_protection",
     }
+
+
+def test_uncertain_context_warns_even_with_a_familiar_signal_shape() -> None:
+    result = evaluate_trade(
+        {"status": "planned", "stop_loss": 4990, "market_context": "uncertain"}
+    )
+
+    assert "signal_context_over_shape" in alert_ids(result)
 
 
 def test_missing_stop_loss_blocks_planned_trade() -> None:

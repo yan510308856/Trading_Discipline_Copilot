@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
-import { APIError, createReview, getTrades } from "../api";
+import { APIError, createReview } from "../api";
+import { useTrades } from "../hooks/useTrades";
 import type {
   FollowedPlan,
   Review,
@@ -12,7 +13,7 @@ import {
   filterAndSortReviewTrades,
   type ReviewFilter,
 } from "../utils/reviewFilters";
-import { calculateCurrentR } from "../utils/tradeCalculations";
+import { DeleteTradeButton } from "./DeleteTradeButton";
 
 const mistakeOptions = [
   ["no_stop_loss", "No stop loss (veto)"],
@@ -64,23 +65,12 @@ function formatDateTime(value: string | null): string {
   }).format(new Date(value));
 }
 
-function calculateTradeFinalR(trade: Trade, exitPrice: number): number {
-  return calculateCurrentR(
-    trade.direction,
-    trade.actual_entry ?? trade.planned_entry,
-    trade.stop_loss,
-    exitPrice,
-  );
-}
-
 interface ReviewFormProps {
   trade: Trade;
-  onReviewed: (review: Review, payload: ReviewPayload) => void;
+  onReviewed: (review: Review) => void;
 }
 
 function ReviewForm({ trade, onReviewed }: ReviewFormProps) {
-  const [exitPrice, setExitPrice] = useState(trade.exit_price?.toString() ?? "");
-  const [exitReason, setExitReason] = useState(trade.exit_reason ?? "manual_exit");
   const [followedPlan, setFollowedPlan] = useState<FollowedPlan>("yes");
   const [mistakeTags, setMistakeTags] = useState<string[]>([]);
   const [positiveActions, setPositiveActions] = useState<string[]>([]);
@@ -89,20 +79,10 @@ function ReviewForm({ trade, onReviewed }: ReviewFormProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState("");
 
-  const parsedExitPrice = Number(exitPrice);
-  const calculatedFinalR = calculateTradeFinalR(trade, parsedExitPrice);
-  const isValid =
-    exitPrice.trim() !== "" &&
-    Number.isFinite(parsedExitPrice) &&
-    Number.isFinite(calculatedFinalR);
-
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!isValid) return;
 
     const payload: ReviewPayload = {
-      exit_price: parsedExitPrice,
-      exit_reason: exitReason,
       followed_plan: followedPlan,
       mistake_tags: mistakeTags,
       positive_actions: positiveActions,
@@ -113,7 +93,7 @@ function ReviewForm({ trade, onReviewed }: ReviewFormProps) {
     setIsSaving(true);
     setError("");
     try {
-      onReviewed(await createReview(trade.id, payload), payload);
+      onReviewed(await createReview(trade.id, payload));
     } catch (requestError) {
       setError(errorMessage(requestError));
     } finally {
@@ -124,39 +104,9 @@ function ReviewForm({ trade, onReviewed }: ReviewFormProps) {
   return (
     <form className="review-card" onSubmit={handleSubmit}>
       <div className="form-grid three-columns">
-        <label>
-          Exit price *
-          <input
-            type="number"
-            step="any"
-            value={exitPrice}
-            onChange={(event) => setExitPrice(event.target.value)}
-          />
-        </label>
-        <label>
-          Exit reason *
-          <select
-            value={exitReason}
-            onChange={(event) => setExitReason(event.target.value)}
-          >
-            <option value="target_hit">Target hit</option>
-            <option value="stop_hit">Stop hit</option>
-            <option value="manual_exit">Manual exit</option>
-            <option value="runner_stop">Runner stop</option>
-            <option value="invalidated_setup">Invalidated setup</option>
-            <option value="time_exit">Time exit</option>
-            <option value="emotional_exit">Emotional exit</option>
-            <option value="other">Other</option>
-          </select>
-        </label>
-        <label>
-          Final R (calculated)
-          <input
-            value={Number.isFinite(calculatedFinalR) ? calculatedFinalR.toFixed(2) : "—"}
-            readOnly
-            aria-readonly="true"
-          />
-        </label>
+        <div><span>Exit price</span><strong>{trade.exit_price ?? "—"}</strong></div>
+        <div><span>Exit reason</span><strong>{trade.exit_reason?.replaceAll("_", " ") ?? "—"}</strong></div>
+        <div><span>Final R</span><strong>{trade.final_r?.toFixed(2) ?? "—"}</strong></div>
       </div>
 
       <fieldset>
@@ -234,7 +184,7 @@ function ReviewForm({ trade, onReviewed }: ReviewFormProps) {
         </label>
       </div>
 
-      <button className="primary-button" disabled={isSaving || !isValid}>
+      <button className="primary-button" disabled={isSaving}>
         {isSaving ? "Scoring review…" : "Save and Score Review"}
       </button>
       {error && <p className="form-message error-message">{error}</p>}
@@ -300,10 +250,11 @@ function ReviewedTrade({ trade, review }: { trade: Trade; review: Review }) {
 
 interface TradeReviewAccordionProps {
   trade: Trade;
-  onReviewed: (tradeId: number, review: Review, payload: ReviewPayload) => void;
+  onReviewed: (tradeId: number, review: Review) => void;
+  onDeleted: (tradeId: number) => void;
 }
 
-function TradeReviewAccordion({ trade, onReviewed }: TradeReviewAccordionProps) {
+function TradeReviewAccordion({ trade, onReviewed, onDeleted }: TradeReviewAccordionProps) {
   return (
     <details className="trade-accordion review-accordion">
       <summary className="trade-summary review-summary">
@@ -324,30 +275,19 @@ function TradeReviewAccordion({ trade, onReviewed }: TradeReviewAccordionProps) 
       ) : (
         <ReviewForm
           trade={trade}
-          onReviewed={(review, payload) => onReviewed(trade.id, review, payload)}
+          onReviewed={(review) => onReviewed(trade.id, review)}
         />
       )}
+      <DeleteTradeButton trade={trade} onDeleted={onDeleted} />
     </details>
   );
 }
 
 export function PostTradeReview() {
-  const [trades, setTrades] = useState<Trade[]>([]);
+  const { trades, setTrades, isLoading, error } = useTrades("closed");
   const [reviewFilter, setReviewFilter] = useState<ReviewFilter>("all");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    void getTrades()
-      .then((loadedTrades) => {
-        setTrades(loadedTrades.filter((trade) => trade.status === "closed"));
-        setError("");
-      })
-      .catch((requestError) => setError(errorMessage(requestError)))
-      .finally(() => setIsLoading(false));
-  }, []);
 
   const filteredTrades = useMemo(
     () => filterAndSortReviewTrades(trades, {
@@ -361,19 +301,12 @@ export function PostTradeReview() {
   function handleReviewed(
     tradeId: number,
     review: Review,
-    payload: ReviewPayload,
   ) {
     setTrades((current) =>
       current.map((trade) =>
         trade.id === tradeId
           ? {
               ...trade,
-              exit_price: payload.exit_price,
-              exit_reason: payload.exit_reason,
-              final_r: (() => {
-                const result = calculateTradeFinalR(trade, payload.exit_price);
-                return Number.isFinite(result) ? Number(result.toFixed(4)) : null;
-              })(),
               followed_plan: review.followed_plan,
               discipline_score: review.discipline_score,
               has_review: true,
@@ -438,6 +371,9 @@ export function PostTradeReview() {
             key={trade.id}
             trade={trade}
             onReviewed={handleReviewed}
+            onDeleted={(tradeId) =>
+              setTrades((current) => current.filter((item) => item.id !== tradeId))
+            }
           />
         ))}
       </div>

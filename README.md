@@ -18,6 +18,7 @@ or predict market direction.
 - Open-trade R tracking, stop management, partial-profit recording, and runners.
 - Post-trade discipline scoring with YAML-configured bonuses, penalties, and vetoes.
 - Persistent post-trade history with date and review-status filters.
+- Confirmed trade deletion with cascading cleanup of owned records.
 - Dashboard and daily discipline summaries.
 - Searchable rules library.
 - FastAPI error envelopes, Alembic migrations, backend tests, and frontend tests.
@@ -46,6 +47,18 @@ The backend automatically runs `alembic upgrade head` before it starts. SQLite
 data is kept in the named Docker volume `trading_data`, so it survives container
 restarts.
 
+Back up the live Docker database without stopping the application:
+
+```bash
+scripts/backup-database.sh
+```
+
+Restore a backup (the script first creates a safety backup of the current data):
+
+```bash
+scripts/restore-database.sh backups/trading_discipline-YYYYMMDD-HHMMSS.db
+```
+
 Stop the application:
 
 ```bash
@@ -69,7 +82,7 @@ cd backend
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
-pip install -r requirements.txt
+pip install -r requirements-dev.txt
 alembic upgrade head
 uvicorn app.main:app --reload
 ```
@@ -167,9 +180,10 @@ YAML rules
   → alerts and rules-library cards
 ```
 
-The backend calculates authoritative values such as Final R and discipline
-score. The frontend may preview calculations, but clients cannot submit their
-own final score.
+The close-trade operation owns exit price, exit reason, close time, and Final R.
+Post-trade review cannot overwrite those execution facts. Partial and final exits
+are stored as execution records, and the backend calculates quantity-weighted
+Final R and the discipline score.
 
 ## Project structure
 
@@ -178,12 +192,15 @@ backend/
   app/                  FastAPI routes, models, schemas, services, and YAML rules
   alembic/              Database migrations
   tests/                pytest API and service tests
+  requirements-dev.txt Development and test dependencies
   Dockerfile
 frontend/
   src/components/       React pages and reusable UI components
   src/utils/            Pure calculations, filters, and Vitest tests
   Dockerfile
   nginx.conf            Production static hosting and /api proxy
+.github/workflows/      Automated tests, builds, and Docker verification
+scripts/                SQLite backup and restore commands
 docs/                   Product design, implementation plan, and learning log
 docker-compose.yml      Local two-container application
 ```
@@ -202,8 +219,7 @@ docker-compose.yml      Local two-container application
 - No authentication or multi-user support; this is a local single-user tool.
 - No CSV import because Stage 10 was skipped.
 - Current prices and partial exits are entered manually.
-- Final R uses entry, initial stop, and final exit; it does not yet calculate a
-  weighted R from multiple partial-exit prices.
+- Weighted Final R requires position size when a trade has partial exits.
 - SQLite timestamps are stored for the local MVP; timezone/reporting policy
   should be made explicit before multi-region deployment.
 

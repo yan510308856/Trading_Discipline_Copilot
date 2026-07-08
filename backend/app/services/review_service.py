@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from app import models, schemas
 from app.errors import APIError
-from app.services.trade_service import calculate_final_r, get_trade
+from app.services.trade_service import get_trade
 
 
 DEFAULT_SCORING_RULES_PATH = (
@@ -140,10 +140,16 @@ def create_review(
     )
     scoring = calculate_discipline_score(review_data.mistake_tags, positive_actions)
     rules = load_scoring_rules()
-    final_r = calculate_final_r(trade, review_data.exit_price)
+    if trade.final_r is None:
+        raise APIError(
+            409,
+            "MISSING_EXIT_RESULT",
+            "The closed trade does not have an authoritative Final R.",
+            {"trade_id": trade.id},
+        )
     classification = classify_trade(
         scoring["score"],
-        final_r,
+        trade.final_r,
         int(rules["good_trade_min_score"]),
         review_data.followed_plan,
     )
@@ -161,9 +167,6 @@ def create_review(
         veto_reason=scoring["veto_reason"],
         trade_classification=classification,
     )
-    trade.exit_price = review_data.exit_price
-    trade.exit_reason = review_data.exit_reason
-    trade.final_r = final_r
     trade.followed_plan = review_data.followed_plan
     trade.discipline_score = scoring["score"]
     database.add(review)
