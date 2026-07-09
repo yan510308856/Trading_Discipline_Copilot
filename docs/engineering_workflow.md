@@ -187,6 +187,26 @@ Models            数据库模型
 Tests             验证行为
 ```
 
+Stage 20 splits API routes by domain under `backend/app/api/`:
+
+```text
+api/daily_readiness.py
+api/trades.py
+api/market_data.py
+api/rules.py
+api/reviews.py
+api/summary.py
+```
+
+Route modules own HTTP concerns: path declarations, query/body parsing,
+response models, dependency injection, and HTTP status codes. Service modules own
+business behavior: trade lifecycle, readiness calculation, rule evaluation,
+market-data lookup, review scoring, and summary aggregation.
+
+Router splits are maintainability refactors. Public endpoint paths and response
+models should remain unchanged, and existing API tests should continue to prove
+the product behavior did not move.
+
 ### 5.2 Database Migration 原则
 
 从 Stage 1 开始引入 Alembic。

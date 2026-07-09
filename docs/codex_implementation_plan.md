@@ -1182,3 +1182,28 @@ severities, operators, or operator-specific fields should fail fast in tests.
 - Options behavior changes.
 - Broker integration.
 - Router refactoring.
+
+## Stage 20 - Backend Router Split
+
+### Summary
+
+Stage 20 splits the large backend API route module into domain routers while
+preserving every public endpoint path and response model. This is a
+maintainability refactor, not a product behavior change.
+
+### Acceptance criteria
+
+- Domain routers live under `backend/app/api/`.
+- `app.main` still includes one combined router from `app.api`.
+- Daily readiness, trades, rules, market data, reviews, and summary endpoints keep the same paths.
+- Route modules keep HTTP concerns separate from service-layer business logic.
+- Existing backend API tests pass without product behavior changes.
+
+### Deferred
+
+- Endpoint path changes.
+- Response model changes.
+- Service refactors.
+- Product features.
+- Persistent warning acknowledgement.
+- Broker integration.
