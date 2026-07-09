@@ -344,3 +344,48 @@ Intraday trading starts with daily preparation, not with the first chart that lo
 - Economic events, watchlists, and market environment are entered manually.
 - No automatic event calendar, watchlist generation, market classification, broker integration, or order execution is implemented.
 - Strict `trade_horizon` gating is deferred.
+
+## Stage 16 - Decimal precision, options details, and symbol price lookup
+
+### Date
+
+2026-07-09
+
+### What changed
+
+- Numeric trade inputs now use two-decimal behavior.
+- Added `option_contract` for options trades.
+- Added an options warning when the exact contract is missing.
+- Added symbol quote lookup for a reference underlying/last price.
+- Kept option premium entry, stop, and targets manual.
+
+### Commands I ran
+
+```bash
+cd backend
+.venv/bin/pytest -q
+
+cd frontend
+npm test
+npm run build
+```
+
+### Tests
+
+- Backend tests cover option contract persistence, missing-contract warning, quote lookup, unavailable quote fallback, and existing lifecycle behavior.
+- Frontend tests cover decimal parsing/formatting and rounded risk calculations.
+
+### Engineering concepts learned
+
+- Decimal normalization belongs at both edges: frontend before submit and backend schemas before persistence.
+- A nullable model field plus a migration is the smallest durable way to add optional domain data.
+- Quote lookup should return an explicit unavailable state instead of crashing when a provider is not configured.
+
+### Trading discipline concepts encoded
+
+For options, the underlying ticker is not enough. The exact expiration, strike, and call/put direction must be recorded so the trade plan matches the instrument actually being traded.
+
+### Known limitations
+
+- Underlying quote lookup does not provide option premium.
+- No option chain, bid/ask spread, Greeks, implied volatility, pricing model, broker integration, or auto-trading is implemented.

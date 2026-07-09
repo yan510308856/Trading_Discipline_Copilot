@@ -4,11 +4,13 @@ import {
   APIError,
   createTrade,
   evaluateRules,
+  getQuote,
   getTodayDailyReadiness,
   saveChecklistAnswers,
 } from "../api";
 import type {
   DailyReadinessData,
+  QuoteResult,
   RuleAlert,
   RuleEvaluationResult,
   RuleStatus,
@@ -16,11 +18,17 @@ import type {
   TradeFormState,
 } from "../types";
 import { readinessProgressText } from "../utils/readiness";
+import {
+  formatDecimal,
+  formatDecimalInput,
+  parseDecimalInput,
+} from "../utils/decimal";
 import { calculateRiskReward } from "../utils/tradeCalculations";
 import { RuleAlertPanel } from "./RuleAlertPanel";
 
 const initialForm: TradeFormState = {
   symbol: "",
+  option_contract: "",
   market: "futures",
   direction: "long",
   setup: "",
@@ -68,10 +76,6 @@ const marketContexts = [
   "uncertain",
 ];
 
-function optionalNumber(value: string): number | null {
-  return value.trim() === "" ? null : Number(value);
-}
-
 function localAlert(
   ruleId: string,
   severity: RuleAlert["severity"],
@@ -104,10 +108,13 @@ export function TradeChecklist() {
   const [dailyReadiness, setDailyReadiness] =
     useState<DailyReadinessData | null>(null);
   const [readinessError, setReadinessError] = useState("");
+  const [quote, setQuote] = useState<QuoteResult | null>(null);
+  const [quoteError, setQuoteError] = useState("");
+  const [isFetchingQuote, setIsFetchingQuote] = useState(false);
 
-  const entry = optionalNumber(form.planned_entry);
-  const stop = optionalNumber(form.stop_loss);
-  const target = optionalNumber(form.target_1);
+  const entry = parseDecimalInput(form.planned_entry);
+  const stop = parseDecimalInput(form.stop_loss);
+  const target = parseDecimalInput(form.target_1);
 
   const riskReward = useMemo(() => {
     if (entry === null || stop === null || target === null) return null;
@@ -191,6 +198,7 @@ export function TradeChecklist() {
           {
             status: "planned",
             market: form.market,
+            option_contract: form.option_contract.trim() || null,
             setup: form.setup,
             market_context: form.market_context,
             planned_entry: entry,
@@ -254,6 +262,42 @@ export function TradeChecklist() {
   ) {
     setForm((current) => ({ ...current, [field]: value }));
     setSuccessMessage("");
+    if (field === "symbol" || field === "market") {
+      setQuote(null);
+      setQuoteError("");
+    }
+  }
+
+  function formatNumberField(field: keyof TradeFormState) {
+    setForm((current) => ({
+      ...current,
+      [field]: formatDecimalInput(String(current[field])),
+    }));
+  }
+
+  async function fetchSymbolPrice() {
+    const symbol = form.symbol.trim();
+    if (!symbol) {
+      setQuoteError("Enter a symbol before fetching price.");
+      return;
+    }
+
+    setIsFetchingQuote(true);
+    setQuoteError("");
+    setQuote(null);
+    try {
+      const result = await getQuote(symbol);
+      setQuote(result);
+      if (result.message) setQuoteError(result.message);
+    } catch (error) {
+      setQuoteError(
+        error instanceof APIError
+          ? `${error.code}: ${error.message}`
+          : "Price could not be fetched. Enter price manually.",
+      );
+    } finally {
+      setIsFetchingQuote(false);
+    }
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -270,6 +314,8 @@ export function TradeChecklist() {
 
     const payload: TradeCreatePayload = {
       symbol: form.symbol.trim().toUpperCase(),
+      option_contract:
+        form.market === "options" ? form.option_contract.trim() || null : null,
       market: form.market,
       direction: form.direction,
       setup: form.setup,
@@ -277,9 +323,9 @@ export function TradeChecklist() {
       planned_entry: entry,
       stop_loss: stop,
       target_1: target,
-      target_2: optionalNumber(form.target_2),
+      target_2: parseDecimalInput(form.target_2),
       runner_enabled: form.runner_enabled,
-      position_size: optionalNumber(form.position_size),
+      position_size: parseDecimalInput(form.position_size),
       notes: form.notes.trim() || null,
     };
 
@@ -302,6 +348,7 @@ export function TradeChecklist() {
         is_immediate_reverse: form.is_immediate_reverse,
         second_leg_entry: form.second_leg_entry,
         big_bar_entry: form.big_bar_entry,
+        option_contract: form.option_contract.trim() || null,
       });
       setSuccessMessage(`Trade plan #${trade.id} for ${trade.symbol} was created.`);
     } catch (error) {
@@ -351,9 +398,15 @@ export function TradeChecklist() {
               <input
                 value={form.symbol}
                 onChange={(event) => updateField("symbol", event.target.value)}
-                placeholder="ES"
+                placeholder={form.market === "options" ? "AAPL" : "ES"}
                 maxLength={32}
               />
+              {form.market === "options" && (
+                <small>
+                  For options, Symbol should be the underlying ticker, e.g.
+                  AAPL, TSLA, SPY.
+                </small>
+              )}
             </label>
             <label>
               Market *
@@ -417,6 +470,61 @@ export function TradeChecklist() {
               </select>
             </label>
           </div>
+          {form.market === "options" && (
+            <label className="option-contract-field">
+              Option contract
+              <input
+                value={form.option_contract}
+                onChange={(event) =>
+                  updateField("option_contract", event.target.value)
+                }
+                placeholder="AAPL 2026-01-16 200C"
+                maxLength={128}
+              />
+              <small>
+                Enter the specific option contract manually. Stage 16 does not
+                fetch live option premium prices.
+              </small>
+            </label>
+          )}
+          <div className="quote-lookup">
+            <button
+              className="secondary-button"
+              type="button"
+              disabled={isFetchingQuote || form.symbol.trim() === ""}
+              onClick={() => void fetchSymbolPrice()}
+            >
+              {isFetchingQuote ? "Fetching..." : "Fetch price"}
+            </button>
+            {quote && quote.price !== null && (
+              <div className="quote-result">
+                <span>
+                  {form.market === "options" ? "Underlying price" : "Last price"}
+                </span>
+                <strong>{formatDecimal(quote.price)}</strong>
+                <small>
+                  {quote.source} · {new Date(quote.fetched_at).toLocaleString()}
+                </small>
+                {form.market !== "options" && (
+                  <button
+                    className="secondary-button"
+                    type="button"
+                    onClick={() =>
+                      updateField("planned_entry", formatDecimal(quote.price))
+                    }
+                  >
+                    Use as planned entry
+                  </button>
+                )}
+                {form.market === "options" && (
+                  <small>
+                    This is the underlying price, not the option premium.
+                  </small>
+                )}
+              </div>
+            )}
+            {quoteError && <p className="quote-message">{quoteError}</p>}
+          </div>
         </fieldset>
 
         <fieldset>
@@ -424,23 +532,23 @@ export function TradeChecklist() {
           <div className="form-grid three-columns">
             <label>
               Planned entry *
-              <input type="number" step="any" value={form.planned_entry} onChange={(event) => updateField("planned_entry", event.target.value)} />
+              <input type="number" step="0.01" inputMode="decimal" value={form.planned_entry} onBlur={() => formatNumberField("planned_entry")} onChange={(event) => updateField("planned_entry", event.target.value)} />
             </label>
             <label>
               Stop loss *
-              <input type="number" step="any" value={form.stop_loss} onChange={(event) => updateField("stop_loss", event.target.value)} />
+              <input type="number" step="0.01" inputMode="decimal" value={form.stop_loss} onBlur={() => formatNumberField("stop_loss")} onChange={(event) => updateField("stop_loss", event.target.value)} />
             </label>
             <label>
               Target 1 *
-              <input type="number" step="any" value={form.target_1} onChange={(event) => updateField("target_1", event.target.value)} />
+              <input type="number" step="0.01" inputMode="decimal" value={form.target_1} onBlur={() => formatNumberField("target_1")} onChange={(event) => updateField("target_1", event.target.value)} />
             </label>
             <label>
               Target 2
-              <input type="number" step="any" value={form.target_2} onChange={(event) => updateField("target_2", event.target.value)} />
+              <input type="number" step="0.01" inputMode="decimal" value={form.target_2} onBlur={() => formatNumberField("target_2")} onChange={(event) => updateField("target_2", event.target.value)} />
             </label>
             <label>
               Position size
-              <input type="number" min="0" step="any" value={form.position_size} onChange={(event) => updateField("position_size", event.target.value)} />
+              <input type="number" min="0" step="0.01" inputMode="decimal" value={form.position_size} onBlur={() => formatNumberField("position_size")} onChange={(event) => updateField("position_size", event.target.value)} />
             </label>
           </div>
 

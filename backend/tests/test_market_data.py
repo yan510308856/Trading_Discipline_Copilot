@@ -50,6 +50,38 @@ def test_finnhub_provider_reports_invalid_key(monkeypatch) -> None:
         raise AssertionError("Expected invalid Finnhub credentials to fail")
 
 
+def test_quote_endpoint_returns_mocked_quote(api_client: TestClient, monkeypatch) -> None:
+    class FakeProvider:
+        def latest_quote(self, symbol: str, market: str) -> Quote | None:
+            assert market == "stocks"
+            return Quote(symbol, 182.456, "fake", 1700000000)
+
+    monkeypatch.setattr(
+        market_data, "configured_market_data_provider", lambda: FakeProvider()
+    )
+
+    response = api_client.get("/market-data/quote?symbol=aapl")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["symbol"] == "AAPL"
+    assert body["price"] == 182.46
+    assert body["source"] == "fake"
+    assert body["fetched_at"].startswith("2023-11-14T")
+    assert body["message"] is None
+
+
+def test_quote_endpoint_handles_unavailable_provider(api_client: TestClient) -> None:
+    response = api_client.get("/market-data/quote?symbol=SPY")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["symbol"] == "SPY"
+    assert body["price"] is None
+    assert body["source"] == "manual"
+    assert body["message"] == "Price could not be fetched. Enter price manually."
+
+
 def test_refresh_open_stock_and_build_attention(
     api_client: TestClient, monkeypatch
 ) -> None:

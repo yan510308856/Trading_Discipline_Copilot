@@ -6,6 +6,7 @@ import json
 import os
 import time
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from functools import lru_cache
 from typing import Protocol
 from urllib.error import HTTPError, URLError
@@ -98,6 +99,43 @@ class FinnhubMarketDataProvider:
 def configured_market_data_provider() -> MarketDataProvider:
     api_key = os.getenv("FINNHUB_API_KEY", "").strip()
     return FinnhubMarketDataProvider(api_key) if api_key else ManualMarketDataProvider()
+
+
+def get_quote(
+    symbol: str,
+    provider: MarketDataProvider | None = None,
+) -> dict[str, object]:
+    normalized_symbol = symbol.strip().upper()
+    if not normalized_symbol:
+        raise APIError(
+            422,
+            "INVALID_SYMBOL",
+            "Symbol is required before fetching a quote.",
+        )
+
+    provider = provider or configured_market_data_provider()
+    quote = provider.latest_quote(normalized_symbol, "stocks")
+    fetched_at = datetime.now(timezone.utc)
+    if quote is None:
+        return {
+            "symbol": normalized_symbol,
+            "price": None,
+            "source": "manual",
+            "fetched_at": fetched_at,
+            "message": "Price could not be fetched. Enter price manually.",
+        }
+
+    return {
+        "symbol": quote.symbol,
+        "price": round(quote.price, 2),
+        "source": quote.source,
+        "fetched_at": (
+            datetime.fromtimestamp(quote.quoted_at, timezone.utc)
+            if quote.quoted_at is not None
+            else fetched_at
+        ),
+        "message": None,
+    }
 
 
 def refresh_open_trade_prices(

@@ -5,6 +5,7 @@ import type {
   DailySummaryData,
   HealthResponse,
   OpenTradeAttention,
+  QuoteResult,
   QuoteRefreshResult,
   Review,
   ReviewPayload,
@@ -103,6 +104,12 @@ export function refreshOpenPrices(): Promise<QuoteRefreshResult> {
   return apiRequest<QuoteRefreshResult>("/market-data/refresh-open", {
     method: "POST",
   });
+}
+
+export function getQuote(symbol: string): Promise<QuoteResult> {
+  return apiRequest<QuoteResult>(
+    `/market-data/quote?symbol=${encodeURIComponent(symbol)}`,
+  );
 }
 
 export function getOpenTradeAttention(): Promise<OpenTradeAttention[]> {

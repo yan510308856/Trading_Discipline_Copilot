@@ -107,6 +107,7 @@ export interface RuleDefinition {
 
 export interface TradeFormState {
   symbol: string;
+  option_contract: string;
   market: Market;
   direction: Direction;
   setup: string;
@@ -127,6 +128,7 @@ export interface TradeFormState {
 
 export interface TradeCreatePayload {
   symbol: string;
+  option_contract: string | null;
   market: Market;
   direction: Direction;
   setup: string;
@@ -166,6 +168,14 @@ export interface Trade extends TradeCreatePayload {
   executions: TradeExecution[];
 }
 
+export interface QuoteResult {
+  symbol: string;
+  price: number | null;
+  source: string;
+  fetched_at: string;
+  message: string | null;
+}
+
 export interface TradeExecution {
   id: number;
   trade_id: number;
@@ -181,6 +191,7 @@ export interface TradePatchPayload {
   runner_enabled?: boolean;
   runner_active?: boolean;
   runner_stop?: number | null;
+  position_size?: number | null;
   notes?: string | null;
 }
 

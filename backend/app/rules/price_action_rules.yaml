@@ -265,6 +265,33 @@ rules:
     discipline_sentence: If you choose to be early in stock, size must stay small.
     enabled: true
 
+  - id: options_trade_missing_contract_details
+    name: Options trades need specific contract details
+    category: risk_control
+    stage: pre_trade
+    severity: warning
+    trigger:
+      status: planned
+      market: options
+    conditions:
+      - field: option_contract
+        operator: missing
+    message: Options trade is missing specific contract details.
+    checklist:
+      - Is the expiration recorded?
+      - Is the strike recorded?
+      - Is the call or put direction recorded?
+    next_actions:
+      - Enter expiration, strike, and call/put direction.
+      - Confirm the option contract matches the trade thesis.
+      - Do not confuse underlying price with option premium.
+    ui_hints:
+      emphasis: acknowledgement_required
+    requires_acknowledgement: true
+    avoid: Planning an options trade from only the underlying ticker.
+    discipline_sentence: For options, the underlying symbol is not enough; record the exact contract before trading.
+    enabled: true
+
   - id: take_profit_and_let_runner_run
     name: Take partial profit at one R and keep a runner
     category: trade_management

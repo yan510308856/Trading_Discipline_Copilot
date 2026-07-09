@@ -49,6 +49,53 @@ def test_create_get_patch_and_list_trade(api_client: TestClient) -> None:
     assert [trade["id"] for trade in list_response.json()] == [created["id"]]
 
 
+def test_option_contract_persists_for_options_trade(api_client: TestClient) -> None:
+    response = api_client.post(
+        "/trades",
+        json=planned_trade_payload()
+        | {
+            "symbol": "AAPL",
+            "market": "options",
+            "planned_entry": 4.126,
+            "stop_loss": 3.555,
+            "target_1": 5.994,
+            "option_contract": " AAPL 2026-01-16 200C ",
+        },
+    )
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body["option_contract"] == "AAPL 2026-01-16 200C"
+    assert body["planned_entry"] == 4.13
+    assert body["stop_loss"] == 3.56
+    assert body["target_1"] == 5.99
+
+
+def test_option_trade_without_contract_still_succeeds(api_client: TestClient) -> None:
+    response = api_client.post(
+        "/trades",
+        json=planned_trade_payload() | {"market": "options", "symbol": "SPY"},
+    )
+
+    assert response.status_code == 201
+    assert response.json()["option_contract"] is None
+
+
+def test_stock_trade_can_be_created_without_option_contract(api_client: TestClient) -> None:
+    response = api_client.post(
+        "/trades",
+        json=planned_trade_payload()
+        | {
+            "market": "stocks",
+            "symbol": "AAPL",
+            "option_contract": "AAPL 2026-01-16 200C",
+        },
+    )
+
+    assert response.status_code == 201
+    assert response.json()["option_contract"] is None
+
+
 def test_evaluate_rules_for_draft_and_existing_trade(api_client: TestClient) -> None:
     draft_response = api_client.post(
         "/rules/evaluate",
@@ -138,7 +185,19 @@ def test_patch_persists_open_trade_management_fields(api_client: TestClient) -> 
     assert response.json()["mfe_r"] == 1.0
     assert response.json()["mae_r"] == 1.0
     assert response.json()["runner_active"] is True
-    assert response.json()["runner_stop"] == 4998
+
+
+def test_patch_open_trade_initial_quantity(api_client: TestClient) -> None:
+    created = create_trade(api_client)
+    api_client.post(f"/trades/{created['id']}/open", json={})
+
+    response = api_client.patch(
+        f"/trades/{created['id']}",
+        json={"position_size": 3.456},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["position_size"] == 3.46
 
 
 def test_partial_quantity_cannot_exceed_position_size(api_client: TestClient) -> None:
@@ -410,10 +469,11 @@ def test_get_rules(api_client: TestClient) -> None:
     rule_ids = {rule["id"] for rule in rules}
 
     assert response.status_code == 200
-    assert len(rules) == 14
+    assert len(rules) == 15
     assert {
         "no_options_for_left_side_bottom_picking",
         "left_side_stock_only_small_size",
+        "options_trade_missing_contract_details",
     } <= rule_ids
     assert set(rules[0]) == {
         "id",

@@ -20,6 +20,7 @@ def test_yaml_contains_all_mvp_rules() -> None:
         "signal_context_over_shape",
         "no_options_for_left_side_bottom_picking",
         "left_side_stock_only_small_size",
+        "options_trade_missing_contract_details",
         "take_profit_and_let_runner_run",
         "green_trade_should_not_go_red",
         "runner_must_have_protection",
@@ -74,7 +75,7 @@ def test_options_left_side_bottom_pick_is_blocked() -> None:
     )
 
     assert result["status"] == "blocked"
-    assert alert_ids(result) == {"no_options_for_left_side_bottom_picking"}
+    assert "no_options_for_left_side_bottom_picking" in alert_ids(result)
     assert result["alerts"][0]["severity"] == "blocker"
     assert "options" in result["alerts"][0]["message"].lower()
 
@@ -94,6 +95,38 @@ def test_stocks_left_side_bottom_pick_returns_acknowledged_warning() -> None:
     assert result["alerts"][0]["severity"] == "warning"
     assert result["alerts"][0]["requires_acknowledgement"] is True
     assert "small" in " ".join(result["alerts"][0]["checklist"]).lower()
+
+
+def test_options_trade_without_contract_details_warns() -> None:
+    result = evaluate_trade(
+        {
+            "status": "planned",
+            "market": "options",
+            "setup": "breakout",
+            "stop_loss": 3.5,
+            "option_contract": None,
+            "follow_through_confirmed": True,
+        }
+    )
+
+    assert result["status"] == "warning"
+    assert alert_ids(result) == {"options_trade_missing_contract_details"}
+    assert result["alerts"][0]["requires_acknowledgement"] is True
+
+
+def test_options_trade_with_contract_details_does_not_warn_for_missing_contract() -> None:
+    result = evaluate_trade(
+        {
+            "status": "planned",
+            "market": "options",
+            "setup": "breakout",
+            "stop_loss": 3.5,
+            "option_contract": "AAPL 2026-01-16 200C",
+            "follow_through_confirmed": True,
+        }
+    )
+
+    assert "options_trade_missing_contract_details" not in alert_ids(result)
 
 
 def test_open_trade_at_one_r_returns_partial_profit_reminder() -> None:

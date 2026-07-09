@@ -143,6 +143,11 @@ def refresh_open_market_data(database: Database) -> dict[str, Any]:
     return {"trades": trades, "errors": errors, "source": source}
 
 
+@router.get("/market-data/quote", response_model=schemas.QuoteResult)
+def get_market_quote(symbol: str = Query(min_length=1, max_length=32)) -> dict[str, Any]:
+    return market_data.get_quote(symbol)
+
+
 def _model_values(trade: models.Trade) -> dict[str, Any]:
     return {
         column.key: getattr(trade, column.key)
