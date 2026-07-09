@@ -14,6 +14,7 @@ import type {
   Trade,
   TradeClosePayload,
   TradeCreatePayload,
+  TradeHorizon,
   TradePatchPayload,
 } from "./types";
 
@@ -144,9 +145,13 @@ export function saveChecklistAnswers(
   });
 }
 
-export function getTrades(status?: Trade["status"]): Promise<Trade[]> {
+export function getTrades(
+  status?: Trade["status"],
+  tradeHorizon?: TradeHorizon,
+): Promise<Trade[]> {
   const query = new URLSearchParams({ limit: "500" });
   if (status) query.set("status", status);
+  if (tradeHorizon) query.set("trade_horizon", tradeHorizon);
   return apiRequest<Trade[]>(`/trades?${query.toString()}`);
 }
 

@@ -10,6 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 Market = Literal["futures", "stocks", "crypto", "forex", "options", "other"]
 Direction = Literal["long", "short"]
+TradeHorizon = Literal["intraday", "swing", "other"]
 TradeStatus = Literal["planned", "open", "closed", "cancelled"]
 FollowedPlan = Literal["yes", "partial", "no"]
 TradeClassification = Literal[
@@ -53,6 +54,7 @@ class TradeExecutionRead(BaseModel):
 class TradeCreate(BaseModel):
     symbol: str = Field(min_length=1, max_length=32)
     option_contract: Optional[str] = Field(default=None, max_length=128)
+    trade_horizon: TradeHorizon = "intraday"
     market: Market
     direction: Direction
     setup: str = Field(min_length=1, max_length=64)
@@ -125,6 +127,7 @@ class TradeRead(TradeCreate):
 class TradePatch(BaseModel):
     symbol: Optional[str] = Field(default=None, min_length=1, max_length=32)
     option_contract: Optional[str] = Field(default=None, max_length=128)
+    trade_horizon: Optional[TradeHorizon] = None
     market: Optional[Market] = None
     direction: Optional[Direction] = None
     setup: Optional[str] = Field(default=None, min_length=1, max_length=64)
@@ -171,6 +174,7 @@ class TradePatch(BaseModel):
     def reject_null_for_required_database_fields(self) -> "TradePatch":
         required_fields = {
             "symbol",
+            "trade_horizon",
             "market",
             "direction",
             "setup",

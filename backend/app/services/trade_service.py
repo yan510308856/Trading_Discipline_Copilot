@@ -22,6 +22,7 @@ def create_planned_trade(database: Session, trade_data: schemas.TradeCreate) -> 
 def list_trades(
     database: Session,
     trade_status: str | None = None,
+    trade_horizon: str | None = None,
     limit: int = 100,
     offset: int = 0,
 ) -> list[models.Trade]:
@@ -31,6 +32,8 @@ def list_trades(
     )
     if trade_status is not None:
         statement = statement.where(models.Trade.status == trade_status)
+    if trade_horizon is not None:
+        statement = statement.where(models.Trade.trade_horizon == trade_horizon)
     statement = statement.order_by(models.Trade.id.desc()).limit(limit).offset(offset)
     return list(database.scalars(statement))
 

@@ -1076,7 +1076,7 @@ Stage 15 adds a Dashboard-based daily readiness checklist that decides whether i
 - A single `daily_readiness` table stores flexible JSON checklist items.
 - The checklist template and readiness calculation live in `daily_readiness_service.py`.
 - The UI uses an explicit Save button to keep persistence obvious.
-- Strict `trade_horizon` gating is deferred to avoid widening the trade schema in this stage.
+- Strict `trade_horizon` gating is deferred to Stage 17 to avoid widening the trade schema in this stage.
 
 ## Stage 16 - Decimal Precision, Options Contract Details, and Symbol Price Lookup
 
@@ -1101,3 +1101,29 @@ Stage 16 improves New Trade planning for stocks and options. Numeric trade input
 - Bid/ask/spread.
 - Greeks, IV, delta, and pricing models.
 - Broker integration or order execution.
+
+## Stage 17 - Trade Horizon, Intraday Gate, and Navigation Scanability
+
+### Summary
+
+Stage 17 adds `trade_horizon` to every trade plan and uses it to scope Daily
+Readiness correctly. Intraday plans require today's readiness checklist to be
+cleared; swing and other plans are not blocked by that intraday gate.
+
+### Acceptance criteria
+
+- `Trade` stores `trade_horizon` with allowed values `intraday`, `swing`, and `other`.
+- Older clients that omit `trade_horizon` still create intraday trades.
+- `GET /trades` can filter by `trade_horizon`.
+- New Trade requires a horizon selection near setup/context.
+- Intraday readiness creates a blocker only for intraday plans.
+- Daily Readiness remains at the bottom of Dashboard.
+- Navigation uses icons plus labels/short labels instead of single-letter initials.
+
+### Deferred
+
+- Dashboard redesign.
+- Option premium lookup or option chain support.
+- Broker integration, order execution, or auto trading.
+- Global frontend state management.
+- Backend router refactoring.

@@ -55,10 +55,17 @@ def update_daily_readiness(
 def list_trades(
     database: Database,
     trade_status: Optional[schemas.TradeStatus] = Query(default=None, alias="status"),
+    trade_horizon: Optional[schemas.TradeHorizon] = Query(default=None),
     limit: int = Query(default=100, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
 ) -> list[models.Trade]:
-    return trade_service.list_trades(database, trade_status, limit, offset)
+    return trade_service.list_trades(
+        database,
+        trade_status,
+        trade_horizon,
+        limit,
+        offset,
+    )
 
 
 @router.post(
@@ -189,7 +196,7 @@ def evaluate_rules(
 def get_open_trade_attention(database: Database) -> list[dict[str, Any]]:
     priorities = {"blocker": 3, "warning": 2, "reminder": 1}
     attention: list[dict[str, Any]] = []
-    trades = trade_service.list_trades(database, "open", 500, 0)
+    trades = trade_service.list_trades(database, "open", None, 500, 0)
     for trade in trades:
         current_r = (
             trade_service.calculate_final_r(trade, trade.current_price)
