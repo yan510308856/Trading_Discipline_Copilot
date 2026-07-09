@@ -255,6 +255,20 @@ def test_patch_open_trade_initial_quantity(api_client: TestClient) -> None:
     assert response.json()["position_size"] == 3.46
 
 
+def test_patch_open_trade_management_targets(api_client: TestClient) -> None:
+    created = create_trade(api_client)
+    api_client.post(f"/trades/{created['id']}/open", json={})
+
+    response = api_client.patch(
+        f"/trades/{created['id']}",
+        json={"target_1": 5030, "target_2": 5040},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["target_1"] == 5030
+    assert response.json()["target_2"] == 5040
+
+
 def test_partial_quantity_cannot_exceed_position_size(api_client: TestClient) -> None:
     created = create_trade(api_client)
     api_client.post(f"/trades/{created['id']}/open", json={})
@@ -483,6 +497,116 @@ def test_daily_summary_aggregates_mistakes_and_lessons(
         "Pause after a stopped trade.",
         "Protect open profit earlier.",
     }
+
+
+def test_daily_summary_without_horizon_includes_all_trades(api_client: TestClient) -> None:
+    intraday = api_client.post(
+        "/trades",
+        json=planned_trade_payload() | {"trade_horizon": "intraday"},
+    ).json()
+    api_client.post(f"/trades/{intraday['id']}/open", json={})
+    api_client.post(
+        f"/trades/{intraday['id']}/close",
+        json={"exit_price": 5020, "exit_reason": "target_hit"},
+    )
+
+    swing = api_client.post(
+        "/trades",
+        json=planned_trade_payload()
+        | {
+            "symbol": "AAPL",
+            "trade_horizon": "swing",
+            "planned_entry": 100,
+            "stop_loss": 95,
+            "target_1": 110,
+        },
+    ).json()
+    api_client.post(f"/trades/{swing['id']}/open", json={})
+    api_client.post(
+        f"/trades/{swing['id']}/close",
+        json={"exit_price": 110, "exit_reason": "target_hit"},
+    )
+
+    response = api_client.get("/summary/daily")
+
+    assert response.status_code == 200
+    assert response.json()["total_trades"] == 2
+    assert response.json()["net_r"] == 4.0
+
+
+def test_daily_summary_filters_intraday_trades(api_client: TestClient) -> None:
+    intraday = api_client.post(
+        "/trades",
+        json=planned_trade_payload() | {"trade_horizon": "intraday"},
+    ).json()
+    api_client.post(f"/trades/{intraday['id']}/open", json={})
+    api_client.post(
+        f"/trades/{intraday['id']}/close",
+        json={"exit_price": 5020, "exit_reason": "target_hit"},
+    )
+    swing = api_client.post(
+        "/trades",
+        json=planned_trade_payload()
+        | {
+            "symbol": "AAPL",
+            "trade_horizon": "swing",
+            "planned_entry": 100,
+            "stop_loss": 95,
+            "target_1": 110,
+        },
+    ).json()
+    api_client.post(f"/trades/{swing['id']}/open", json={})
+    api_client.post(
+        f"/trades/{swing['id']}/close",
+        json={"exit_price": 105, "exit_reason": "manual_exit"},
+    )
+
+    response = api_client.get("/summary/daily?trade_horizon=intraday")
+
+    assert response.status_code == 200
+    assert response.json()["total_trades"] == 1
+    assert response.json()["net_r"] == 2.0
+
+
+def test_daily_summary_filters_swing_trades(api_client: TestClient) -> None:
+    intraday = api_client.post(
+        "/trades",
+        json=planned_trade_payload() | {"trade_horizon": "intraday"},
+    ).json()
+    api_client.post(f"/trades/{intraday['id']}/open", json={})
+    api_client.post(
+        f"/trades/{intraday['id']}/close",
+        json={"exit_price": 5020, "exit_reason": "target_hit"},
+    )
+    swing = api_client.post(
+        "/trades",
+        json=planned_trade_payload()
+        | {
+            "symbol": "AAPL",
+            "trade_horizon": "swing",
+            "planned_entry": 100,
+            "stop_loss": 95,
+            "target_1": 110,
+        },
+    ).json()
+    api_client.post(f"/trades/{swing['id']}/open", json={})
+    api_client.post(
+        f"/trades/{swing['id']}/close",
+        json={"exit_price": 110, "exit_reason": "target_hit"},
+    )
+
+    response = api_client.get("/summary/daily?trade_horizon=swing")
+
+    assert response.status_code == 200
+    assert response.json()["total_trades"] == 1
+    assert response.json()["net_r"] == 2.0
+
+
+def test_daily_summary_rejects_invalid_trade_horizon(api_client: TestClient) -> None:
+    response = api_client.get("/summary/daily?trade_horizon=overnight")
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "VALIDATION_ERROR"
 
 
 def test_daily_summary_empty_state_for_date_without_trades(

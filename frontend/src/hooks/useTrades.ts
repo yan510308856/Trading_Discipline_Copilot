@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 
 import { APIError, getTrades } from "../api";
-import type { Trade } from "../types";
+import type { Trade, TradeHorizon } from "../types";
 
-export function useTrades(status?: Trade["status"]) {
+export function useTrades(status?: Trade["status"], tradeHorizon?: TradeHorizon) {
   const [trades, setTrades] = useState<Trade[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
@@ -11,7 +11,7 @@ export function useTrades(status?: Trade["status"]) {
   useEffect(() => {
     const controller = new AbortController();
     setIsLoading(true);
-    void getTrades(status)
+    void getTrades(status, tradeHorizon)
       .then((loadedTrades) => {
         if (!controller.signal.aborted) {
           setTrades(loadedTrades);
@@ -32,7 +32,7 @@ export function useTrades(status?: Trade["status"]) {
       });
 
     return () => controller.abort();
-  }, [status]);
+  }, [status, tradeHorizon]);
 
   return { trades, setTrades, isLoading, error };
 }

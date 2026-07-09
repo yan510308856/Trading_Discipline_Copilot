@@ -3,6 +3,11 @@ import { useCallback, useEffect, useState } from "react";
 import { APIError, getDailySummary, getHealth, refreshOpenPrices } from "../api";
 import type { ConnectionState, DailySummaryData, Trade } from "../types";
 import { calculateCurrentR } from "../utils/tradeCalculations";
+import {
+  HorizonFilter,
+  type HorizonFilterValue,
+  horizonForApi,
+} from "./HorizonFilter";
 import { IntradayReadinessPanel } from "./IntradayReadinessPanel";
 import { SummaryCards } from "./SummaryCards";
 
@@ -21,6 +26,7 @@ function requestErrorMessage(error: unknown): string {
 export function Dashboard() {
   const [connection, setConnection] = useState<ConnectionState>("checking");
   const [summary, setSummary] = useState<DailySummaryData | null>(null);
+  const [summaryHorizon, setSummaryHorizon] = useState<HorizonFilterValue>("all");
   const [summaryError, setSummaryError] = useState("");
   const [isLoadingSummary, setIsLoadingSummary] = useState(true);
   const [openTrades, setOpenTrades] = useState<Trade[]>([]);
@@ -60,14 +66,14 @@ export function Dashboard() {
     }
 
     try {
-      setSummary(await getDailySummary());
+      setSummary(await getDailySummary(undefined, horizonForApi(summaryHorizon)));
       await refreshQuotes();
     } catch (error) {
       setSummaryError(requestErrorMessage(error));
     } finally {
       setIsLoadingSummary(false);
     }
-  }, [refreshQuotes]);
+  }, [refreshQuotes, summaryHorizon]);
 
   useEffect(() => {
     void refreshDashboard();
@@ -76,11 +82,11 @@ export function Dashboard() {
   return (
     <section className="dashboard" aria-labelledby="dashboard-title">
       <div className="hero-card">
-        <p className="eyebrow">Today&apos;s workspace</p>
-        <h2 id="dashboard-title">Trade the plan, not the feeling.</h2>
+        <p className="eyebrow">Today&apos;s operating state</p>
+        <h2 id="dashboard-title">Discipline status and active risk.</h2>
         <p>
-          Build deliberate plans, surface discipline risks, and review execution
-          without confusing a lucky outcome for a good decision.
+          Check readiness, open risk, blocker pressure, and review quality before
+          adding another trade.
         </p>
       </div>
 
@@ -95,6 +101,11 @@ export function Dashboard() {
               Top issue: {summary.most_frequent_mistakes[0].tag.replaceAll("_", " ")}
             </span>
           )}
+          <HorizonFilter
+            value={summaryHorizon}
+            onChange={setSummaryHorizon}
+            label="Summary horizon"
+          />
         </div>
 
         {isLoadingSummary && <p className="empty-state">Loading today&apos;s summary…</p>}

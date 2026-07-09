@@ -25,6 +25,11 @@ import {
 import { PriceLadder } from "./PriceLadder";
 import { RuleAlertPanel } from "./RuleAlertPanel";
 import { DeleteTradeButton } from "./DeleteTradeButton";
+import {
+  HorizonFilter,
+  type HorizonFilterValue,
+  horizonForApi,
+} from "./HorizonFilter";
 
 interface TradeCardProps {
   trade: Trade;
@@ -35,6 +40,74 @@ interface TradeCardProps {
 
 function numberOrNull(value: string): number | null {
   return parseDecimalInput(value);
+}
+
+interface EditableMetricProps {
+  label: string;
+  value: number | null;
+  onSave: (value: number | null) => Promise<void>;
+  required?: boolean;
+}
+
+function EditableMetric({
+  label,
+  value,
+  onSave,
+  required = false,
+}: EditableMetricProps) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [draft, setDraft] = useState(value?.toString() ?? "");
+  const parsedDraft = numberOrNull(draft);
+  const canSave = required
+    ? parsedDraft !== null
+    : draft.trim() === "" || parsedDraft !== null;
+
+  useEffect(() => {
+    if (!isEditing) setDraft(value?.toString() ?? "");
+  }, [isEditing, value]);
+
+  async function save() {
+    if (!canSave) return;
+    await onSave(draft.trim() === "" ? null : parsedDraft);
+    setIsEditing(false);
+  }
+
+  if (isEditing) {
+    return (
+      <div className="editable-metric editing">
+        <span>{label}</span>
+        <input
+          aria-label={label}
+          autoFocus
+          type="number"
+          step="any"
+          value={draft}
+          onChange={(event) => setDraft(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") void save();
+            if (event.key === "Escape") setIsEditing(false);
+          }}
+        />
+        <div className="metric-edit-actions">
+          <button type="button" disabled={!canSave} onClick={() => void save()}>
+            Save
+          </button>
+          <button type="button" onClick={() => setIsEditing(false)}>
+            Cancel
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="editable-metric">
+      <span>{label}</span>
+      <button type="button" onClick={() => setIsEditing(true)}>
+        {value ?? "—"}
+      </button>
+    </div>
+  );
 }
 
 function displayPrice(value: number | null): string {
@@ -90,9 +163,6 @@ function TradeCard({ trade, onUpdated, defaultExpanded, onDeleted }: TradeCardPr
   const [runnerStop, setRunnerStop] = useState(
     trade.runner_stop?.toString() ?? "",
   );
-  const [initialQuantity, setInitialQuantity] = useState(
-    trade.position_size?.toString() ?? "",
-  );
   const [partialQuantity, setPartialQuantity] = useState("");
   const [partialPrice, setPartialPrice] = useState("");
   const [note, setNote] = useState(trade.notes ?? "");
@@ -124,9 +194,15 @@ function TradeCard({ trade, onUpdated, defaultExpanded, onDeleted }: TradeCardPr
     trade.position_size,
     trade.partial_exit_quantity,
   );
+  const partialExitLevels = trade.executions
+    .filter((item) => item.execution_type === "partial")
+    .map((item) => ({ price: item.price, quantity: item.quantity }));
+  const activeStopForMap =
+    trade.runner_active && trade.runner_stop !== null
+      ? trade.runner_stop
+      : numberOrNull(currentStop);
   const parsedPartialQuantity = numberOrNull(partialQuantity);
   const parsedPartialPrice = numberOrNull(partialPrice);
-  const parsedInitialQuantity = numberOrNull(initialQuantity);
   const partialQuantityIsValid =
     parsedPartialQuantity !== null &&
     parsedPartialQuantity >= 0 &&
@@ -239,7 +315,8 @@ function TradeCard({ trade, onUpdated, defaultExpanded, onDeleted }: TradeCardPr
           <span className="trade-status planned">Planned</span>
         </summary>
         <article className="open-trade-card">
-        <div className="trade-facts compact-facts">
+        <div className="trade-facts compact-facts cockpit-metrics">
+          <div><span>Horizon</span><strong>{trade.trade_horizon}</strong></div>
           <div><span>Planned entry</span><strong>{trade.planned_entry}</strong></div>
           <div><span>Initial stop</span><strong>{trade.stop_loss}</strong></div>
           <div><span>Target 1</span><strong>{trade.target_1}</strong></div>
@@ -299,48 +376,40 @@ function TradeCard({ trade, onUpdated, defaultExpanded, onDeleted }: TradeCardPr
         {primaryRequiredAction && <p>{primaryRequiredAction.message}</p>}
       </section>
 
-      <div className="trade-facts">
+      <div className="trade-facts cockpit-metrics">
+        <div><span>Horizon</span><strong>{trade.trade_horizon}</strong></div>
+        <div><span>Current R</span><strong>{currentR === null ? "—" : `${currentR.toFixed(2)}R`}</strong></div>
         <div><span>Actual entry</span><strong>{displayPrice(trade.actual_entry)}</strong></div>
         {trade.option_contract && (
           <div><span>Option contract</span><strong>{trade.option_contract}</strong></div>
         )}
         <div><span>Initial stop</span><strong>{trade.stop_loss}</strong></div>
         <div><span>Current stop</span><strong>{displayPrice(trade.current_stop)}</strong></div>
-        <div><span>Target 1</span><strong>{trade.target_1}</strong></div>
-        <div><span>Target 2</span><strong>{displayPrice(trade.target_2)}</strong></div>
-        {trade.market === "options" && (
-          <div><span>Underlying price</span><strong>{displayPrice(trade.current_price)}</strong></div>
-        )}
-        <div><span>Initial quantity</span><strong>{quantity.initial ?? "—"}</strong></div>
-        <div><span>Taken profit</span><strong>{quantity.taken}</strong></div>
+        <div><span>Current price</span><strong>{displayPrice(trade.current_price)}</strong></div>
+        <EditableMetric
+          label="Target 1"
+          value={trade.target_1}
+          required
+          onSave={(value) => update({ target_1: value ?? trade.target_1 })}
+        />
+        <EditableMetric
+          label="Target 2"
+          value={trade.target_2}
+          onSave={(value) => update({ target_2: value })}
+        />
+        <EditableMetric
+          label="Position size"
+          value={trade.position_size}
+          onSave={(value) => update({ position_size: value })}
+        />
+        <div><span>Partial quantity</span><strong>{quantity.taken}</strong></div>
         <div><span>Runner remaining</span><strong>{quantity.runner ?? "—"}</strong></div>
+        <div><span>Runner state</span><strong>{trade.runner_active ? "Active" : "Inactive"}</strong></div>
       </div>
 
-      <section className="management-section">
-        <h3>Position details</h3>
-        <div className="management-grid runner-grid">
-          <label>
-            Initial quantity
-            <input
-              aria-label={`Initial quantity for ${trade.symbol}`}
-              type="number"
-              min="0"
-              step="0.01"
-              inputMode="decimal"
-              value={initialQuantity}
-              onChange={(event) => setInitialQuantity(event.target.value)}
-            />
-          </label>
-          <button
-            className="secondary-button"
-            disabled={isSaving || parsedInitialQuantity === null}
-            onClick={() => update({ position_size: parsedInitialQuantity })}
-          >
-            Save Initial Quantity
-          </button>
-        </div>
-
-        {trade.market === "options" && (
+      {trade.market === "options" && (
+        <section className="management-section">
+          <h3>Underlying reference</h3>
           <div className="option-underlying-reference">
             <button
               className="secondary-button"
@@ -362,15 +431,16 @@ function TradeCard({ trade, onUpdated, defaultExpanded, onDeleted }: TradeCardPr
             )}
             {quoteMessage && <p>{quoteMessage}</p>}
           </div>
-        )}
-      </section>
+        </section>
+      )}
 
       <PriceLadder
         entry={trade.actual_entry}
         currentPrice={parsedPrice}
-        currentStop={numberOrNull(currentStop)}
+        currentStop={activeStopForMap}
         target1={trade.target_1}
         target2={trade.target_2}
+        partialExits={partialExitLevels}
       />
 
       <section className="management-section">
@@ -390,12 +460,6 @@ function TradeCard({ trade, onUpdated, defaultExpanded, onDeleted }: TradeCardPr
           <button className="secondary-button" disabled={isSaving || numberOrNull(currentStop) === null} onClick={() => update({ current_stop: numberOrNull(currentStop) })}>Move Stop by Structure</button>
         </div>
         <div className="action-row">
-          <button className="secondary-button" disabled={isSaving || trade.actual_entry === null} onClick={() => {
-            if (trade.actual_entry !== null) {
-              setCurrentStop(trade.actual_entry.toString());
-              void update({ current_stop: trade.actual_entry });
-            }
-          }}>Move Stop to Breakeven</button>
           <label className="partial-quantity-field">
             Partial exit price
             <input aria-label={`Partial exit price for ${trade.symbol}`} type="number" step="any" value={partialPrice} onChange={(event) => setPartialPrice(event.target.value)} />
@@ -414,14 +478,12 @@ function TradeCard({ trade, onUpdated, defaultExpanded, onDeleted }: TradeCardPr
 
       <section className="management-section">
         <h3>Runner management</h3>
-        <div className="management-grid runner-grid">
+        <div className="runner-control-row">
           <label>
             Runner stop
             <input aria-label={`Runner stop for ${trade.symbol}`} type="number" step="any" value={runnerStop} onChange={(event) => setRunnerStop(event.target.value)} />
           </label>
           <button className="secondary-button" disabled={isSaving || numberOrNull(runnerStop) === null} onClick={() => update({ runner_stop: numberOrNull(runnerStop) })}>Save Runner Stop</button>
-        </div>
-        <div className="action-row">
           <button className="secondary-button" disabled={isSaving || trade.runner_active || quantity.runner === 0} onClick={() => update({ runner_enabled: true, runner_active: true })}>Runner Active</button>
           <button className="secondary-button" disabled={isSaving || !trade.runner_active} onClick={() => update({ runner_active: false })}>Runner Closed</button>
         </div>
@@ -473,7 +535,8 @@ function TradeCard({ trade, onUpdated, defaultExpanded, onDeleted }: TradeCardPr
 }
 
 export function OpenTradePanel() {
-  const loaded = useTrades();
+  const [horizonFilter, setHorizonFilter] = useState<HorizonFilterValue>("all");
+  const loaded = useTrades(undefined, horizonForApi(horizonFilter));
   const { setTrades, isLoading, error } = loaded;
   const trades = useMemo(
     () =>
@@ -502,9 +565,12 @@ export function OpenTradePanel() {
       <div className="open-trades-heading">
         <div>
           <p className="eyebrow">In-trade</p>
-          <h2>Manage risk while the trade is live.</h2>
+          <h2>Manage live risk.</h2>
         </div>
-        <span>{trades.length} active plan{trades.length === 1 ? "" : "s"}</span>
+        <div className="heading-controls">
+          <HorizonFilter value={horizonFilter} onChange={setHorizonFilter} />
+          <span>{trades.length} active plan{trades.length === 1 ? "" : "s"}</span>
+        </div>
       </div>
 
       {isLoading && <p className="empty-state">Loading active trades…</p>}

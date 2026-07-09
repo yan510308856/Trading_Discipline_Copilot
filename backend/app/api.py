@@ -236,5 +236,6 @@ def create_review(
 def get_daily_summary(
     database: Database,
     summary_date: Optional[date] = Query(default=None, alias="date"),
+    trade_horizon: Optional[schemas.TradeHorizon] = Query(default=None),
 ) -> dict:
-    return summary_service.daily_summary(database, summary_date)
+    return summary_service.daily_summary(database, summary_date, trade_horizon)

@@ -227,6 +227,12 @@ notes: string
 a new plan can be created. `swing` and `other` trades are not blocked by Daily
 Readiness, because that checklist is specifically an intraday preparation gate.
 
+Stage 18 makes `trade_horizon` a reusable filter dimension across operational
+screens. Open Trades, Post-Trade Review, Daily Summary, and the Dashboard daily
+summary can narrow their data to all trades, intraday, swing, or other trades.
+Open Trade management also supports direct inline edits for active target and
+position-size metrics, and recorded partial exits are shown on the price map.
+
 This keeps one real live workflow rather than adding Practice Mode or Learning
 Mode. The app remains a discipline support tool; it does not place broker
 orders, auto-execute trades, or predict market direction.
@@ -349,7 +355,6 @@ runner_stop: number | null
 
 - `Mark Entry Filled`
 - `Partial Profit Taken`
-- `Move Stop to Breakeven`
 - `Move Stop by Structure`
 - `Runner Active`
 - `Exit Trade`

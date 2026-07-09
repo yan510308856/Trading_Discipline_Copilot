@@ -193,6 +193,8 @@ export interface TradePatchPayload {
   trade_horizon?: TradeHorizon;
   current_stop?: number | null;
   current_price?: number | null;
+  target_1?: number;
+  target_2?: number | null;
   runner_enabled?: boolean;
   runner_active?: boolean;
   runner_stop?: number | null;

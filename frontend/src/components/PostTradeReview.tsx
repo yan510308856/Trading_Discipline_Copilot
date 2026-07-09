@@ -14,6 +14,11 @@ import {
   type ReviewFilter,
 } from "../utils/reviewFilters";
 import { DeleteTradeButton } from "./DeleteTradeButton";
+import {
+  HorizonFilter,
+  type HorizonFilterValue,
+  horizonForApi,
+} from "./HorizonFilter";
 
 const mistakeOptions = [
   ["no_stop_loss", "No stop loss (veto)"],
@@ -284,7 +289,11 @@ function TradeReviewAccordion({ trade, onReviewed, onDeleted }: TradeReviewAccor
 }
 
 export function PostTradeReview() {
-  const { trades, setTrades, isLoading, error } = useTrades("closed");
+  const [horizonFilter, setHorizonFilter] = useState<HorizonFilterValue>("all");
+  const { trades, setTrades, isLoading, error } = useTrades(
+    "closed",
+    horizonForApi(horizonFilter),
+  );
   const [reviewFilter, setReviewFilter] = useState<ReviewFilter>("all");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -319,6 +328,7 @@ export function PostTradeReview() {
 
   function clearFilters() {
     setReviewFilter("all");
+    setHorizonFilter("all");
     setStartDate("");
     setEndDate("");
   }
@@ -328,12 +338,13 @@ export function PostTradeReview() {
       <div className="review-page-heading">
         <div>
           <p className="eyebrow">Post-trade</p>
-          <h2>Grade the process, not just the P&amp;L.</h2>
+          <h2>Review closed trades.</h2>
         </div>
-        <p>A disciplined loss can be a good trade. A rule-breaking win is still a bad trade.</p>
+        <p>Filter the history, then grade execution quality.</p>
       </div>
 
       <div className="review-filters" aria-label="Trade history filters">
+        <HorizonFilter value={horizonFilter} onChange={setHorizonFilter} />
         <label>
           Review status
           <select

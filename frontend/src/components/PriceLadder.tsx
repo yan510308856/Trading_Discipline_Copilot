@@ -1,7 +1,12 @@
 interface PriceLevel {
   label: string;
   value: number | null;
-  kind: "target" | "current" | "entry" | "stop";
+  kind: "target" | "current" | "entry" | "stop" | "partial";
+}
+
+interface PartialExitLevel {
+  price: number;
+  quantity: number | null;
 }
 
 interface PriceLadderProps {
@@ -10,6 +15,7 @@ interface PriceLadderProps {
   currentStop: number | null;
   target1: number;
   target2: number | null;
+  partialExits?: PartialExitLevel[];
 }
 
 export function PriceLadder({
@@ -18,10 +24,18 @@ export function PriceLadder({
   currentStop,
   target1,
   target2,
+  partialExits = [],
 }: PriceLadderProps) {
   const candidateLevels: PriceLevel[] = [
     { label: "Target 2", value: target2, kind: "target" },
     { label: "Target 1", value: target1, kind: "target" },
+    ...partialExits.map((exit, index) => ({
+      label: exit.quantity === null
+        ? `Partial ${index + 1}`
+        : `Partial ${index + 1} (${exit.quantity})`,
+      value: exit.price,
+      kind: "partial" as const,
+    })),
     { label: "Current", value: currentPrice, kind: "current" },
     { label: "Entry", value: entry, kind: "entry" },
     { label: "Stop", value: currentStop, kind: "stop" },

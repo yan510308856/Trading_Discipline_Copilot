@@ -435,3 +435,52 @@ Intraday trades need same-day preparation before planning. Swing and other trade
 - No broker integration, order execution, or auto trading is implemented.
 - No option premium, option chain, Greeks, or bid/ask spread support is added.
 - Trade horizon is used for planning gates and API filtering, not yet for analytics.
+
+## Stage 18 - Trade horizon filters and cockpit metrics layout
+
+### Date
+
+2026-07-09
+
+### What changed
+
+- Added `trade_horizon` filtering to the daily summary API.
+- Added reusable frontend horizon filtering for operational screens.
+- Applied horizon filters to Open Trades, Post-Trade Review, Daily Summary, and Dashboard summary.
+- Tightened touched metric layouts with smaller labels, larger tabular values, and less decorative spacing.
+- Added inline edits for open-trade Target 1, Target 2, and Position size metrics.
+- Added recorded partial exits to the price map.
+- Removed the stop-to-breakeven shortcut from open-trade management.
+- Kept Daily Readiness at the bottom of Dashboard by product choice.
+
+### Commands to run
+
+```bash
+cd backend
+pytest -q
+
+cd frontend
+npm test
+npm run build
+```
+
+### Tests
+
+- Backend tests cover daily summary all/intraday/swing horizon filtering and invalid horizon validation.
+- Frontend tests cover horizon filter rendering, API query parameters, and summary metric rendering.
+
+### Engineering concepts learned
+
+- A filter dimension should be represented consistently in API query params, typed clients, hooks, and screen state.
+- Keeping filter state local is enough when the same filter does not need cross-page persistence yet.
+- Cockpit UI work is often about hierarchy and scanability, not a large redesign.
+
+### Trading discipline concepts encoded
+
+Different trade horizons should be separable during management and review. Intraday, swing, and other trades can have different preparation quality and mistakes, so filtering helps review the correct behavior set.
+
+### Known limitations
+
+- Horizon filters are local to each screen and are not persisted.
+- No new broker, quote, or options premium behavior is introduced.
+- No cross-horizon analytics dashboard is implemented.

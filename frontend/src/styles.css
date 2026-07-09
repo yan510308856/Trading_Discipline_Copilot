@@ -195,13 +195,13 @@ h3 {
 }
 
 .hero-card {
-  padding: clamp(32px, 6vw, 66px);
+  padding: clamp(24px, 4vw, 42px);
   color: #f4f8f5;
   background:
     radial-gradient(circle at 87% 20%, rgba(154, 194, 173, 0.27), transparent 28%),
     linear-gradient(135deg, #214c3d, #17392f);
-  border-radius: 24px;
-  box-shadow: 0 24px 70px rgba(28, 58, 47, 0.14);
+  border-radius: 12px;
+  box-shadow: 0 16px 42px rgba(28, 58, 47, 0.12);
 }
 
 .hero-card .eyebrow {
@@ -210,10 +210,10 @@ h3 {
 
 .hero-card p:last-child {
   max-width: 650px;
-  margin: 22px 0 0;
+  margin: 16px 0 0;
   color: #c9dbd3;
-  font-size: 17px;
-  line-height: 1.7;
+  font-size: 15px;
+  line-height: 1.55;
 }
 
 .dashboard-grid {
@@ -228,7 +228,7 @@ h3 {
 .page-card {
   background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: 18px;
+  border-radius: 12px;
 }
 
 .status-card,
@@ -922,14 +922,14 @@ textarea {
 
 .review-filters {
   display: grid;
-  grid-template-columns: minmax(180px, 1fr) repeat(2, minmax(150px, 0.8fr)) auto auto;
+  grid-template-columns: minmax(150px, 0.8fr) minmax(180px, 1fr) repeat(2, minmax(150px, 0.8fr)) auto auto;
   align-items: end;
   gap: 12px;
   margin-bottom: 20px;
   padding: 16px;
   background: #e9eee8;
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: 12px;
 }
 
 .review-filters label {
@@ -1201,16 +1201,35 @@ textarea {
 
 .open-trades-heading h2 {
   max-width: 650px;
-  font-size: clamp(32px, 4vw, 48px);
+  font-size: clamp(28px, 3.5vw, 40px);
 }
 
-.open-trades-heading > span {
+.open-trades-heading > span,
+.heading-controls > span {
   padding: 8px 11px;
   color: var(--muted);
   background: #e7ede7;
   border-radius: 999px;
   font-size: 12px;
   white-space: nowrap;
+}
+
+.heading-controls,
+.summary-controls {
+  display: flex;
+  align-items: end;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.horizon-filter {
+  display: grid;
+  gap: 6px;
+  min-width: 150px;
+  color: #506058;
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .open-trade-list {
@@ -1222,7 +1241,7 @@ textarea {
   overflow: hidden;
   background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: 18px;
+  border-radius: 12px;
 }
 
 .trade-summary {
@@ -1268,7 +1287,7 @@ textarea {
   padding: clamp(22px, 4vw, 36px);
   background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: 18px;
+  border-radius: 12px;
 }
 
 .trade-accordion > .open-trade-card {
@@ -1336,7 +1355,7 @@ textarea {
   overflow: hidden;
   background: #d8e0da;
   border: 1px solid #d8e0da;
-  border-radius: 11px;
+  border-radius: 10px;
 }
 
 .compact-facts {
@@ -1348,6 +1367,7 @@ textarea {
   gap: 5px;
   padding: 14px;
   background: #eff3ef;
+  min-width: 0;
 }
 
 .trade-facts span {
@@ -1358,7 +1378,67 @@ textarea {
 }
 
 .trade-facts strong {
-  font-size: 15px;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+  font-size: 16px;
+}
+
+.cockpit-metrics strong {
+  color: var(--forest);
+  font-size: 18px;
+}
+
+.editable-metric > button {
+  width: fit-content;
+  margin: 0;
+  padding: 0;
+  color: var(--forest);
+  background: transparent;
+  border: 0;
+  font: inherit;
+  font-size: 18px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  text-align: left;
+}
+
+.editable-metric > button:hover,
+.editable-metric > button:focus-visible {
+  color: #163e30;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.editable-metric.editing {
+  gap: 7px;
+}
+
+.editable-metric input {
+  min-width: 0;
+  padding: 8px 9px;
+  font-size: 14px;
+}
+
+.metric-edit-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.metric-edit-actions button {
+  padding: 6px 8px;
+  color: var(--forest);
+  background: #f8faf6;
+  border: 1px solid #b8c9bf;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.metric-edit-actions button:disabled {
+  color: #8c9993;
+  cursor: not-allowed;
 }
 
 .required-action {
@@ -1368,7 +1448,7 @@ textarea {
   background: #eef3ef;
   border: 1px solid #d4ded7;
   border-left: 5px solid #6d8b7d;
-  border-radius: 11px;
+  border-radius: 10px;
 }
 
 .required-action span {
@@ -1434,6 +1514,13 @@ textarea {
   max-width: 500px;
 }
 
+.runner-control-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) auto auto auto;
+  gap: 10px;
+  align-items: end;
+}
+
 .option-underlying-reference {
   display: grid;
   gap: 10px;
@@ -1480,7 +1567,8 @@ textarea {
 
 .management-section label,
 .inline-action label,
-.exit-row label {
+.exit-row label,
+.runner-control-row label {
   display: grid;
   gap: 6px;
   color: #506058;
@@ -1489,7 +1577,8 @@ textarea {
 }
 
 .management-section .secondary-button,
-.inline-action .primary-button {
+.inline-action .primary-button,
+.runner-control-row .secondary-button {
   margin-top: 0;
 }
 
@@ -1542,6 +1631,14 @@ textarea {
   color: #536159;
   font-size: 11px;
   transform: translateY(-50%);
+}
+
+.price-partial {
+  color: #7c5b1f;
+}
+
+.price-partial i {
+  background: #c08a26;
 }
 
 .price-marker i {
@@ -1756,6 +1853,7 @@ textarea {
   .compact-facts,
   .management-grid,
   .runner-grid,
+  .runner-control-row,
   .option-underlying-reference div,
   .inline-action,
   .exit-row {
@@ -1776,7 +1874,7 @@ textarea {
   padding: 25px;
   background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: 18px;
+  border-radius: 12px;
 }
 
 .readiness-panel {
@@ -1785,7 +1883,7 @@ textarea {
   background: var(--surface);
   border: 1px solid var(--line);
   border-left: 6px solid #a4b5ad;
-  border-radius: 18px;
+  border-radius: 12px;
 }
 
 .readiness-not_cleared {
@@ -1920,6 +2018,10 @@ textarea {
   margin-bottom: 22px;
 }
 
+.section-heading {
+  flex-wrap: wrap;
+}
+
 .top-mistake-badge {
   max-width: 360px;
   padding: 7px 10px;
@@ -1943,7 +2045,7 @@ textarea {
   padding: 18px;
   background: #edf3ef;
   border: 1px solid #d7e1da;
-  border-radius: 12px;
+  border-radius: 10px;
 }
 
 .summary-metric-card span {
@@ -1957,6 +2059,7 @@ textarea {
 .summary-metric-card strong {
   align-self: end;
   color: var(--forest);
+  font-variant-numeric: tabular-nums;
   font-size: clamp(24px, 3vw, 34px);
 }
 
@@ -1967,7 +2070,7 @@ textarea {
 
 .daily-summary-heading h2 {
   max-width: 720px;
-  font-size: clamp(32px, 4vw, 48px);
+  font-size: clamp(28px, 3.5vw, 40px);
 }
 
 .daily-summary-heading label {

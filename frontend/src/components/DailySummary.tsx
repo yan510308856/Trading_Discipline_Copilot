@@ -2,6 +2,11 @@ import { useEffect, useState } from "react";
 
 import { APIError, getDailySummary } from "../api";
 import type { DailySummaryData } from "../types";
+import {
+  HorizonFilter,
+  type HorizonFilterValue,
+  horizonForApi,
+} from "./HorizonFilter";
 import { SummaryCards } from "./SummaryCards";
 
 function todayKey(): string {
@@ -24,6 +29,7 @@ function requestErrorMessage(error: unknown): string {
 
 export function DailySummary() {
   const [selectedDate, setSelectedDate] = useState(todayKey);
+  const [horizonFilter, setHorizonFilter] = useState<HorizonFilterValue>("all");
   const [summary, setSummary] = useState<DailySummaryData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
@@ -32,7 +38,7 @@ export function DailySummary() {
     let active = true;
     setIsLoading(true);
     setError("");
-    void getDailySummary(selectedDate)
+    void getDailySummary(selectedDate, horizonForApi(horizonFilter))
       .then((result) => {
         if (active) setSummary(result);
       })
@@ -45,7 +51,7 @@ export function DailySummary() {
     return () => {
       active = false;
     };
-  }, [selectedDate]);
+  }, [horizonFilter, selectedDate]);
 
   return (
     <section className="daily-summary-page">
@@ -54,14 +60,17 @@ export function DailySummary() {
           <p className="eyebrow">Reflection</p>
           <h2>Turn today&apos;s trades into tomorrow&apos;s discipline.</h2>
         </div>
-        <label>
-          Summary date
-          <input
-            type="date"
-            value={selectedDate}
-            onChange={(event) => setSelectedDate(event.target.value)}
-          />
-        </label>
+        <div className="summary-controls">
+          <HorizonFilter value={horizonFilter} onChange={setHorizonFilter} />
+          <label>
+            Summary date
+            <input
+              type="date"
+              value={selectedDate}
+              onChange={(event) => setSelectedDate(event.target.value)}
+            />
+          </label>
+        </div>
       </div>
 
       {isLoading && <p className="empty-state">Loading daily summary…</p>}
