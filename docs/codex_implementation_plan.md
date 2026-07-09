@@ -1053,3 +1053,27 @@ Stage 14 hardens the MVP for real trading discipline support. The app keeps one 
 - Backend business logic stays in the rule engine service, not route handlers.
 - Frontend API calls remain in `src/api.ts`.
 - The UI change is an incremental sectioning of the existing checklist, not a routing or state-management rewrite.
+
+## Stage 15 - Daily Intraday Readiness Checklist
+
+### Summary
+
+Stage 15 adds a Dashboard-based daily readiness checklist that decides whether intraday trading is cleared for the current day. The checklist persists by date and uses required preparation items only to compute readiness status.
+
+### Acceptance criteria
+
+- Dashboard shows Today's Intraday Readiness.
+- Readiness records persist by date.
+- Required and optional items are visually distinguishable.
+- The backend computes required completed count, required total count, and cleared status.
+- The user can save completion and notes for today's checklist.
+- New Trade shows a blocker-style banner when today's intraday readiness is incomplete.
+- Existing open trade management and swing review flows are not blocked by readiness.
+- No broker integration, order execution, automatic event calendar, automatic watchlist generation, or automatic market classification is introduced.
+
+### Engineering notes
+
+- A single `daily_readiness` table stores flexible JSON checklist items.
+- The checklist template and readiness calculation live in `daily_readiness_service.py`.
+- The UI uses an explicit Save button to keep persistence obvious.
+- Strict `trade_horizon` gating is deferred to avoid widening the trade schema in this stage.

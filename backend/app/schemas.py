@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -18,6 +18,7 @@ TradeClassification = Literal[
     "bad_trade_winner",
     "bad_trade_loser",
 ]
+ReadinessStatus = Literal["not_cleared", "partially_ready", "cleared"]
 
 
 class ReviewSummary(BaseModel):
@@ -261,6 +262,42 @@ class DailySummary(BaseModel):
     revenge_trade_count: int
     most_frequent_mistakes: list[MistakeFrequency]
     lessons: list[str]
+
+
+class DailyReadinessItem(BaseModel):
+    id: str
+    label: str
+    required: bool
+    completed: bool = False
+    notes: str = ""
+    category: str
+    notes_placeholder: str = ""
+
+
+class DailyReadinessUpdateItem(BaseModel):
+    id: str
+    completed: bool
+    notes: str = ""
+
+
+class DailyReadinessUpdate(BaseModel):
+    items: list[DailyReadinessUpdateItem]
+    notes: Optional[str] = None
+
+
+class DailyReadinessRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: Optional[int] = None
+    readiness_date: date
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+    items: list[DailyReadinessItem]
+    notes: Optional[str] = None
+    required_complete_count: int
+    required_total_count: int
+    is_cleared_for_intraday: bool
+    status: ReadinessStatus
 
 
 class ChecklistAnswerCreate(BaseModel):

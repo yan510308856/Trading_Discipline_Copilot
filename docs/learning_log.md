@@ -298,3 +298,49 @@ npm run build
 ### Trading discipline concepts encoded
 
 Blockers are hard stops. Warnings slow the trader down and require conscious acceptance. Reminders point to required management actions while leaving the trading decision with the human.
+
+## Stage 15 - Daily intraday readiness checklist
+
+### Date
+
+2026-07-09
+
+### What changed
+
+- Added a persisted daily intraday readiness checklist.
+- Added required preparation items for watchlist, market environment, scheduled risks, swing position review, and risk limits.
+- Added optional preparation items for platform readiness, mental state, and no-forced-trade confirmation.
+- Added a Dashboard panel that shows Not cleared / Partially ready / Cleared status.
+- Added a New Trade banner when intraday readiness is incomplete.
+
+### Commands I ran
+
+```bash
+cd backend
+.venv/bin/pytest -q
+
+cd frontend
+npm test
+npm run build
+```
+
+### Tests
+
+- Backend tests cover default checklist creation, required count calculation, cleared/not-cleared status, persistence, today's endpoint, and unknown item error envelopes.
+- Frontend tests cover readiness copy and progress helpers.
+
+### Engineering concepts learned
+
+- A JSON checklist field is useful when the item template may evolve and does not need complex querying yet.
+- Service-layer calculations keep route handlers simple and make business rules easier to test.
+- A small migration is the safe way to evolve SQLite without deleting local data.
+
+### Trading discipline concepts encoded
+
+Intraday trading starts with daily preparation, not with the first chart that looks interesting. Readiness is a permission gate for planning intraday trades, while existing swing/open position management remains allowed.
+
+### Known limitations
+
+- Economic events, watchlists, and market environment are entered manually.
+- No automatic event calendar, watchlist generation, market classification, broker integration, or order execution is implemented.
+- Strict `trade_horizon` gating is deferred.

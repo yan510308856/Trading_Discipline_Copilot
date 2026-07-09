@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { APIError, getDailySummary, getHealth, refreshOpenPrices } from "../api";
 import type { ConnectionState, DailySummaryData, Trade } from "../types";
 import { calculateCurrentR } from "../utils/tradeCalculations";
+import { IntradayReadinessPanel } from "./IntradayReadinessPanel";
 import { SummaryCards } from "./SummaryCards";
 
 const connectionCopy: Record<ConnectionState, string> = {
@@ -82,6 +83,8 @@ export function Dashboard() {
           without confusing a lucky outcome for a good decision.
         </p>
       </div>
+
+      <IntradayReadinessPanel />
 
       <section className="dashboard-summary" aria-labelledby="today-summary-title">
         <div className="section-heading">

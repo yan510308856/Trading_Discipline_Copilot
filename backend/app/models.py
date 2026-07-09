@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Optional
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, JSON, String, Text
+from sqlalchemy import Boolean, Date, DateTime, Float, ForeignKey, Integer, JSON, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -140,3 +140,19 @@ class TradeExecution(Base):
     quantity: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
 
     trade: Mapped[Trade] = relationship(back_populates="executions")
+
+
+class DailyReadiness(Base):
+    __tablename__ = "daily_readiness"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    readiness_date: Mapped[date] = mapped_column(Date, unique=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now
+    )
+    checklist_items: Mapped[list[dict]] = mapped_column(JSON, default=list)
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    is_cleared_for_intraday: Mapped[bool] = mapped_column(Boolean, default=False)
+    completed_required_count: Mapped[int] = mapped_column(Integer, default=0)
+    total_required_count: Mapped[int] = mapped_column(Integer, default=0)
