@@ -69,9 +69,15 @@ export function getHealth(): Promise<HealthResponse> {
   return apiRequest<HealthResponse>("/health");
 }
 
-export function getDailySummary(date?: string): Promise<DailySummaryData> {
-  const query = date ? `?date=${encodeURIComponent(date)}` : "";
-  return apiRequest<DailySummaryData>(`/summary/daily${query}`);
+export function getDailySummary(
+  date?: string,
+  tradeHorizon?: TradeHorizon,
+): Promise<DailySummaryData> {
+  const query = new URLSearchParams();
+  if (date) query.set("date", date);
+  if (tradeHorizon) query.set("trade_horizon", tradeHorizon);
+  const queryString = query.toString() ? `?${query.toString()}` : "";
+  return apiRequest<DailySummaryData>(`/summary/daily${queryString}`);
 }
 
 export function getTodayDailyReadiness(): Promise<DailyReadinessData> {

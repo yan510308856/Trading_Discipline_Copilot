@@ -1127,3 +1127,31 @@ cleared; swing and other plans are not blocked by that intraday gate.
 - Broker integration, order execution, or auto trading.
 - Global frontend state management.
 - Backend router refactoring.
+
+## Stage 18 - Trade Horizon Filters and Cockpit Metrics Layout
+
+### Summary
+
+Stage 18 promotes `trade_horizon` from a planning-only field to a reusable
+filter dimension. The UI remains controlled and cockpit-like: state, blockers,
+next actions, and trusted inputs have priority over motivational copy.
+
+### Acceptance criteria
+
+- `GET /summary/daily` accepts optional `trade_horizon`.
+- Summary without a horizon includes all trades.
+- Summary with a horizon includes only matching trades.
+- Open Trades, Post-Trade Review, Daily Summary, and Dashboard summary expose a horizon filter where practical.
+- Touched metric grids use compact labels, larger tabular values, and tighter operational spacing.
+- Open-trade Target 1, Target 2, and Position size metrics can be edited inline.
+- Recorded partial exits appear on the price map.
+- The stop-to-breakeven shortcut is removed from the touched management controls.
+- Daily Readiness remains at the bottom of Dashboard.
+
+### Deferred
+
+- Moving Daily Readiness.
+- Dashboard redesign.
+- Option quote behavior changes.
+- Broker integration or auto trading.
+- TanStack Query, global state management, or a full design-system extraction.

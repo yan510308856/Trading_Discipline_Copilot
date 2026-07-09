@@ -64,6 +64,8 @@ def update_trade(
         "partial_taken",
         "partial_exit_quantity",
         "position_size",
+        "target_1",
+        "target_2",
         "notes",
     }
     if trade.status != "planned" and not set(updates).issubset(management_fields):

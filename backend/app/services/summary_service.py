@@ -14,7 +14,11 @@ from app import models
 GREEN_TO_RED_TAGS = {"green_trade_to_red_without_review", "green_to_red"}
 
 
-def daily_summary(database: Session, summary_date: date | None = None) -> dict:
+def daily_summary(
+    database: Session,
+    summary_date: date | None = None,
+    trade_horizon: str | None = None,
+) -> dict:
     """Aggregate trades, violations, mistakes, and lessons for one UTC date."""
 
     selected_date = summary_date or datetime.now(timezone.utc).date()
@@ -34,6 +38,8 @@ def daily_summary(database: Session, summary_date: date | None = None) -> dict:
         .where(activity_time.between(start, end))
         .order_by(activity_time.desc())
     )
+    if trade_horizon is not None:
+        statement = statement.where(models.Trade.trade_horizon == trade_horizon)
     trades = list(database.scalars(statement))
 
     scores = [
