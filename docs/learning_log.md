@@ -528,3 +528,48 @@ Rules are safety boundaries, not decorative copy. Validating the rule file prote
 - Persistent warning acknowledgement is still deferred.
 - No new trading rules were added.
 - The validation currently targets price-action rules, not the scoring YAML.
+
+## Stage 20 - Backend router split
+
+### Date
+
+2026-07-09
+
+### What changed
+
+- Split backend routes into domain modules under `backend/app/api/`.
+- Kept `app.main` including a single combined `app.api.router`.
+- Preserved existing endpoint paths and response models.
+- Left service-layer business behavior unchanged.
+
+### Commands to run
+
+```bash
+cd backend
+pytest -q
+
+cd frontend
+npm test
+npm run build
+```
+
+### Tests
+
+- Existing backend API tests verify route behavior is unchanged.
+- Frontend tests and build verify API client expectations still compile and run.
+
+### Engineering concepts learned
+
+- Route layers translate HTTP requests into service calls.
+- Service layers contain business behavior and should not be rewritten during a router split.
+- Refactors should be behavior-preserving and proven by existing tests.
+
+### Trading discipline concepts encoded
+
+No trading behavior changed. This stage improves maintainability so future readiness, trade, rule, review, and summary work has clearer ownership.
+
+### Known limitations
+
+- No product features were added.
+- Persistent warning acknowledgement remains deferred.
+- No broker integration or options behavior changes were introduced.
