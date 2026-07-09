@@ -484,3 +484,47 @@ Different trade horizons should be separable during management and review. Intra
 - Horizon filters are local to each screen and are not persisted.
 - No new broker, quote, or options premium behavior is introduced.
 - No cross-horizon analytics dashboard is implemented.
+
+## Stage 19 - Rule engine schema validation
+
+### Date
+
+2026-07-09
+
+### What changed
+
+- Added a Pydantic schema for price-action rule YAML.
+- `load_rules()` now validates YAML before returning rule dictionaries.
+- Existing price-action rules now include the full explicit metadata contract.
+- Added `docs/rule_authoring_guide.md`.
+
+### Commands to run
+
+```bash
+cd backend
+pytest -q
+
+cd frontend
+npm test
+npm run build
+```
+
+### Tests
+
+- Backend tests cover current YAML validation, missing top-level `rules`, unsupported operators, invalid severity, missing `compare_field`, and invalid `in` values.
+
+### Engineering concepts learned
+
+- Configuration files need tests when they drive business behavior.
+- Pydantic is useful for validating both API payloads and internal YAML assets.
+- Operator-specific validation catches authoring mistakes before runtime.
+
+### Trading discipline concepts encoded
+
+Rules are safety boundaries, not decorative copy. Validating the rule file protects the discipline workflow from silent YAML mistakes.
+
+### Known limitations
+
+- Persistent warning acknowledgement is still deferred.
+- No new trading rules were added.
+- The validation currently targets price-action rules, not the scoring YAML.

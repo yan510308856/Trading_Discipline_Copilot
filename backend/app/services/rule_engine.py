@@ -8,19 +8,9 @@ from typing import Any
 
 import yaml
 
+from app.services.rule_schema import SUPPORTED_OPERATORS, RuleDocumentModel
 
 DEFAULT_RULES_PATH = Path(__file__).parents[1] / "rules" / "price_action_rules.yaml"
-SUPPORTED_OPERATORS = {
-    "missing",
-    "equals",
-    "in",
-    "greater_than",
-    "greater_than_or_equal",
-    "less_than",
-    "less_than_or_equal",
-    "greater_than_field",
-    "less_than_field",
-}
 
 
 def load_rules(path: Path | str = DEFAULT_RULES_PATH) -> list[dict[str, Any]]:
@@ -29,10 +19,9 @@ def load_rules(path: Path | str = DEFAULT_RULES_PATH) -> list[dict[str, Any]]:
     with Path(path).open(encoding="utf-8") as rules_file:
         document = yaml.safe_load(rules_file) or {}
 
-    rules = document.get("rules")
-    if not isinstance(rules, list):
+    if "rules" not in document:
         raise ValueError("Rules YAML must contain a top-level 'rules' list")
-    return rules
+    return RuleDocumentModel.model_validate(document).model_dump(exclude_none=True)["rules"]
 
 
 def _trade_values(trade: object) -> Mapping[str, Any]:

@@ -523,6 +523,11 @@ Reminder:
     - strong_trend_gap_no_retest
 ```
 
+Stage 19 adds schema validation for YAML rule definitions. Rules are a core
+product asset, so invalid YAML should fail fast in tests instead of failing
+silently during live trade planning. The authoring contract is documented in
+`docs/rule_authoring_guide.md`.
+
 ### 5.1 初始核心规则清单
 
 MVP 至少实现这些规则：

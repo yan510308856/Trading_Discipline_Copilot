@@ -1155,3 +1155,30 @@ next actions, and trusted inputs have priority over motivational copy.
 - Option quote behavior changes.
 - Broker integration or auto trading.
 - TanStack Query, global state management, or a full design-system extraction.
+
+## Stage 19 - Rule Engine Schema Validation
+
+### Summary
+
+Stage 19 validates price-action YAML rules with Pydantic before the rule engine
+uses them. Rules are treated as a core product asset: invalid stages,
+severities, operators, or operator-specific fields should fail fast in tests.
+
+### Acceptance criteria
+
+- `price_action_rules.yaml` validates through a dedicated rule schema.
+- `load_rules()` validates YAML and returns API-compatible dictionaries.
+- Unsupported operators fail clearly.
+- Invalid severities fail clearly.
+- `in` requires a list value.
+- `greater_than_field` and `less_than_field` require `compare_field`.
+- Rule authoring guidance exists in `docs/rule_authoring_guide.md`.
+
+### Deferred
+
+- Persistent warning acknowledgement.
+- New trading rules.
+- Daily Readiness movement.
+- Options behavior changes.
+- Broker integration.
+- Router refactoring.

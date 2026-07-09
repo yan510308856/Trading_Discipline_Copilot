@@ -19,6 +19,7 @@ rules:
       - If no valid stop exists, skip the trade.
     ui_hints:
       emphasis: hard_block
+    requires_acknowledgement: false
     avoid: Entering any trade before defining its invalidation point.
     discipline_sentence: No stop loss, no trade.
     enabled: true
@@ -46,6 +47,7 @@ rules:
       - Create a new plan only if there is a fresh, independent setup.
     ui_hints:
       emphasis: hard_block
+    requires_acknowledgement: false
     avoid: Treating a stop loss as a signal to reverse immediately.
     discipline_sentence: A stop is information, not an invitation to retaliate.
     enabled: true
@@ -140,6 +142,8 @@ rules:
     next_actions:
       - Define the breakout level and invalidation before acting.
       - Wait for expansion and follow-through.
+    ui_hints: {}
+    requires_acknowledgement: false
     avoid: Predicting direction while price remains compressed.
     discipline_sentence: Compression is context; the breakout still needs confirmation.
     enabled: true
@@ -181,6 +185,8 @@ rules:
     next_actions:
       - Plan the runner protection before entry.
       - Avoid chasing if the stop would be structurally invalid.
+    ui_hints: {}
+    requires_acknowledgement: false
     avoid: Chasing strength without a defined invalidation point.
     discipline_sentence: Strength can persist, but urgency is not an entry plan.
     enabled: true
@@ -231,6 +237,7 @@ rules:
       - Wait for confirmation or choose a different, clearly defined setup.
     ui_hints:
       emphasis: hard_block
+    requires_acknowledgement: false
     avoid: Using leveraged, time-sensitive products while trying to catch an unconfirmed bottom.
     discipline_sentence: Do not use options to be early on a bottom.
     enabled: true
@@ -315,6 +322,7 @@ rules:
       - If keeping a runner, confirm the remaining risk is protected.
     ui_hints:
       required_action: Decide whether to take partial profit.
+    requires_acknowledgement: false
     avoid: Holding the full position after the planned profit milestone.
     discipline_sentence: Pay yourself at the planned milestone, then let the runner work.
     enabled: true
@@ -342,6 +350,7 @@ rules:
       - Decide whether the stop should move by structure.
     ui_hints:
       required_action: Reassess management plan.
+    requires_acknowledgement: false
     avoid: Letting open profit become a loss without deliberate reassessment.
     discipline_sentence: Protect earned opportunity without smothering the trade.
     enabled: true
@@ -369,6 +378,7 @@ rules:
     ui_hints:
       required_action: Set runner stop.
       emphasis: acknowledgement_required
+    requires_acknowledgement: false
     avoid: Leaving a runner active without a protective stop.
     discipline_sentence: A runner earns freedom only after its risk is protected.
     enabled: true
