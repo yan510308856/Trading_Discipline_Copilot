@@ -1,4 +1,35 @@
+import pytest
+import yaml
+from typing import Optional
+
 from app.services.rule_engine import RuleEngine, evaluate_trade, load_rules
+
+
+def valid_rule_document(condition: Optional[dict] = None, **overrides: object) -> dict:
+    rule = {
+        "id": "test_rule",
+        "name": "Test rule",
+        "category": "test",
+        "stage": "pre_trade",
+        "severity": "warning",
+        "trigger": {"status": "planned"},
+        "conditions": [] if condition is None else [condition],
+        "message": "Test message.",
+        "checklist": ["Check the test rule."],
+        "next_actions": ["Act on the test rule."],
+        "ui_hints": {},
+        "requires_acknowledgement": False,
+        "avoid": "Avoid invalid test behavior.",
+        "discipline_sentence": "Test discipline sentence.",
+        "enabled": True,
+    } | overrides
+    return {"version": 1, "rules": [rule]}
+
+
+def write_rule_document(tmp_path, document: dict) -> object:
+    path = tmp_path / "rules.yaml"
+    path.write_text(yaml.safe_dump(document), encoding="utf-8")
+    return path
 
 
 def alert_ids(result: dict) -> set[str]:
@@ -25,6 +56,54 @@ def test_yaml_contains_all_mvp_rules() -> None:
         "green_trade_should_not_go_red",
         "runner_must_have_protection",
     }
+
+
+def test_current_price_action_rules_validate() -> None:
+    assert len(load_rules()) == 15
+
+
+def test_missing_top_level_rules_fails(tmp_path) -> None:
+    path = write_rule_document(tmp_path, {"version": 1})
+
+    with pytest.raises(ValueError, match="top-level 'rules' list"):
+        load_rules(path)
+
+
+def test_unsupported_operator_fails(tmp_path) -> None:
+    path = write_rule_document(
+        tmp_path,
+        valid_rule_document({"field": "status", "operator": "contains", "value": "planned"}),
+    )
+
+    with pytest.raises(ValueError, match="Unsupported rule operator: contains"):
+        load_rules(path)
+
+
+def test_invalid_severity_fails(tmp_path) -> None:
+    path = write_rule_document(tmp_path, valid_rule_document(severity="critical"))
+
+    with pytest.raises(ValueError, match="severity"):
+        load_rules(path)
+
+
+def test_compare_field_operator_requires_compare_field(tmp_path) -> None:
+    path = write_rule_document(
+        tmp_path,
+        valid_rule_document({"field": "target_1", "operator": "greater_than_field"}),
+    )
+
+    with pytest.raises(ValueError, match="requires compare_field"):
+        load_rules(path)
+
+
+def test_in_operator_requires_list_value(tmp_path) -> None:
+    path = write_rule_document(
+        tmp_path,
+        valid_rule_document({"field": "setup", "operator": "in", "value": "breakout"}),
+    )
+
+    with pytest.raises(ValueError, match="requires a list value"):
+        load_rules(path)
 
 
 def test_uncertain_context_warns_even_with_a_familiar_signal_shape() -> None:
