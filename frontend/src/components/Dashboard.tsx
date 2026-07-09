@@ -84,8 +84,6 @@ export function Dashboard() {
         </p>
       </div>
 
-      <IntradayReadinessPanel />
-
       <section className="dashboard-summary" aria-labelledby="today-summary-title">
         <div className="section-heading">
           <div>
@@ -189,6 +187,8 @@ export function Dashboard() {
           </blockquote>
         </article>
       </div>
+
+      <IntradayReadinessPanel />
     </section>
   );
 }

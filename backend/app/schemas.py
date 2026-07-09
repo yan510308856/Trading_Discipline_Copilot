@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Any, Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 Market = Literal["futures", "stocks", "crypto", "forex", "options", "other"]
@@ -52,6 +52,7 @@ class TradeExecutionRead(BaseModel):
 
 class TradeCreate(BaseModel):
     symbol: str = Field(min_length=1, max_length=32)
+    option_contract: Optional[str] = Field(default=None, max_length=128)
     market: Market
     direction: Direction
     setup: str = Field(min_length=1, max_length=64)
@@ -66,6 +67,33 @@ class TradeCreate(BaseModel):
     position_size: Optional[float] = Field(default=None, gt=0)
     risk_per_trade: Optional[float] = Field(default=None, ge=0)
     notes: Optional[str] = None
+
+    @field_validator(
+        "planned_entry",
+        "actual_entry",
+        "stop_loss",
+        "target_1",
+        "target_2",
+        "position_size",
+        "risk_per_trade",
+    )
+    @classmethod
+    def round_trade_numbers(cls, value: Optional[float]) -> Optional[float]:
+        return None if value is None else round(value, 2)
+
+    @field_validator("option_contract")
+    @classmethod
+    def clean_option_contract(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        cleaned = value.strip()
+        return cleaned or None
+
+    @model_validator(mode="after")
+    def clear_option_contract_for_non_options(self) -> "TradeCreate":
+        if self.market != "options":
+            self.option_contract = None
+        return self
 
 
 class TradeRead(TradeCreate):
@@ -96,6 +124,7 @@ class TradeRead(TradeCreate):
 
 class TradePatch(BaseModel):
     symbol: Optional[str] = Field(default=None, min_length=1, max_length=32)
+    option_contract: Optional[str] = Field(default=None, max_length=128)
     market: Optional[Market] = None
     direction: Optional[Direction] = None
     setup: Optional[str] = Field(default=None, min_length=1, max_length=64)
@@ -113,6 +142,30 @@ class TradePatch(BaseModel):
     position_size: Optional[float] = Field(default=None, gt=0)
     risk_per_trade: Optional[float] = Field(default=None, ge=0)
     notes: Optional[str] = None
+
+    @field_validator(
+        "planned_entry",
+        "actual_entry",
+        "stop_loss",
+        "current_stop",
+        "current_price",
+        "target_1",
+        "target_2",
+        "runner_stop",
+        "position_size",
+        "risk_per_trade",
+    )
+    @classmethod
+    def round_trade_numbers(cls, value: Optional[float]) -> Optional[float]:
+        return None if value is None else round(value, 2)
+
+    @field_validator("option_contract")
+    @classmethod
+    def clean_option_contract(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        cleaned = value.strip()
+        return cleaned or None
 
     @model_validator(mode="after")
     def reject_null_for_required_database_fields(self) -> "TradePatch":
@@ -237,6 +290,14 @@ class QuoteRefreshResult(BaseModel):
     trades: list[TradeRead]
     errors: list[QuoteRefreshError]
     source: Literal["finnhub", "manual"]
+
+
+class QuoteResult(BaseModel):
+    symbol: str
+    price: Optional[float]
+    source: str
+    fetched_at: datetime
+    message: Optional[str] = None
 
 
 class OpenTradeAttention(BaseModel):

@@ -29,6 +29,14 @@ describe("calculateRiskReward", () => {
     expect(result.risk).toBe(-10);
     expect(Number.isNaN(result.targetR)).toBe(true);
   });
+
+  it("rounds risk and R values to two decimals", () => {
+    expect(calculateRiskReward("long", 10.1, 9.8, 10.7)).toEqual({
+      risk: 0.3,
+      targetDistance: 0.6,
+      targetR: 2,
+    });
+  });
 });
 
 describe("calculateCurrentR", () => {

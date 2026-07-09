@@ -215,6 +215,8 @@ notes: string
 
 这不是自动交易，也不是行情判断，而是交易前风控校验。
 
+Stage 16 起，交易计划中的价格和数量输入默认使用两位小数显示和保存，避免 `1.999999999` 或 `0.30000000004` 这类浮点显示噪音。
+
 ```text
 Long:
 risk = planned_entry - stop_loss
@@ -239,6 +241,18 @@ Planned R/R: 1.8R
 Risk per unit: 10 points
 Target 1 distance: 18 points
 ```
+
+#### Options 输入规则
+
+如果 `market = options`：
+
+- `symbol` 表示 underlying ticker，例如 `AAPL`, `TSLA`, `SPY`, `QQQ`, `NVDA`。
+- `option_contract` 记录具体合约，例如 `AAPL 2026-01-16 200C`。
+- 缺少 `option_contract` 是 warning，不是 blocker；用户必须确认后才能继续创建计划。
+- Stage 16 不获取实时 option premium，不做 option chain，不计算 Greeks。
+- Symbol price lookup 对 options 只显示 underlying price，不能当作 option premium。
+
+如果 `market != options`，`option_contract` 不需要填写。
 
 #### 交易前必须回答的问题
 

@@ -1077,3 +1077,27 @@ Stage 15 adds a Dashboard-based daily readiness checklist that decides whether i
 - The checklist template and readiness calculation live in `daily_readiness_service.py`.
 - The UI uses an explicit Save button to keep persistence obvious.
 - Strict `trade_horizon` gating is deferred to avoid widening the trade schema in this stage.
+
+## Stage 16 - Decimal Precision, Options Contract Details, and Symbol Price Lookup
+
+### Summary
+
+Stage 16 improves New Trade planning for stocks and options. Numeric trade inputs use two-decimal behavior, options trades can record the exact option contract, and the form can fetch a reference quote for the underlying symbol.
+
+### Acceptance criteria
+
+- Planned entry, stop loss, targets, and position size use `step="0.01"` and normalize to two decimals.
+- Risk per unit, target distance, and Planned R/R display clean two-decimal values.
+- Options trades keep `symbol` as the underlying ticker and store `option_contract` separately.
+- Missing option contract details produce a warning requiring acknowledgement, not a blocker.
+- `GET /market-data/quote?symbol=...` returns a quote result or a safe manual fallback.
+- Options quote display is labelled as underlying price, not option premium.
+- Existing manual price input still works.
+
+### Deferred
+
+- Live option chain browsing.
+- Option premium quotes.
+- Bid/ask/spread.
+- Greeks, IV, delta, and pricing models.
+- Broker integration or order execution.

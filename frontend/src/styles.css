@@ -482,6 +482,67 @@ legend {
   font-weight: 600;
 }
 
+.trade-form label small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.4;
+}
+
+.option-contract-field,
+.quote-lookup {
+  margin-top: 16px;
+}
+
+.quote-lookup {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  background: #f4f6f2;
+  border: 1px solid #e0e5df;
+  border-radius: 11px;
+}
+
+.quote-lookup > .secondary-button {
+  width: fit-content;
+  margin-top: 0;
+}
+
+.quote-result {
+  display: grid;
+  grid-template-columns: minmax(130px, 0.8fr) minmax(90px, 0.4fr) minmax(180px, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.quote-result span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.quote-result strong {
+  color: var(--forest);
+  font-size: 20px;
+}
+
+.quote-result small,
+.quote-message {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.quote-result .secondary-button {
+  margin-top: 0;
+}
+
+.quote-message {
+  margin: 0;
+}
+
 input,
 select,
 textarea {
@@ -811,6 +872,7 @@ textarea {
 
   .two-columns,
   .three-columns,
+  .quote-result,
   .risk-summary {
     grid-template-columns: 1fr;
   }
@@ -1364,6 +1426,50 @@ textarea {
   max-width: 500px;
 }
 
+.option-underlying-reference {
+  display: grid;
+  gap: 10px;
+  max-width: 620px;
+  margin-top: 14px;
+  padding: 13px;
+  background: #f4f6f2;
+  border: 1px solid #e0e5df;
+  border-radius: 11px;
+}
+
+.option-underlying-reference .secondary-button {
+  width: fit-content;
+  margin-top: 0;
+}
+
+.option-underlying-reference div {
+  display: grid;
+  grid-template-columns: minmax(140px, 0.7fr) minmax(90px, 0.4fr) minmax(180px, 1fr);
+  gap: 10px;
+  align-items: center;
+}
+
+.option-underlying-reference span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.option-underlying-reference strong {
+  color: var(--forest);
+  font-size: 18px;
+}
+
+.option-underlying-reference small,
+.option-underlying-reference p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 .management-section label,
 .inline-action label,
 .exit-row label {
@@ -1642,6 +1748,7 @@ textarea {
   .compact-facts,
   .management-grid,
   .runner-grid,
+  .option-underlying-reference div,
   .inline-action,
   .exit-row {
     grid-template-columns: 1fr;

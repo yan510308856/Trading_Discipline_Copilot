@@ -4,6 +4,7 @@ import {
   APIError,
   closeTrade,
   evaluateRules,
+  getQuote,
   openTrade,
   patchTrade,
   recordPartialExit,
@@ -12,9 +13,11 @@ import { useTrades } from "../hooks/useTrades";
 import type {
   RuleAlert,
   RuleEvaluationResult,
+  QuoteResult,
   Trade,
   TradePatchPayload,
 } from "../types";
+import { formatDecimal, parseDecimalInput } from "../utils/decimal";
 import {
   calculateCurrentR,
   calculatePositionBreakdown,
@@ -31,7 +34,7 @@ interface TradeCardProps {
 }
 
 function numberOrNull(value: string): number | null {
-  return value.trim() === "" ? null : Number(value);
+  return parseDecimalInput(value);
 }
 
 function displayPrice(value: number | null): string {
@@ -87,6 +90,9 @@ function TradeCard({ trade, onUpdated, defaultExpanded, onDeleted }: TradeCardPr
   const [runnerStop, setRunnerStop] = useState(
     trade.runner_stop?.toString() ?? "",
   );
+  const [initialQuantity, setInitialQuantity] = useState(
+    trade.position_size?.toString() ?? "",
+  );
   const [partialQuantity, setPartialQuantity] = useState("");
   const [partialPrice, setPartialPrice] = useState("");
   const [note, setNote] = useState(trade.notes ?? "");
@@ -96,6 +102,9 @@ function TradeCard({ trade, onUpdated, defaultExpanded, onDeleted }: TradeCardPr
     status: "allowed",
     alerts: [],
   });
+  const [underlyingQuote, setUnderlyingQuote] = useState<QuoteResult | null>(null);
+  const [quoteMessage, setQuoteMessage] = useState("");
+  const [isFetchingQuote, setIsFetchingQuote] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -117,6 +126,7 @@ function TradeCard({ trade, onUpdated, defaultExpanded, onDeleted }: TradeCardPr
   );
   const parsedPartialQuantity = numberOrNull(partialQuantity);
   const parsedPartialPrice = numberOrNull(partialPrice);
+  const parsedInitialQuantity = numberOrNull(initialQuantity);
   const partialQuantityIsValid =
     parsedPartialQuantity !== null &&
     parsedPartialQuantity >= 0 &&
@@ -190,6 +200,34 @@ function TradeCard({ trade, onUpdated, defaultExpanded, onDeleted }: TradeCardPr
     }
   }
 
+  async function fetchUnderlyingReference() {
+    setIsFetchingQuote(true);
+    setQuoteMessage("");
+    setUnderlyingQuote(null);
+    try {
+      const result = await getQuote(trade.symbol);
+      setUnderlyingQuote(result);
+      if (result.price === null) {
+        setQuoteMessage(result.message ?? "Underlying price could not be fetched.");
+        return;
+      }
+      const formattedPrice = formatDecimal(result.price);
+      setCurrentPrice(formattedPrice);
+      onUpdated(await patchTrade(trade.id, { current_price: result.price }));
+      setQuoteMessage(
+        `${trade.symbol} underlying price fetched and saved. This is not option premium.`,
+      );
+    } catch (requestError) {
+      setQuoteMessage(
+        requestError instanceof APIError
+          ? `${requestError.code}: ${requestError.message}`
+          : "Underlying price could not be fetched.",
+      );
+    } finally {
+      setIsFetchingQuote(false);
+    }
+  }
+
   if (trade.status === "planned") {
     return (
       <details className="trade-accordion planned-trade-card" open={defaultExpanded}>
@@ -205,6 +243,9 @@ function TradeCard({ trade, onUpdated, defaultExpanded, onDeleted }: TradeCardPr
           <div><span>Planned entry</span><strong>{trade.planned_entry}</strong></div>
           <div><span>Initial stop</span><strong>{trade.stop_loss}</strong></div>
           <div><span>Target 1</span><strong>{trade.target_1}</strong></div>
+          {trade.option_contract && (
+            <div><span>Option contract</span><strong>{trade.option_contract}</strong></div>
+          )}
         </div>
         <div className="inline-action">
           <label>
@@ -260,14 +301,69 @@ function TradeCard({ trade, onUpdated, defaultExpanded, onDeleted }: TradeCardPr
 
       <div className="trade-facts">
         <div><span>Actual entry</span><strong>{displayPrice(trade.actual_entry)}</strong></div>
+        {trade.option_contract && (
+          <div><span>Option contract</span><strong>{trade.option_contract}</strong></div>
+        )}
         <div><span>Initial stop</span><strong>{trade.stop_loss}</strong></div>
         <div><span>Current stop</span><strong>{displayPrice(trade.current_stop)}</strong></div>
         <div><span>Target 1</span><strong>{trade.target_1}</strong></div>
         <div><span>Target 2</span><strong>{displayPrice(trade.target_2)}</strong></div>
+        {trade.market === "options" && (
+          <div><span>Underlying price</span><strong>{displayPrice(trade.current_price)}</strong></div>
+        )}
         <div><span>Initial quantity</span><strong>{quantity.initial ?? "—"}</strong></div>
         <div><span>Taken profit</span><strong>{quantity.taken}</strong></div>
         <div><span>Runner remaining</span><strong>{quantity.runner ?? "—"}</strong></div>
       </div>
+
+      <section className="management-section">
+        <h3>Position details</h3>
+        <div className="management-grid runner-grid">
+          <label>
+            Initial quantity
+            <input
+              aria-label={`Initial quantity for ${trade.symbol}`}
+              type="number"
+              min="0"
+              step="0.01"
+              inputMode="decimal"
+              value={initialQuantity}
+              onChange={(event) => setInitialQuantity(event.target.value)}
+            />
+          </label>
+          <button
+            className="secondary-button"
+            disabled={isSaving || parsedInitialQuantity === null}
+            onClick={() => update({ position_size: parsedInitialQuantity })}
+          >
+            Save Initial Quantity
+          </button>
+        </div>
+
+        {trade.market === "options" && (
+          <div className="option-underlying-reference">
+            <button
+              className="secondary-button"
+              type="button"
+              disabled={isFetchingQuote}
+              onClick={() => void fetchUnderlyingReference()}
+            >
+              {isFetchingQuote ? "Fetching..." : `Fetch ${trade.symbol} price`}
+            </button>
+            {underlyingQuote?.price !== null && underlyingQuote?.price !== undefined && (
+              <div>
+                <span>Underlying price</span>
+                <strong>{formatDecimal(underlyingQuote.price)}</strong>
+                <small>
+                  {underlyingQuote.source} ·{" "}
+                  {new Date(underlyingQuote.fetched_at).toLocaleString()}
+                </small>
+              </div>
+            )}
+            {quoteMessage && <p>{quoteMessage}</p>}
+          </div>
+        )}
+      </section>
 
       <PriceLadder
         entry={trade.actual_entry}
@@ -281,10 +377,12 @@ function TradeCard({ trade, onUpdated, defaultExpanded, onDeleted }: TradeCardPr
         <h3>Price and stop management</h3>
         <div className="management-grid">
           <label>
-            Current price
-            <input aria-label={`Current price for ${trade.symbol}`} type="number" step="any" value={currentPrice} onChange={(event) => setCurrentPrice(event.target.value)} />
+            {trade.market === "options" ? "Underlying price" : "Current price"}
+            <input aria-label={`${trade.market === "options" ? "Underlying price" : "Current price"} for ${trade.symbol}`} type="number" step="any" value={currentPrice} onChange={(event) => setCurrentPrice(event.target.value)} />
           </label>
-          <button className="secondary-button" disabled={isSaving || parsedPrice === null} onClick={() => update({ current_price: parsedPrice })}>Update Price</button>
+          <button className="secondary-button" disabled={isSaving || parsedPrice === null} onClick={() => update({ current_price: parsedPrice })}>
+            {trade.market === "options" ? "Save Underlying Price" : "Update Price"}
+          </button>
           <label>
             Structure stop
             <input aria-label={`Structure stop for ${trade.symbol}`} type="number" step="any" value={currentStop} onChange={(event) => setCurrentStop(event.target.value)} />

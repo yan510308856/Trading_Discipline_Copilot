@@ -1,4 +1,5 @@
 import type { Direction } from "../types";
+import { roundToTwoDecimals } from "./decimal";
 
 export interface RiskReward {
   risk: number;
@@ -17,9 +18,9 @@ export function calculateRiskReward(
     direction === "long" ? target - entry : entry - target;
 
   return {
-    risk,
-    targetDistance,
-    targetR: risk > 0 ? targetDistance / risk : Number.NaN,
+    risk: roundToTwoDecimals(risk),
+    targetDistance: roundToTwoDecimals(targetDistance),
+    targetR: risk > 0 ? roundToTwoDecimals(targetDistance / risk) : Number.NaN,
   };
 }
 
