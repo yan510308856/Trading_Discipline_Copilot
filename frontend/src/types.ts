@@ -60,6 +60,9 @@ export interface RuleDefinition {
   conditions: Array<Record<string, unknown>>;
   message: string;
   checklist: string[];
+  next_actions?: string[];
+  ui_hints?: Record<string, unknown>;
+  requires_acknowledgement?: boolean;
   avoid: string;
   discipline_sentence: string;
   enabled: boolean;
@@ -180,6 +183,9 @@ export interface RuleAlert {
   message: string;
   checklist: string[];
   discipline_sentence: string;
+  next_actions?: string[];
+  ui_hints?: Record<string, unknown>;
+  requires_acknowledgement?: boolean;
 }
 
 export interface RuleEvaluationResult {

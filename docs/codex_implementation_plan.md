@@ -1028,3 +1028,28 @@ Stage 10: read-only import, data normalization
 Stage 11: polish, README, manual QA
 Stage 12: CI, logging, event log, backup/export
 ```
+
+## Stage 14 - Real Trading Workflow & Live Discipline Hardening
+
+### Summary
+
+Stage 14 hardens the MVP for real trading discipline support. The app keeps one live workflow, rejects Practice Mode / Learning Mode, and treats blocker rules as hard stops. Warning rules may still allow a trade plan, but only after the user explicitly acknowledges the active warnings.
+
+### Acceptance criteria
+
+- Missing stop loss blocks planned trade creation.
+- Breakout without follow-through returns a warning.
+- Warning alerts require explicit acknowledgement before creating a trade plan.
+- Left-side bottom picking with options is blocked.
+- Left-side bottom picking with stocks warns and reminds small size.
+- Rule alerts may include `next_actions`, `ui_hints`, and `requires_acknowledgement` without breaking older rules.
+- Open trade cards show a top-level Required Action area, prioritizing blocker, then warning, then reminder.
+- No broker integration, order placement, order modification, cancellation, or auto-trading is introduced.
+- Product documentation states this is real trading discipline support with no Practice Mode / Learning Mode.
+
+### Engineering notes
+
+- Rule behavior remains configuration-driven through YAML.
+- Backend business logic stays in the rule engine service, not route handlers.
+- Frontend API calls remain in `src/api.ts`.
+- The UI change is an incremental sectioning of the existing checklist, not a routing or state-management rewrite.

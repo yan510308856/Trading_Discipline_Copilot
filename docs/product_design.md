@@ -10,6 +10,8 @@
 
 这个应用不是自动交易机器人，也不是行情预测软件。
 
+Stage 14 明确产品边界：这个应用用于真实交易中的纪律支持，而不是练习模式或学习模式。系统只有一个 live discipline workflow，不提供 Practice Mode / Learning Mode，也不会因为“练习”而放松 blocker 规则。
+
 它的定位是：
 
 ```text
@@ -27,6 +29,17 @@ Trading Discipline Copilot
 
 > 这个工具不是为了告诉我一定做多还是做空，而是为了在我下单前问清楚理由，在持仓中保护利润，在平仓后诚实复盘。
 
+Live workflow:
+
+```text
+Plan → Execute → Manage → Review
+```
+
+- `Plan`: 填写真实交易计划，系统检查 blocker / warning / reminder。
+- `Execute`: 用户自己在券商或交易平台执行；本应用不下单。
+- `Manage`: 记录价格、止损、部分止盈、runner，系统提示需要处理的纪律动作。
+- `Review`: 平仓后复盘执行质量，而不是只看盈亏。
+
 ---
 
 ## 2. 非目标 / 暂不做内容
@@ -39,6 +52,9 @@ MVP 阶段明确不做：
 - 不自动识别所有趋势、TR、Wedge、FT。
 - 不做复杂 AI 行情分析。
 - 不接真实券商账户进行修改订单。
+- 不提供 Practice Mode。
+- 不提供 Learning Mode。
+- 不因为练习或模拟场景软化 blocker 规则。
 
 第一版优先验证：
 
@@ -214,10 +230,18 @@ Target 1 distance: 18 points
 Allowed:
   meaning: 核心项完成，可以交易
 Warning:
-  meaning: 可以继续，但存在明显风险，必须确认
+  meaning: 可以继续，但存在明显风险，必须显式确认 warning 后才能创建计划
 Blocked:
   meaning: 禁止继续，必须修正问题
+Reminder:
+  meaning: 不阻止计划或持仓管理，但提示需要注意的纪律动作
 ```
+
+行为定义：
+
+- Blocker: 真实交易纪律硬限制。触发后不能创建 trade plan，必须先修正。
+- Warning: 允许继续，但必须由用户勾选 “I have reviewed and accepted these warnings.” 后才能创建 trade plan。
+- Reminder: 提醒用户处理风险管理动作，不等同于交易建议。
 
 典型 Blocker：
 

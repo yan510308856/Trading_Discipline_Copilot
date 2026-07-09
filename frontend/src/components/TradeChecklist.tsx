@@ -41,6 +41,9 @@ const setups = [
   "pullback",
   "failed_breakout",
   "reversal",
+  "left_side_bottom_pick",
+  "early_reversal",
+  "bottom_pick",
   "h1_h2_l1_l2",
   "wedge",
   "double_top_bottom",
@@ -78,6 +81,9 @@ function localAlert(
     message,
     checklist: [],
     discipline_sentence: disciplineSentence,
+    next_actions: [],
+    ui_hints: {},
+    requires_acknowledgement: severity === "warning",
   };
 }
 
@@ -91,6 +97,7 @@ export function TradeChecklist() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [requestError, setRequestError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+  const [warningsAcknowledged, setWarningsAcknowledged] = useState(false);
 
   const entry = optionalNumber(form.planned_entry);
   const stop = optionalNumber(form.stop_loss);
@@ -153,6 +160,7 @@ export function TradeChecklist() {
         const result = await evaluateRules(
           {
             status: "planned",
+            market: form.market,
             setup: form.setup,
             market_context: form.market_context,
             planned_entry: entry,
@@ -194,6 +202,21 @@ export function TradeChecklist() {
     : alerts.length > 0
       ? "warning"
       : "allowed";
+  const requiresWarningAcknowledgement =
+    status === "warning" &&
+    alerts.some(
+      (alert) =>
+        alert.severity === "warning" || alert.requires_acknowledgement === true,
+    );
+  const createIsDisabled =
+    status === "blocked" ||
+    (requiresWarningAcknowledgement && !warningsAcknowledged) ||
+    isEvaluating ||
+    isSubmitting;
+
+  useEffect(() => {
+    setWarningsAcknowledged(false);
+  }, [status, alerts.map((alert) => alert.rule_id).join("|")]);
 
   function updateField<K extends keyof TradeFormState>(
     field: K,
@@ -205,7 +228,13 @@ export function TradeChecklist() {
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (status === "blocked" || entry === null || stop === null || target === null) {
+    if (
+      status === "blocked" ||
+      (requiresWarningAcknowledgement && !warningsAcknowledged) ||
+      entry === null ||
+      stop === null ||
+      target === null
+    ) {
       return;
     }
 
@@ -264,11 +293,11 @@ export function TradeChecklist() {
             <p className="eyebrow">Pre-trade</p>
             <h2>Build the plan before taking the risk.</h2>
           </div>
-          <p>Required fields are marked with an asterisk.</p>
+          <p>Single live-trading workflow. Blockers stop the plan; warnings require review.</p>
         </div>
 
         <fieldset>
-          <legend>Trade identity</legend>
+          <legend>1. What am I trying to trade?</legend>
           <div className="form-grid three-columns">
             <label>
               Symbol *
@@ -344,7 +373,7 @@ export function TradeChecklist() {
         </fieldset>
 
         <fieldset>
-          <legend>Risk and targets</legend>
+          <legend>2. Is the risk valid?</legend>
           <div className="form-grid three-columns">
             <label>
               Planned entry *
@@ -376,7 +405,7 @@ export function TradeChecklist() {
         </fieldset>
 
         <fieldset>
-          <legend>Discipline context</legend>
+          <legend>3. What discipline warnings must I acknowledge?</legend>
           <div className="check-list">
             {form.setup === "breakout" && (
               <label className="check-row"><input type="checkbox" checked={form.follow_through_confirmed} onChange={(event) => updateField("follow_through_confirmed", event.target.checked)} /><span><strong>Follow-through confirmed</strong><small>The breakout has confirmation beyond the initial bar.</small></span></label>
@@ -400,13 +429,20 @@ export function TradeChecklist() {
           <textarea rows={4} value={form.notes} onChange={(event) => updateField("notes", event.target.value)} placeholder="Entry reason, invalidation structure, and what would make you wait…" />
         </label>
 
-        {status === "warning" && (
-          <p className="warning-confirmation">This plan may be created, but review and consciously accept every warning first.</p>
+        {requiresWarningAcknowledgement && (
+          <label className="warning-acknowledgement">
+            <input
+              type="checkbox"
+              checked={warningsAcknowledged}
+              onChange={(event) => setWarningsAcknowledged(event.target.checked)}
+            />
+            <span>I have reviewed and accepted these warnings.</span>
+          </label>
         )}
         {requestError && <p className="form-message error-message">{requestError}</p>}
         {successMessage && <p className="form-message success-message">{successMessage}</p>}
 
-        <button className="primary-button" type="submit" disabled={status === "blocked" || isEvaluating || isSubmitting}>
+        <button className="primary-button" type="submit" disabled={createIsDisabled}>
           {isSubmitting ? "Creating…" : "Create Trade Plan"}
         </button>
       </form>

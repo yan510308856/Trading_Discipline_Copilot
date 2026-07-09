@@ -13,6 +13,7 @@ DEFAULT_RULES_PATH = Path(__file__).parents[1] / "rules" / "price_action_rules.y
 SUPPORTED_OPERATORS = {
     "missing",
     "equals",
+    "in",
     "greater_than",
     "greater_than_or_equal",
     "less_than",
@@ -59,6 +60,11 @@ def _condition_matches(condition: Mapping[str, Any], trade: Mapping[str, Any]) -
         return _is_missing(actual)
     if operator == "equals":
         return actual == condition.get("value")
+    if operator == "in":
+        expected_values = condition.get("value", [])
+        if not isinstance(expected_values, list):
+            raise ValueError("Operator 'in' requires a list value")
+        return actual in expected_values
     if _is_missing(actual):
         return False
 
@@ -120,6 +126,11 @@ class RuleEngine:
                     "message": rule["message"],
                     "checklist": rule.get("checklist", []),
                     "discipline_sentence": rule.get("discipline_sentence", ""),
+                    "next_actions": rule.get("next_actions", []),
+                    "ui_hints": rule.get("ui_hints", {}),
+                    "requires_acknowledgement": rule.get(
+                        "requires_acknowledgement", False
+                    ),
                 }
             )
 
