@@ -12,6 +12,15 @@ const statusCopy: Record<RuleStatus, string> = {
   blocked: "Blocked",
 };
 
+const statusMessage: Record<RuleStatus, string> = {
+  allowed:
+    "No blocker or warning is currently active. Continue only if the plan still makes sense.",
+  warning:
+    "This trade is allowed only after conscious acknowledgement. Do not treat this as routine.",
+  blocked:
+    "This trade plan is blocked because it violates a live trading discipline rule.",
+};
+
 export function RuleAlertPanel({
   status = "allowed",
   alerts = [],
@@ -28,6 +37,11 @@ export function RuleAlertPanel({
           {isChecking ? "Checking…" : statusCopy[status]}
         </span>
       </div>
+      {!isChecking && (
+        <p className={`rule-status-copy status-copy-${status}`}>
+          {statusMessage[status]}
+        </p>
+      )}
 
       {alerts.length === 0 ? (
         <p className="rule-empty">
@@ -47,11 +61,21 @@ export function RuleAlertPanel({
                 <span>{alert.severity}</span>
               </div>
               {alert.checklist.length > 0 && (
-                <ul>
+                <ul className="alert-checklist">
                   {alert.checklist.map((item) => (
                     <li key={item}>{item}</li>
                   ))}
                 </ul>
+              )}
+              {alert.next_actions && alert.next_actions.length > 0 && (
+                <div className="alert-next-actions">
+                  <span>Next actions</span>
+                  <ul>
+                    {alert.next_actions.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
               )}
               {alert.discipline_sentence && (
                 <p className="discipline-sentence">

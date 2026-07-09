@@ -199,6 +199,9 @@ class RuleAlert(BaseModel):
     message: str
     checklist: list[str]
     discipline_sentence: str
+    next_actions: list[str] = Field(default_factory=list)
+    ui_hints: dict[str, Any] = Field(default_factory=dict)
+    requires_acknowledgement: bool = False
 
 
 class RuleDefinition(BaseModel):
@@ -211,6 +214,9 @@ class RuleDefinition(BaseModel):
     conditions: list[dict[str, Any]]
     message: str
     checklist: list[str]
+    next_actions: list[str] = Field(default_factory=list)
+    ui_hints: dict[str, Any] = Field(default_factory=dict)
+    requires_acknowledgement: bool = False
     avoid: str
     discipline_sentence: str
     enabled: bool

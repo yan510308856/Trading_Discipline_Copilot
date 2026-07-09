@@ -10,6 +10,7 @@ import {
 } from "../api";
 import { useTrades } from "../hooks/useTrades";
 import type {
+  RuleAlert,
   RuleEvaluationResult,
   Trade,
   TradePatchPayload,
@@ -41,6 +42,36 @@ function errorMessage(error: unknown): string {
   return error instanceof APIError
     ? `${error.code}: ${error.message}`
     : "The trade update failed. Confirm that the backend is running.";
+}
+
+const alertPriority: Record<RuleAlert["severity"], number> = {
+  blocker: 3,
+  warning: 2,
+  reminder: 1,
+};
+
+function requiredAction(alerts: RuleAlert[]): RuleAlert | null {
+  return [...alerts].sort(
+    (left, right) =>
+      alertPriority[right.severity] - alertPriority[left.severity],
+  )[0] ?? null;
+}
+
+function requiredActionText(alert: RuleAlert | null): string {
+  if (!alert) return "Monitor the trade against the original plan.";
+  const hintedAction = alert.ui_hints?.required_action;
+  if (typeof hintedAction === "string") return hintedAction;
+  if (alert.next_actions && alert.next_actions.length > 0) {
+    return alert.next_actions[0];
+  }
+
+  const fallbackActions: Record<string, string> = {
+    runner_must_have_protection: "Set runner stop.",
+    take_profit_and_let_runner_run:
+      "Decide whether to take partial profit.",
+    green_trade_should_not_go_red: "Reassess management plan.",
+  };
+  return fallbackActions[alert.rule_id] ?? alert.message;
 }
 
 function TradeCard({ trade, onUpdated, defaultExpanded, onDeleted }: TradeCardProps) {
@@ -91,6 +122,7 @@ function TradeCard({ trade, onUpdated, defaultExpanded, onDeleted }: TradeCardPr
     parsedPartialQuantity >= 0 &&
     (trade.position_size === null ||
       parsedPartialQuantity < trade.position_size - trade.partial_exit_quantity);
+  const primaryRequiredAction = requiredAction(evaluation.alerts);
 
   useEffect(() => {
     if (trade.status !== "open") return;
@@ -215,6 +247,16 @@ function TradeCard({ trade, onUpdated, defaultExpanded, onDeleted }: TradeCardPr
         </div>
       </summary>
       <article className="open-trade-card">
+
+      <section
+        className={`required-action required-action-${
+          primaryRequiredAction?.severity ?? "none"
+        }`}
+      >
+        <span>Required Action</span>
+        <strong>{requiredActionText(primaryRequiredAction)}</strong>
+        {primaryRequiredAction && <p>{primaryRequiredAction.message}</p>}
+      </section>
 
       <div className="trade-facts">
         <div><span>Actual entry</span><strong>{displayPrice(trade.actual_entry)}</strong></div>

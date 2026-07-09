@@ -260,3 +260,41 @@ Intentionally skipped. The MVP has no CSV import, broker integration, or automat
 - The app remains local and single-user.
 - Market prices, partial exits, and reviews are manually entered.
 - No CSV import, broker connection, authentication, or auto-trading is implemented.
+
+## Stage 14 - Real trading workflow and live discipline hardening
+
+### Date
+
+2026-07-08
+
+### What changed
+
+- Clarified that Trading Discipline Copilot supports real trading discipline, not Practice Mode or Learning Mode.
+- Added actionable rule metadata: `next_actions`, `ui_hints`, and `requires_acknowledgement`.
+- Added left-side bottom-picking rules: options are blocked, stocks require small-size warning acknowledgement.
+- Required explicit warning acknowledgement before a warning-level trade plan can be created.
+- Added a Required Action area to open trade cards.
+
+### Commands I ran
+
+```bash
+backend/.venv/bin/pytest backend/tests/test_rule_engine.py -q
+cd frontend
+npm test
+npm run build
+```
+
+### Tests
+
+- Rule engine tests cover missing stop loss, breakout without follow-through, left-side options blocker, left-side stock warning, and legacy rules without new metadata.
+- Frontend unit tests and production build pass.
+
+### Engineering concepts learned
+
+- Additive schema changes let old configuration keep working while new UI behavior becomes possible.
+- Warning acknowledgement is a product safety gate, not just a visual message.
+- Small UI hardening can improve real workflow safety without a full redesign.
+
+### Trading discipline concepts encoded
+
+Blockers are hard stops. Warnings slow the trader down and require conscious acceptance. Reminders point to required management actions while leaving the trading decision with the human.

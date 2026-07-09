@@ -14,6 +14,11 @@ rules:
     checklist:
       - Is the stop loss set?
       - Does it mark the point where the setup is invalid?
+    next_actions:
+      - Add the structural stop before creating the plan.
+      - If no valid stop exists, skip the trade.
+    ui_hints:
+      emphasis: hard_block
     avoid: Entering any trade before defining its invalidation point.
     discipline_sentence: No stop loss, no trade.
     enabled: true
@@ -36,6 +41,11 @@ rules:
     checklist:
       - Is the reverse supported by a new setup?
       - Have you paused long enough to avoid a revenge trade?
+    next_actions:
+      - Step away and reassess the structure.
+      - Create a new plan only if there is a fresh, independent setup.
+    ui_hints:
+      emphasis: hard_block
     avoid: Treating a stop loss as a signal to reverse immediately.
     discipline_sentence: A stop is information, not an invitation to retaliate.
     enabled: true
@@ -55,6 +65,12 @@ rules:
     checklist:
       - Was the breakout bar strong?
       - Did the next price action confirm the breakout?
+    next_actions:
+      - Wait for follow-through or a structured retest.
+      - Reduce urgency; do not chase the first breakout bar.
+    ui_hints:
+      emphasis: acknowledgement_required
+    requires_acknowledgement: true
     avoid: Chasing a breakout before follow-through confirms it.
     discipline_sentence: The breakout is not the signal; follow-through is confirmation.
     enabled: true
@@ -74,6 +90,12 @@ rules:
     checklist:
       - Is price near the edge or in the middle of the range?
       - Is there room before the opposite side of the range?
+    next_actions:
+      - Confirm there is enough room to the opposite side of the range.
+      - Consider waiting for a clearer edge or failed breakout.
+    ui_hints:
+      emphasis: acknowledgement_required
+    requires_acknowledgement: true
     avoid: Entering a second leg in the middle of a trading range.
     discipline_sentence: In a range, assume disappointment before continuation.
     enabled: true
@@ -93,6 +115,12 @@ rules:
     checklist:
       - Are you buying high or selling low in the range?
       - Can you wait for a pullback or confirmation?
+    next_actions:
+      - Do not chase the large bar at the range extreme.
+      - Wait for confirmation, a pullback, or a clearer failure setup.
+    ui_hints:
+      emphasis: acknowledgement_required
+    requires_acknowledgement: true
     avoid: Chasing an emotional big bar at a trading-range extreme.
     discipline_sentence: A big bar in a range often creates urgency, not edge.
     enabled: true
@@ -109,6 +137,9 @@ rules:
     checklist:
       - Is the pattern still compressed rather than already expanded?
       - Will you wait for a clear breakout and follow-through?
+    next_actions:
+      - Define the breakout level and invalidation before acting.
+      - Wait for expansion and follow-through.
     avoid: Predicting direction while price remains compressed.
     discipline_sentence: Compression is context; the breakout still needs confirmation.
     enabled: true
@@ -125,6 +156,12 @@ rules:
     checklist:
       - Is this near yesterday's high or low?
       - Have repeated breakout attempts already failed?
+    next_actions:
+      - Treat another breakout attempt as suspect until confirmation appears.
+      - Reassess whether the level is acting as rejection.
+    ui_hints:
+      emphasis: acknowledgement_required
+    requires_acknowledgement: true
     avoid: Repeating the same breakout entry after the market has rejected it.
     discipline_sentence: Repeated failure at a key level is information, not bad luck.
     enabled: true
@@ -141,6 +178,9 @@ rules:
     checklist:
       - Is the gap holding beyond the breakout point?
       - Is there a structured entry and protected runner plan?
+    next_actions:
+      - Plan the runner protection before entry.
+      - Avoid chasing if the stop would be structurally invalid.
     avoid: Chasing strength without a defined invalidation point.
     discipline_sentence: Strength can persist, but urgency is not an entry plan.
     enabled: true
@@ -157,8 +197,72 @@ rules:
     checklist:
       - What market structure supports this signal?
       - Is the setup aligned with trend, range, or breakout context?
+    next_actions:
+      - Name the market structure before entering.
+      - Skip the trade if the only reason is a familiar candle shape.
+    ui_hints:
+      emphasis: acknowledgement_required
+    requires_acknowledgement: true
     avoid: Trading a recognizable shape without structural context.
     discipline_sentence: Read the market first and the signal bar second.
+    enabled: true
+
+  - id: no_options_for_left_side_bottom_picking
+    name: Do not use options for left-side bottom picking
+    category: risk_control
+    stage: pre_trade
+    severity: blocker
+    trigger:
+      status: planned
+      market: options
+    conditions:
+      - field: setup
+        operator: in
+        value:
+          - left_side_bottom_pick
+          - early_reversal
+          - bottom_pick
+    message: Options are blocked for left-side bottom-picking or early reversal plans.
+    checklist:
+      - Is this attempt happening before clear confirmation?
+      - Would option decay or spread risk punish being early?
+    next_actions:
+      - Do not create this options trade plan.
+      - Wait for confirmation or choose a different, clearly defined setup.
+    ui_hints:
+      emphasis: hard_block
+    avoid: Using leveraged, time-sensitive products while trying to catch an unconfirmed bottom.
+    discipline_sentence: Do not use options to be early on a bottom.
+    enabled: true
+
+  - id: left_side_stock_only_small_size
+    name: Left-side stock bottom picks require small-size confirmation
+    category: risk_control
+    stage: pre_trade
+    severity: warning
+    trigger:
+      status: planned
+      market: stocks
+    conditions:
+      - field: setup
+        operator: in
+        value:
+          - left_side_bottom_pick
+          - early_reversal
+          - bottom_pick
+    message: A left-side stock bottom-picking plan is allowed only with small-size confirmation.
+    checklist:
+      - Is the position intentionally small?
+      - Is the stop structural and close enough to honor immediately?
+      - Are you accepting that confirmation is incomplete?
+    next_actions:
+      - Confirm this is small size before creating the plan.
+      - Define the invalidation point and do not average down.
+    ui_hints:
+      emphasis: acknowledgement_required
+    requires_acknowledgement: true
+    avoid: Treating an early stock reversal attempt like a confirmed trend entry.
+    discipline_sentence: If you choose to be early in stock, size must stay small.
     enabled: true
 
   - id: take_profit_and_let_runner_run
@@ -179,6 +283,11 @@ rules:
     checklist:
       - Has partial profit been recorded?
       - Is the remaining position sized and protected appropriately?
+    next_actions:
+      - Decide whether to take partial profit at the planned milestone.
+      - If keeping a runner, confirm the remaining risk is protected.
+    ui_hints:
+      required_action: Decide whether to take partial profit.
     avoid: Holding the full position after the planned profit milestone.
     discipline_sentence: Pay yourself at the planned milestone, then let the runner work.
     enabled: true
@@ -201,6 +310,11 @@ rules:
     checklist:
       - Is the original setup still valid?
       - Should the stop have been advanced by structure?
+    next_actions:
+      - Reassess whether the original management plan is still valid.
+      - Decide whether the stop should move by structure.
+    ui_hints:
+      required_action: Reassess management plan.
     avoid: Letting open profit become a loss without deliberate reassessment.
     discipline_sentence: Protect earned opportunity without smothering the trade.
     enabled: true
@@ -222,6 +336,12 @@ rules:
     checklist:
       - Is the runner stop recorded?
       - Does the stop protect profit without ignoring market structure?
+    next_actions:
+      - Set the runner stop.
+      - Close or disable the runner if no protective stop is valid.
+    ui_hints:
+      required_action: Set runner stop.
+      emphasis: acknowledgement_required
     avoid: Leaving a runner active without a protective stop.
     discipline_sentence: A runner earns freedom only after its risk is protected.
     enabled: true

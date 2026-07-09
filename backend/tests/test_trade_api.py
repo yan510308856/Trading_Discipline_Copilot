@@ -406,10 +406,16 @@ def test_only_closed_trade_can_be_reviewed(api_client: TestClient) -> None:
 
 def test_get_rules(api_client: TestClient) -> None:
     response = api_client.get("/rules")
+    rules = response.json()
+    rule_ids = {rule["id"] for rule in rules}
 
     assert response.status_code == 200
-    assert len(response.json()) == 12
-    assert set(response.json()[0]) == {
+    assert len(rules) == 14
+    assert {
+        "no_options_for_left_side_bottom_picking",
+        "left_side_stock_only_small_size",
+    } <= rule_ids
+    assert set(rules[0]) == {
         "id",
         "name",
         "category",
@@ -419,6 +425,9 @@ def test_get_rules(api_client: TestClient) -> None:
         "conditions",
         "message",
         "checklist",
+        "next_actions",
+        "ui_hints",
+        "requires_acknowledgement",
         "avoid",
         "discipline_sentence",
         "enabled",
