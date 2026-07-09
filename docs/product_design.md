@@ -35,6 +35,7 @@ Live workflow:
 Plan → Execute → Manage → Review
 ```
 
+- `Daily Readiness`: 开始新的 intraday 交易前，先完成当天准备检查。
 - `Plan`: 填写真实交易计划，系统检查 blocker / warning / reminder。
 - `Execute`: 用户自己在券商或交易平台执行；本应用不下单。
 - `Manage`: 记录价格、止损、部分止盈、runner，系统提示需要处理的纪律动作。
@@ -102,6 +103,8 @@ cancelled  cancelled
 
 显示内容：
 
+- 今日 intraday readiness 状态：Not cleared / Partially ready / Cleared。
+- 今日 intraday readiness 必填项完成进度。
 - 今日交易次数。
 - 今日净 R 倍数。
 - 今日纪律评分平均值。
@@ -128,6 +131,32 @@ Open Trades: 1
 Warnings Today: 3
 Worst Mistake: Chased breakout without FT
 ```
+
+#### 4.1.1 Today's Intraday Readiness
+
+目标：在开始新的 intraday 交易计划前，确认今天是否已经完成必要准备。
+
+必填项：
+
+- `watchlist_selected`: Select today's watchlist before the open.
+- `market_environment_assessed`: Assess today's market environment.
+- `important_events_checked`: Check important events and scheduled risks.
+- `swing_positions_reviewed`: Review existing swing positions.
+- `daily_risk_limits_set`: Define today's risk limits.
+
+可选项：
+
+- `platform_ready`: Confirm platform, data, and broker access are working.
+- `mental_state_checked`: Check mental and physical state.
+- `no_forced_trade_confirmed`: Confirm there is no need to force a trade today.
+
+状态计算：
+
+- `not_cleared`: 没有完成任何必填项。
+- `partially_ready`: 完成了部分必填项。
+- `cleared`: 所有必填项完成，可以开始计划 intraday trades。
+
+这个状态不是交易信号。它只表示当天准备流程是否完成。Stage 15 中重要事件检查、市场环境判断、watchlist 和风险限制都由用户手动输入，不接入自动日历或自动分类。
 
 ---
 

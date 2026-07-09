@@ -1,5 +1,7 @@
 import type {
   APIErrorEnvelope,
+  DailyReadinessData,
+  DailyReadinessUpdatePayload,
   DailySummaryData,
   HealthResponse,
   OpenTradeAttention,
@@ -68,6 +70,29 @@ export function getHealth(): Promise<HealthResponse> {
 export function getDailySummary(date?: string): Promise<DailySummaryData> {
   const query = date ? `?date=${encodeURIComponent(date)}` : "";
   return apiRequest<DailySummaryData>(`/summary/daily${query}`);
+}
+
+export function getTodayDailyReadiness(): Promise<DailyReadinessData> {
+  return apiRequest<DailyReadinessData>("/daily-readiness/today");
+}
+
+export function getDailyReadiness(date: string): Promise<DailyReadinessData> {
+  return apiRequest<DailyReadinessData>(
+    `/daily-readiness?date=${encodeURIComponent(date)}`,
+  );
+}
+
+export function updateDailyReadiness(
+  date: string,
+  payload: DailyReadinessUpdatePayload,
+): Promise<DailyReadinessData> {
+  return apiRequest<DailyReadinessData>(
+    `/daily-readiness/${encodeURIComponent(date)}`,
+    {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    },
+  );
 }
 
 export function getRules(): Promise<RuleDefinition[]> {

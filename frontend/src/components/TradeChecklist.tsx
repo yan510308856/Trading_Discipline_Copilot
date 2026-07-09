@@ -4,15 +4,18 @@ import {
   APIError,
   createTrade,
   evaluateRules,
+  getTodayDailyReadiness,
   saveChecklistAnswers,
 } from "../api";
 import type {
+  DailyReadinessData,
   RuleAlert,
   RuleEvaluationResult,
   RuleStatus,
   TradeCreatePayload,
   TradeFormState,
 } from "../types";
+import { readinessProgressText } from "../utils/readiness";
 import { calculateRiskReward } from "../utils/tradeCalculations";
 import { RuleAlertPanel } from "./RuleAlertPanel";
 
@@ -98,6 +101,9 @@ export function TradeChecklist() {
   const [requestError, setRequestError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [warningsAcknowledged, setWarningsAcknowledged] = useState(false);
+  const [dailyReadiness, setDailyReadiness] =
+    useState<DailyReadinessData | null>(null);
+  const [readinessError, setReadinessError] = useState("");
 
   const entry = optionalNumber(form.planned_entry);
   const stop = optionalNumber(form.stop_loss);
@@ -107,6 +113,30 @@ export function TradeChecklist() {
     if (entry === null || stop === null || target === null) return null;
     return calculateRiskReward(form.direction, entry, stop, target);
   }, [entry, form.direction, stop, target]);
+
+  useEffect(() => {
+    let isCurrent = true;
+    async function loadReadiness() {
+      try {
+        const result = await getTodayDailyReadiness();
+        if (!isCurrent) return;
+        setDailyReadiness(result);
+        setReadinessError("");
+      } catch (error) {
+        if (!isCurrent) return;
+        setReadinessError(
+          error instanceof APIError
+            ? `${error.code}: ${error.message}`
+            : "Could not load today's intraday readiness status.",
+        );
+      }
+    }
+
+    void loadReadiness();
+    return () => {
+      isCurrent = false;
+    };
+  }, []);
 
   const localAlerts = useMemo(() => {
     const alerts: RuleAlert[] = [];
@@ -295,6 +325,23 @@ export function TradeChecklist() {
           </div>
           <p>Single live-trading workflow. Blockers stop the plan; warnings require review.</p>
         </div>
+
+        {dailyReadiness && !dailyReadiness.is_cleared_for_intraday && (
+          <div className="pretrade-readiness-warning">
+            <strong>Daily intraday readiness is incomplete.</strong>
+            <p>
+              Do not plan intraday trades until the Dashboard checklist is
+              cleared.{" "}
+              {readinessProgressText(
+                dailyReadiness.required_complete_count,
+                dailyReadiness.required_total_count,
+              )}
+            </p>
+          </div>
+        )}
+        {readinessError && (
+          <p className="form-message error-message">{readinessError}</p>
+        )}
 
         <fieldset>
           <legend>1. What am I trying to trade?</legend>

@@ -34,6 +34,43 @@ export interface DailySummaryData {
   lessons: string[];
 }
 
+export type DailyReadinessStatus =
+  | "not_cleared"
+  | "partially_ready"
+  | "cleared";
+
+export interface DailyReadinessItem {
+  id: string;
+  label: string;
+  required: boolean;
+  completed: boolean;
+  notes: string;
+  category: string;
+  notes_placeholder: string;
+}
+
+export interface DailyReadinessData {
+  id: number | null;
+  readiness_date: string;
+  created_at: string | null;
+  updated_at: string | null;
+  items: DailyReadinessItem[];
+  notes: string | null;
+  required_complete_count: number;
+  required_total_count: number;
+  is_cleared_for_intraday: boolean;
+  status: DailyReadinessStatus;
+}
+
+export interface DailyReadinessUpdatePayload {
+  items: Array<{
+    id: string;
+    completed: boolean;
+    notes: string;
+  }>;
+  notes: string | null;
+}
+
 export type ConnectionState = "checking" | "connected" | "unavailable";
 
 export type Market =

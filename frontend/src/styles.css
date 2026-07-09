@@ -1664,6 +1664,138 @@ textarea {
   border-radius: 18px;
 }
 
+.readiness-panel {
+  margin-top: 22px;
+  padding: 25px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-left: 6px solid #a4b5ad;
+  border-radius: 18px;
+}
+
+.readiness-not_cleared {
+  border-left-color: #b94d43;
+}
+
+.readiness-partially_ready {
+  border-left-color: #c08a26;
+}
+
+.readiness-cleared {
+  border-left-color: #46816a;
+}
+
+.readiness-badge {
+  padding: 7px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.readiness-badge-not_cleared {
+  color: #873b35;
+  background: #f7e4e1;
+}
+
+.readiness-badge-partially_ready {
+  color: #71531f;
+  background: #f8edcf;
+}
+
+.readiness-badge-cleared {
+  color: #245e43;
+  background: #e0efe6;
+}
+
+.readiness-message {
+  max-width: 760px;
+  margin: 0;
+  color: #46564f;
+  line-height: 1.55;
+}
+
+.readiness-progress {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.readiness-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.readiness-item {
+  display: grid;
+  grid-template-columns: minmax(240px, 0.9fr) minmax(260px, 1.1fr);
+  gap: 14px;
+  padding: 14px;
+  background: #f4f6f2;
+  border: 1px solid #e0e5df;
+  border-radius: 12px;
+}
+
+.readiness-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  color: #46564f;
+}
+
+.readiness-check input {
+  width: 17px;
+  height: 17px;
+  margin-top: 3px;
+  accent-color: var(--forest);
+}
+
+.readiness-check span {
+  display: grid;
+  gap: 5px;
+}
+
+.readiness-check strong {
+  font-size: 14px;
+}
+
+.readiness-check small {
+  width: fit-content;
+  padding: 4px 7px;
+  color: var(--muted);
+  background: #e8eee8;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.readiness-day-notes {
+  margin-top: 18px;
+}
+
+.readiness-save {
+  max-width: 240px;
+}
+
+.pretrade-readiness-warning {
+  margin-bottom: 22px;
+  padding: 14px 16px;
+  color: #873b35;
+  background: #f7e4e1;
+  border: 1px solid #dfaaa2;
+  border-left: 5px solid #b94d43;
+  border-radius: 11px;
+}
+
+.pretrade-readiness-warning p {
+  margin: 6px 0 0;
+  line-height: 1.5;
+}
+
 .section-heading,
 .daily-summary-heading {
   display: flex;
@@ -1796,6 +1928,10 @@ textarea {
 
   .summary-card-grid,
   .daily-review-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .readiness-item {
     grid-template-columns: 1fr;
   }
 

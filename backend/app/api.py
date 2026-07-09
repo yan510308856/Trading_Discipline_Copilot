@@ -11,12 +11,44 @@ from sqlalchemy.orm import Session
 
 from app import models, schemas
 from app.database import get_db
-from app.services import market_data, review_service, summary_service, trade_service
+from app.services import (
+    daily_readiness_service,
+    market_data,
+    review_service,
+    summary_service,
+    trade_service,
+)
 from app.services.rule_engine import evaluate_trade, load_rules
 
 
 router = APIRouter()
 Database = Annotated[Session, Depends(get_db)]
+
+
+@router.get("/daily-readiness/today", response_model=schemas.DailyReadinessRead)
+def get_today_daily_readiness(database: Database) -> schemas.DailyReadinessRead:
+    return daily_readiness_service.get_readiness(database, date.today())
+
+
+@router.get("/daily-readiness", response_model=schemas.DailyReadinessRead)
+def get_daily_readiness(
+    database: Database,
+    readiness_date: date = Query(alias="date"),
+) -> schemas.DailyReadinessRead:
+    return daily_readiness_service.get_readiness(database, readiness_date)
+
+
+@router.put("/daily-readiness/{readiness_date}", response_model=schemas.DailyReadinessRead)
+def update_daily_readiness(
+    readiness_date: date,
+    readiness: schemas.DailyReadinessUpdate,
+    database: Database,
+) -> schemas.DailyReadinessRead:
+    return daily_readiness_service.update_readiness(
+        database,
+        readiness_date,
+        readiness,
+    )
 
 
 @router.get("/trades", response_model=list[schemas.TradeRead])
