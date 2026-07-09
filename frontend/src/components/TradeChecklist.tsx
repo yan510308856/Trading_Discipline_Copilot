@@ -11,7 +11,6 @@ import {
 import type {
   DailyReadinessData,
   QuoteResult,
-  RuleAlert,
   RuleEvaluationResult,
   RuleStatus,
   TradeCreatePayload,
@@ -24,11 +23,17 @@ import {
   parseDecimalInput,
 } from "../utils/decimal";
 import { calculateRiskReward } from "../utils/tradeCalculations";
+import {
+  buildLocalTradeAlerts,
+  isCreateTradePlanDisabled,
+  statusFromAlerts,
+} from "../utils/tradePlanGate";
 import { RuleAlertPanel } from "./RuleAlertPanel";
 
-const initialForm: TradeFormState = {
+export const initialForm: TradeFormState = {
   symbol: "",
   option_contract: "",
+  trade_horizon: "intraday",
   market: "futures",
   direction: "long",
   setup: "",
@@ -47,7 +52,7 @@ const initialForm: TradeFormState = {
   big_bar_entry: false,
 };
 
-const setups = [
+export const setups = [
   "breakout",
   "pullback",
   "failed_breakout",
@@ -75,24 +80,6 @@ const marketContexts = [
   "gap_open",
   "uncertain",
 ];
-
-function localAlert(
-  ruleId: string,
-  severity: RuleAlert["severity"],
-  message: string,
-  disciplineSentence: string,
-): RuleAlert {
-  return {
-    rule_id: ruleId,
-    severity,
-    message,
-    checklist: [],
-    discipline_sentence: disciplineSentence,
-    next_actions: [],
-    ui_hints: {},
-    requires_acknowledgement: severity === "warning",
-  };
-}
 
 export function TradeChecklist() {
   const [form, setForm] = useState<TradeFormState>(initialForm);
@@ -145,49 +132,10 @@ export function TradeChecklist() {
     };
   }, []);
 
-  const localAlerts = useMemo(() => {
-    const alerts: RuleAlert[] = [];
-    const missingFields = [
-      ["symbol", form.symbol],
-      ["setup", form.setup],
-      ["market context", form.market_context],
-      ["planned entry", form.planned_entry],
-      ["target 1", form.target_1],
-    ].filter(([, value]) => value.trim() === "");
-
-    if (missingFields.length > 0) {
-      alerts.push(
-        localAlert(
-          "complete_required_trade_fields",
-          "blocker",
-          `Complete required fields: ${missingFields.map(([name]) => name).join(", ")}.`,
-          "A complete plan is a prerequisite for a deliberate trade.",
-        ),
-      );
-    }
-
-    if (riskReward && riskReward.risk <= 0) {
-      alerts.push(
-        localAlert(
-          "invalid_trade_risk",
-          "blocker",
-          "The stop is on the wrong side of entry for this direction.",
-          "If the invalidation point does not create positive risk, the structure is not valid.",
-        ),
-      );
-    } else if (riskReward && riskReward.targetR < 1) {
-      alerts.push(
-        localAlert(
-          "low_initial_reward_to_risk",
-          "warning",
-          "Target 1 offers less than 1R of initial reward.",
-          "Small reward should not require full-sized risk.",
-        ),
-      );
-    }
-
-    return alerts;
-  }, [form, riskReward]);
+  const localAlerts = useMemo(
+    () => buildLocalTradeAlerts(form, riskReward, dailyReadiness),
+    [dailyReadiness, form, riskReward],
+  );
 
   useEffect(() => {
     const controller = new AbortController();
@@ -197,6 +145,7 @@ export function TradeChecklist() {
         const result = await evaluateRules(
           {
             status: "planned",
+            trade_horizon: form.trade_horizon,
             market: form.market,
             option_contract: form.option_contract.trim() || null,
             setup: form.setup,
@@ -233,13 +182,7 @@ export function TradeChecklist() {
   }, [entry, form, stop, target]);
 
   const alerts = [...localAlerts, ...evaluation.alerts];
-  const status: RuleStatus = alerts.some(
-    (alert) => alert.severity === "blocker",
-  )
-    ? "blocked"
-    : alerts.length > 0
-      ? "warning"
-      : "allowed";
+  const status: RuleStatus = statusFromAlerts(alerts);
   const requiresWarningAcknowledgement =
     status === "warning" &&
     alerts.some(
@@ -247,10 +190,13 @@ export function TradeChecklist() {
         alert.severity === "warning" || alert.requires_acknowledgement === true,
     );
   const createIsDisabled =
-    status === "blocked" ||
-    (requiresWarningAcknowledgement && !warningsAcknowledged) ||
-    isEvaluating ||
-    isSubmitting;
+    isCreateTradePlanDisabled(
+      status,
+      requiresWarningAcknowledgement,
+      warningsAcknowledged,
+      isEvaluating,
+      isSubmitting,
+    );
 
   useEffect(() => {
     setWarningsAcknowledged(false);
@@ -317,6 +263,7 @@ export function TradeChecklist() {
       option_contract:
         form.market === "options" ? form.option_contract.trim() || null : null,
       market: form.market,
+      trade_horizon: form.trade_horizon,
       direction: form.direction,
       setup: form.setup,
       market_context: form.market_context,
@@ -373,7 +320,9 @@ export function TradeChecklist() {
           <p>Single live-trading workflow. Blockers stop the plan; warnings require review.</p>
         </div>
 
-        {dailyReadiness && !dailyReadiness.is_cleared_for_intraday && (
+        {form.trade_horizon === "intraday" &&
+          dailyReadiness &&
+          !dailyReadiness.is_cleared_for_intraday && (
           <div className="pretrade-readiness-warning">
             <strong>Daily intraday readiness is incomplete.</strong>
             <p>
@@ -440,7 +389,27 @@ export function TradeChecklist() {
               </select>
             </label>
           </div>
-          <div className="form-grid two-columns">
+          <div className="form-grid three-columns">
+            <label>
+              Trade horizon *
+              <select
+                value={form.trade_horizon}
+                onChange={(event) =>
+                  updateField(
+                    "trade_horizon",
+                    event.target.value as TradeFormState["trade_horizon"],
+                  )
+                }
+              >
+                <option value="intraday">Intraday</option>
+                <option value="swing">Swing</option>
+                <option value="other">Other</option>
+              </select>
+              <small>
+                Classify this trade before planning it. Intraday trades require
+                today&apos;s readiness checklist to be cleared.
+              </small>
+            </label>
             <label>
               Setup *
               <select

@@ -10,14 +10,14 @@ import { TradeChecklist } from "./components/TradeChecklist";
 import type { NavigationItem, PageId } from "./types";
 import { hashForPage, pageFromHash } from "./utils/navigation";
 
-const navigation: NavigationItem[] = [
-  { id: "dashboard", label: "Dashboard", shortLabel: "Home" },
-  { id: "trade-checklist", label: "New Trade", shortLabel: "Plan" },
-  { id: "rule-alerts", label: "Rule Alerts", shortLabel: "Alerts" },
-  { id: "open-trades", label: "Open Trades", shortLabel: "Manage" },
-  { id: "post-trade-review", label: "Post-Trade Review", shortLabel: "Review" },
-  { id: "daily-summary", label: "Daily Summary", shortLabel: "Summary" },
-  { id: "rules-library", label: "Rules Library", shortLabel: "Rules" },
+export const navigation: NavigationItem[] = [
+  { id: "dashboard", label: "Dashboard", shortLabel: "Home", icon: "▦" },
+  { id: "trade-checklist", label: "New Trade", shortLabel: "Plan", icon: "☑" },
+  { id: "rule-alerts", label: "Rule Alerts", shortLabel: "Alerts", icon: "⚠" },
+  { id: "open-trades", label: "Open Trades", shortLabel: "Manage", icon: "▣" },
+  { id: "post-trade-review", label: "Post-Trade Review", shortLabel: "Review", icon: "✓" },
+  { id: "daily-summary", label: "Daily Summary", shortLabel: "Summary", icon: "▥" },
+  { id: "rules-library", label: "Rules Library", shortLabel: "Rules", icon: "□" },
 ];
 
 const pages: Record<PageId, React.ReactNode> = {
@@ -65,10 +65,11 @@ export default function App() {
               onClick={() => navigateTo(item.id)}
               aria-current={activePage === item.id ? "page" : undefined}
             >
-              <span className="nav-initial" aria-hidden="true">
-                {item.shortLabel.slice(0, 1)}
+              <span className="nav-icon" aria-hidden="true">
+                {item.icon}
               </span>
-              <span>{item.label}</span>
+              <span className="nav-label">{item.label}</span>
+              <span className="nav-short-label">{item.shortLabel}</span>
             </button>
           ))}
         </nav>
@@ -82,7 +83,7 @@ export default function App() {
             <p className="eyebrow">Trading Discipline Copilot</p>
             <h1>{navigation.find((item) => item.id === activePage)?.label}</h1>
           </div>
-          <span className="stage-label">MVP · Stage 11 polish</span>
+          <span className="stage-label">Live discipline MVP</span>
         </header>
         {pages[activePage]}
       </main>

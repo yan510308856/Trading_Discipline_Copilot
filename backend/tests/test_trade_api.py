@@ -37,6 +37,7 @@ def test_create_get_patch_and_list_trade(api_client: TestClient) -> None:
     created = create_trade(api_client)
 
     assert created["status"] == "planned"
+    assert created["trade_horizon"] == "intraday"
     assert api_client.get(f"/trades/{created['id']}").json()["symbol"] == "ES"
 
     patch_response = api_client.patch(
@@ -47,6 +48,60 @@ def test_create_get_patch_and_list_trade(api_client: TestClient) -> None:
     assert patch_response.status_code == 200
     assert patch_response.json()["notes"] == "Wait for confirmation."
     assert [trade["id"] for trade in list_response.json()] == [created["id"]]
+
+
+def test_create_intraday_trade_persists_trade_horizon(api_client: TestClient) -> None:
+    response = api_client.post(
+        "/trades",
+        json=planned_trade_payload() | {"trade_horizon": "intraday"},
+    )
+
+    assert response.status_code == 201
+    assert response.json()["trade_horizon"] == "intraday"
+
+
+def test_create_swing_trade_persists_trade_horizon(api_client: TestClient) -> None:
+    response = api_client.post(
+        "/trades",
+        json=planned_trade_payload() | {"trade_horizon": "swing"},
+    )
+
+    assert response.status_code == 201
+    assert response.json()["trade_horizon"] == "swing"
+
+
+def test_omitted_trade_horizon_defaults_to_intraday(api_client: TestClient) -> None:
+    response = api_client.post("/trades", json=planned_trade_payload())
+
+    assert response.status_code == 201
+    assert response.json()["trade_horizon"] == "intraday"
+
+
+def test_list_trades_filters_by_trade_horizon(api_client: TestClient) -> None:
+    intraday = api_client.post(
+        "/trades",
+        json=planned_trade_payload() | {"symbol": "ES", "trade_horizon": "intraday"},
+    ).json()
+    swing = api_client.post(
+        "/trades",
+        json=planned_trade_payload() | {"symbol": "AAPL", "trade_horizon": "swing"},
+    ).json()
+
+    response = api_client.get("/trades?trade_horizon=swing")
+
+    assert response.status_code == 200
+    assert [trade["id"] for trade in response.json()] == [swing["id"]]
+    assert intraday["id"] not in [trade["id"] for trade in response.json()]
+
+
+def test_invalid_trade_horizon_returns_validation_error(api_client: TestClient) -> None:
+    response = api_client.post(
+        "/trades",
+        json=planned_trade_payload() | {"trade_horizon": "overnight"},
+    )
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "VALIDATION_ERROR"
 
 
 def test_option_contract_persists_for_options_trade(api_client: TestClient) -> None:

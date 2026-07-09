@@ -122,6 +122,11 @@ cancelled  cancelled
 - `Daily Review`
 - `Rules Library`
 
+Daily Readiness intentionally remains at the bottom of the Dashboard. The
+Dashboard should feel like an operational cockpit: state, blockers, and next
+actions matter more than motivational hero copy, while the readiness editor
+stays in its stable lower position.
+
 Dashboard 卡片建议：
 
 ```text
@@ -176,6 +181,7 @@ Worst Mistake: Chased breakout without FT
 
 ```yaml
 symbol: string
+trade_horizon: intraday | swing | other
 market: futures | stocks | crypto | forex | options | other
 direction: long | short
 setup:
@@ -208,6 +214,22 @@ runner_enabled: boolean
 position_size: number | null
 notes: string
 ```
+
+#### Trade Horizon 规则
+
+创建交易计划时必须先分类：
+
+- `intraday`
+- `swing`
+- `other`
+
+`intraday` trades require today's Daily Readiness checklist to be cleared before
+a new plan can be created. `swing` and `other` trades are not blocked by Daily
+Readiness, because that checklist is specifically an intraday preparation gate.
+
+This keeps one real live workflow rather than adding Practice Mode or Learning
+Mode. The app remains a discipline support tool; it does not place broker
+orders, auto-execute trades, or predict market direction.
 
 #### 自动计算辅助：Risk / Reward 与 R 倍数
 

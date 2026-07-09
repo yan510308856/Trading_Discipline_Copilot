@@ -11,6 +11,7 @@ export interface NavigationItem {
   id: PageId;
   label: string;
   shortLabel: string;
+  icon: string;
 }
 
 export interface HealthResponse {
@@ -82,6 +83,7 @@ export type Market =
   | "other";
 
 export type Direction = "long" | "short";
+export type TradeHorizon = "intraday" | "swing" | "other";
 export type FollowedPlan = "yes" | "partial" | "no";
 export type RuleStatus = "allowed" | "warning" | "blocked";
 export type RuleSeverity = "blocker" | "warning" | "reminder";
@@ -108,6 +110,7 @@ export interface RuleDefinition {
 export interface TradeFormState {
   symbol: string;
   option_contract: string;
+  trade_horizon: TradeHorizon;
   market: Market;
   direction: Direction;
   setup: string;
@@ -129,6 +132,7 @@ export interface TradeFormState {
 export interface TradeCreatePayload {
   symbol: string;
   option_contract: string | null;
+  trade_horizon: TradeHorizon;
   market: Market;
   direction: Direction;
   setup: string;
@@ -186,6 +190,7 @@ export interface TradeExecution {
 }
 
 export interface TradePatchPayload {
+  trade_horizon?: TradeHorizon;
   current_stop?: number | null;
   current_price?: number | null;
   runner_enabled?: boolean;

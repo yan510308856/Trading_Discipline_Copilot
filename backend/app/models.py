@@ -31,6 +31,7 @@ class Trade(Base):
     )
     symbol: Mapped[str] = mapped_column(String(32), index=True)
     option_contract: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    trade_horizon: Mapped[str] = mapped_column(String(16), default="intraday", index=True)
     market: Mapped[str] = mapped_column(String(32))
     direction: Mapped[str] = mapped_column(String(8))
     setup: Mapped[str] = mapped_column(String(64))

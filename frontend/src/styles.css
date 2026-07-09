@@ -109,15 +109,19 @@ button {
   font-weight: 600;
 }
 
-.nav-initial {
+.nav-icon {
   display: grid;
   width: 25px;
   height: 25px;
   place-items: center;
   border: 1px solid currentcolor;
   border-radius: 8px;
-  font-size: 11px;
+  font-size: 13px;
   opacity: 0.8;
+}
+
+.nav-short-label {
+  display: none;
 }
 
 .sidebar-note {
@@ -374,8 +378,12 @@ blockquote {
     flex: 0 0 auto;
   }
 
-  .nav-item > span:last-child {
+  .nav-label {
     display: none;
+  }
+
+  .nav-short-label {
+    display: inline;
   }
 
   .main-content {

@@ -1,7 +1,7 @@
 # Trading Discipline Copilot
 
-Trading Discipline Copilot is a local web application for practicing a manual,
-rules-based trading process. It helps you:
+Trading Discipline Copilot is a local web application for supporting a manual,
+rules-based live trading discipline process. It helps you:
 
 1. Validate a trade plan before entry.
 2. Manage an open trade with discipline reminders.
@@ -10,10 +10,13 @@ rules-based trading process. It helps you:
 
 It is **not** an auto-trading bot. It does not connect to a broker, place orders,
 or predict market direction.
+It is not a practice-mode simulator; blockers are part of the real workflow.
 
 ## Features
 
 - Pre-trade form with blocker, warning, and reminder rules loaded from YAML.
+- Required trade horizon classification: intraday, swing, or other.
+- Intraday trade plans are blocked until today's Daily Readiness checklist is cleared.
 - Planned and open trade lifecycle stored in SQLite.
 - Open-trade R tracking, stop management, partial-profit recording, and runners.
 - Optional Finnhub quotes for open US stock positions; the API key stays server-side.
@@ -139,23 +142,26 @@ Tests use isolated temporary SQLite databases and do not modify
 ## Full workflow example
 
 1. Open **Dashboard** and confirm the backend is connected.
-2. Open **New Trade**.
-3. Leave stop loss empty and confirm the plan is blocked.
-4. Enter a structural stop loss.
-5. Select the `breakout` setup without follow-through and inspect the warning.
-6. Complete the required fields and create the planned trade.
-7. Open **Open Trades** and mark the entry filled.
-8. Enter a current price that reaches at least `1R`.
-9. Confirm the partial-profit reminder appears.
-10. Record partial profit, activate the runner, and give it a protective stop.
-11. Enter an exit price and close the trade.
-12. Open **Post-Trade Review**, expand the trade, and save a review.
-13. Return to **Dashboard** and confirm the discipline score and R are included.
+2. Complete **Today's Intraday Readiness** at the bottom of the Dashboard before planning intraday trades.
+3. Open **New Trade**.
+4. Classify the plan as **Intraday**, **Swing**, or **Other**.
+5. Leave stop loss empty and confirm the plan is blocked.
+6. Enter a structural stop loss.
+7. Select the `breakout` setup without follow-through and inspect the warning.
+8. Complete the required fields and create the planned trade.
+9. Open **Open Trades** and mark the entry filled.
+10. Enter a current price that reaches at least `1R`.
+11. Confirm the partial-profit reminder appears.
+12. Record partial profit, activate the runner, and give it a protective stop.
+13. Enter an exit price and close the trade.
+14. Open **Post-Trade Review**, expand the trade, and save a review.
+15. Return to **Dashboard** and confirm the discipline score and R are included.
 
 Example long trade:
 
 ```text
 Symbol: ES
+Trade horizon: intraday
 Direction: long
 Setup: breakout
 Context: strong_trend
@@ -187,6 +193,11 @@ The close-trade operation owns exit price, exit reason, close time, and Final R.
 Post-trade review cannot overwrite those execution facts. Partial and final exits
 are stored as execution records, and the backend calculates quantity-weighted
 Final R and the discipline score.
+
+`trade_horizon` is saved with the trade plan. The backend defaults older clients
+to `intraday`, and `GET /trades` can filter by horizon when needed. Swing and
+other trades are not blocked by the Daily Readiness gate because that checklist
+is specifically for intraday preparation.
 
 ## Project structure
 

@@ -343,7 +343,7 @@ Intraday trading starts with daily preparation, not with the first chart that lo
 
 - Economic events, watchlists, and market environment are entered manually.
 - No automatic event calendar, watchlist generation, market classification, broker integration, or order execution is implemented.
-- Strict `trade_horizon` gating is deferred.
+- Strict `trade_horizon` gating is deferred in Stage 15 and resolved in Stage 17.
 
 ## Stage 16 - Decimal precision, options details, and symbol price lookup
 
@@ -389,3 +389,49 @@ For options, the underlying ticker is not enough. The exact expiration, strike, 
 
 - Underlying quote lookup does not provide option premium.
 - No option chain, bid/ask spread, Greeks, implied volatility, pricing model, broker integration, or auto-trading is implemented.
+
+## Stage 17 - Trade horizon, intraday gate, and navigation scanability
+
+### Date
+
+2026-07-09
+
+### What changed
+
+- Added `trade_horizon` for `intraday`, `swing`, and `other` trade plans.
+- Intraday plans are blocked when today's Daily Readiness is incomplete.
+- Swing and other plans are not blocked by Daily Readiness.
+- Daily Readiness intentionally remains at the bottom of Dashboard.
+- Navigation now uses simple icons plus readable labels instead of single-letter initials.
+
+### Commands to run
+
+```bash
+cd backend
+pytest -q
+
+cd frontend
+npm test
+npm run build
+```
+
+### Tests
+
+- Backend tests cover horizon persistence, defaulting, filtering, and invalid values.
+- Frontend tests cover the horizon selector, default intraday value, readiness gate behavior, and navigation scanability.
+
+### Engineering concepts learned
+
+- A persisted product concept needs a database migration, backend schema, API contract, frontend type, UI field, and tests.
+- Optional query parameters add filtering without creating new endpoints.
+- Pure utility functions make frontend business rules testable without a browser test runner.
+
+### Trading discipline concepts encoded
+
+Intraday trades need same-day preparation before planning. Swing and other trades may still require discipline, but they should not be blocked by an intraday-specific readiness checklist.
+
+### Known limitations
+
+- No broker integration, order execution, or auto trading is implemented.
+- No option premium, option chain, Greeks, or bid/ask spread support is added.
+- Trade horizon is used for planning gates and API filtering, not yet for analytics.
