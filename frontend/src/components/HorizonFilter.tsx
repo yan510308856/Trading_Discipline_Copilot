@@ -25,8 +25,9 @@ export function HorizonFilter({
         onChange={(event) => onChange(event.target.value as HorizonFilterValue)}
       >
         <option value="all">All</option>
-        <option value="intraday">Intraday</option>
         <option value="swing">Swing</option>
+        <option value="intraday">Intraday</option>
+        <option value="leap">Leap</option>
         <option value="other">Other</option>
       </select>
     </label>

@@ -18,6 +18,7 @@ import type {
   TradePatchPayload,
 } from "../types";
 import { formatDecimal, parseDecimalInput } from "../utils/decimal";
+import { groupTradesByMarket } from "../utils/tradeGrouping";
 import {
   calculateCurrentR,
   calculatePositionBreakdown,
@@ -112,6 +113,18 @@ function EditableMetric({
 
 function displayPrice(value: number | null): string {
   return value === null ? "—" : value.toString();
+}
+
+export function tradingViewUrl(symbol: string): string {
+  return `https://www.tradingview.com/chart/?symbol=${encodeURIComponent(
+    symbol.trim().toUpperCase(),
+  )}`;
+}
+
+export function robinhoodUrl(symbol: string): string {
+  return `https://robinhood.com/stocks/${encodeURIComponent(
+    symbol.trim().toUpperCase(),
+  )}`;
 }
 
 function errorMessage(error: unknown): string {
@@ -308,9 +321,31 @@ function TradeCard({ trade, onUpdated, defaultExpanded, onDeleted }: TradeCardPr
     return (
       <details className="trade-accordion planned-trade-card" open={defaultExpanded}>
         <summary className="trade-summary">
-          <div>
-            <p className="eyebrow">Planned trade #{trade.id}</p>
-            <h2>{trade.symbol} <span>{trade.direction}</span></h2>
+          <div className="trade-summary-primary">
+            <div>
+              <p className="eyebrow">Planned trade #{trade.id}</p>
+              <h2>{trade.symbol} <span>{trade.direction}</span></h2>
+            </div>
+            <div className="trade-link-actions">
+              <a
+                className="chart-link-button"
+                href={tradingViewUrl(trade.symbol)}
+                target="_blank"
+                rel="noreferrer"
+                onClick={(event) => event.stopPropagation()}
+              >
+                Chart
+              </a>
+              <a
+                className="chart-link-button broker-link-button"
+                href={robinhoodUrl(trade.symbol)}
+                target="_blank"
+                rel="noreferrer"
+                onClick={(event) => event.stopPropagation()}
+              >
+                RH {trade.symbol}
+              </a>
+            </div>
           </div>
           <span className="trade-status planned">Planned</span>
         </summary>
@@ -353,9 +388,31 @@ function TradeCard({ trade, onUpdated, defaultExpanded, onDeleted }: TradeCardPr
   return (
     <details className="trade-accordion" open={defaultExpanded}>
       <summary className="trade-summary">
-        <div>
-          <p className="eyebrow">Open trade #{trade.id}</p>
-          <h2>{trade.symbol} <span>{trade.direction}</span></h2>
+        <div className="trade-summary-primary">
+          <div>
+            <p className="eyebrow">Open trade #{trade.id}</p>
+            <h2>{trade.symbol} <span>{trade.direction}</span></h2>
+          </div>
+          <div className="trade-link-actions">
+            <a
+              className="chart-link-button"
+              href={tradingViewUrl(trade.symbol)}
+              target="_blank"
+              rel="noreferrer"
+              onClick={(event) => event.stopPropagation()}
+            >
+              Chart
+            </a>
+            <a
+              className="chart-link-button broker-link-button"
+              href={robinhoodUrl(trade.symbol)}
+              target="_blank"
+              rel="noreferrer"
+              onClick={(event) => event.stopPropagation()}
+            >
+              RH {trade.symbol}
+            </a>
+          </div>
         </div>
         <div className="trade-card-statuses">
           <span className="trade-status open">Open</span>
@@ -549,6 +606,7 @@ export function OpenTradePanel() {
         }),
     [loaded.trades],
   );
+  const tradeGroups = useMemo(() => groupTradesByMarket(trades), [trades]);
 
   function replaceTrade(updatedTrade: Trade) {
     setTrades((current) =>
@@ -582,16 +640,25 @@ export function OpenTradePanel() {
         </div>
       )}
       <div className="open-trade-list">
-        {trades.map((trade, index) => (
-          <TradeCard
-            key={trade.id}
-            trade={trade}
-            onUpdated={replaceTrade}
-            onDeleted={(tradeId) =>
-              setTrades((current) => current.filter((item) => item.id !== tradeId))
-            }
-            defaultExpanded={index === 0}
-          />
+        {tradeGroups.map((group) => (
+          <section className="market-trade-group" key={group.key}>
+            <div className="market-group-heading">
+              <h3>{group.label}</h3>
+            </div>
+            <div className="market-group-list">
+              {group.trades.map((trade, index) => (
+                <TradeCard
+                  key={trade.id}
+                  trade={trade}
+                  onUpdated={replaceTrade}
+                  onDeleted={(tradeId) =>
+                    setTrades((current) => current.filter((item) => item.id !== tradeId))
+                  }
+                  defaultExpanded={group.key === tradeGroups[0]?.key && index === 0}
+                />
+              ))}
+            </div>
+          </section>
         ))}
       </div>
     </section>
