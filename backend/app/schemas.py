@@ -10,7 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 Market = Literal["futures", "stocks", "crypto", "forex", "options", "other"]
 Direction = Literal["long", "short"]
-TradeHorizon = Literal["intraday", "swing", "other"]
+TradeHorizon = Literal["swing", "intraday", "leap", "other"]
 TradeStatus = Literal["planned", "open", "closed", "cancelled"]
 FollowedPlan = Literal["yes", "partial", "no"]
 TradeClassification = Literal[

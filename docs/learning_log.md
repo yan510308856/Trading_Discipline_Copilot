@@ -573,3 +573,50 @@ No trading behavior changed. This stage improves maintainability so future readi
 - No product features were added.
 - Persistent warning acknowledgement remains deferred.
 - No broker integration or options behavior changes were introduced.
+
+## Stage 21 - Frontend server state and small UI primitives
+
+### Date
+
+2026-07-09
+
+### What changed
+
+- Added TanStack Query and wrapped the app in `QueryClientProvider`.
+- Added query hooks for daily summary, readiness, trades, rules, and open attention.
+- Added mutation hooks for common write paths with related query invalidation.
+- Refactored Dashboard summary, Daily Readiness, and shared trade-list loading onto query-backed state.
+- Added small UI primitives: Button, StatusBadge, Panel, and Field.
+
+### Commands to run
+
+```bash
+cd backend
+pytest -q
+
+cd frontend
+npm test
+npm run build
+```
+
+### Tests
+
+- Frontend tests cover query provider setup, query keys, Dashboard loading state, and UI primitive rendering.
+- Backend tests confirm no API behavior changed.
+
+### Engineering concepts learned
+
+- Server state is backend-owned API data that needs caching, loading/error state, and invalidation.
+- Local UI state is temporary interaction state such as form drafts and filters.
+- TanStack Query is better than Zustand for server data because it understands query keys, refetching, and mutation invalidation.
+- UI primitives should start small and be used only where patterns are stable.
+
+### Trading discipline concepts encoded
+
+No trading behavior changed. This stage improves frontend maintainability so readiness, trades, summaries, and reviews can stay consistent as the workflow grows.
+
+### Known limitations
+
+- Not every API call is refactored yet.
+- UI primitives are intentionally tiny and not a full design system.
+- Persistent warning acknowledgement remains deferred.

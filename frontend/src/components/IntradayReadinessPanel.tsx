@@ -1,16 +1,19 @@
 import { useEffect, useState } from "react";
 
+import { APIError } from "../api";
 import {
-  APIError,
-  getTodayDailyReadiness,
-  updateDailyReadiness,
-} from "../api";
+  useDailyReadinessQuery,
+  useUpdateDailyReadinessMutation,
+} from "../hooks/queries";
 import type { DailyReadinessData, DailyReadinessItem } from "../types";
 import {
   readinessProgressText,
   readinessStatusLabel,
   readinessStatusMessage,
 } from "../utils/readiness";
+import { Button } from "./ui/Button";
+import { Field } from "./ui/Field";
+import { StatusBadge } from "./ui/StatusBadge";
 
 function errorMessage(error: unknown): string {
   if (error instanceof APIError && error.code === "HTTP_ERROR") {
@@ -41,60 +44,48 @@ export function IntradayReadinessPanel({
   const [readiness, setReadiness] = useState<DailyReadinessData | null>(null);
   const [items, setItems] = useState<DailyReadinessItem[]>([]);
   const [notes, setNotes] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
-  const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+  const readinessQuery = useDailyReadinessQuery();
+  const updateReadinessMutation = useUpdateDailyReadinessMutation();
+  const isLoading = readinessQuery.isLoading;
+  const isSaving = updateReadinessMutation.isPending;
+  const error = readinessQuery.error
+    ? errorMessage(readinessQuery.error)
+    : updateReadinessMutation.error
+      ? errorMessage(updateReadinessMutation.error)
+      : "";
 
   useEffect(() => {
-    let isCurrent = true;
-
-    async function loadReadiness() {
-      setIsLoading(true);
-      setError("");
-      try {
-        const result = await getTodayDailyReadiness();
-        if (!isCurrent) return;
-        setReadiness(result);
-        setItems(result.items);
-        setNotes(result.notes ?? "");
-        onReadinessChange?.(result);
-      } catch (requestError) {
-        if (isCurrent) setError(errorMessage(requestError));
-      } finally {
-        if (isCurrent) setIsLoading(false);
-      }
+    if (readinessQuery.data) {
+      setReadiness(readinessQuery.data);
+      setItems(readinessQuery.data.items);
+      setNotes(readinessQuery.data.notes ?? "");
+      onReadinessChange?.(readinessQuery.data);
     }
-
-    void loadReadiness();
-    return () => {
-      isCurrent = false;
-    };
-  }, [onReadinessChange]);
+  }, [onReadinessChange, readinessQuery.data]);
 
   async function saveReadiness() {
     if (!readiness) return;
-    setIsSaving(true);
-    setError("");
     setSuccessMessage("");
     try {
-      const result = await updateDailyReadiness(readiness.readiness_date, {
-        items: items.map((item) => ({
-          id: item.id,
-          completed: item.completed,
-          notes: item.notes,
-        })),
-        notes: notes.trim() || null,
+      const result = await updateReadinessMutation.mutateAsync({
+        date: readiness.readiness_date,
+        payload: {
+          items: items.map((item) => ({
+            id: item.id,
+            completed: item.completed,
+            notes: item.notes,
+          })),
+          notes: notes.trim() || null,
+        },
       });
       setReadiness(result);
       setItems(result.items);
       setNotes(result.notes ?? "");
       setSuccessMessage("Intraday readiness saved.");
       onReadinessChange?.(result);
-    } catch (requestError) {
-      setError(errorMessage(requestError));
-    } finally {
-      setIsSaving(false);
+    } catch {
+      // Mutation error is surfaced through `error`.
     }
   }
 
@@ -116,9 +107,12 @@ export function IntradayReadinessPanel({
           <p className="eyebrow">Daily gate</p>
           <h3 id="intraday-readiness-title">Today&apos;s Intraday Readiness</h3>
         </div>
-        <span className={`readiness-badge readiness-badge-${status}`}>
+        <StatusBadge
+          className={`readiness-badge readiness-badge-${status}`}
+          variant={status}
+        >
           {readinessStatusLabel[status]}
-        </span>
+        </StatusBadge>
       </div>
 
       <p className="readiness-message">{readinessStatusMessage[status]}</p>
@@ -165,7 +159,7 @@ export function IntradayReadinessPanel({
             ))}
           </div>
 
-          <label className="notes-field readiness-day-notes">
+          <Field className="notes-field readiness-day-notes">
             Day notes
             <textarea
               rows={3}
@@ -173,19 +167,19 @@ export function IntradayReadinessPanel({
               onChange={(event) => setNotes(event.target.value)}
               placeholder="Anything that affects today's intraday trading permission..."
             />
-          </label>
+          </Field>
 
           {successMessage && (
             <p className="form-message success-message">{successMessage}</p>
           )}
-          <button
-            className="primary-button readiness-save"
-            type="button"
+          <Button
+            className="readiness-save"
+            variant="primary"
             disabled={isSaving}
             onClick={() => void saveReadiness()}
           >
             {isSaving ? "Saving..." : "Save Readiness"}
-          </button>
+          </Button>
         </>
       )}
     </section>

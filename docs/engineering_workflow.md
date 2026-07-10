@@ -237,7 +237,8 @@ components/       可复用组件
 api.ts            API 调用
 types.ts          TypeScript 类型
 utils/            工具函数
-state/            Stage 6 起若跨页面共享状态变多，使用 Zustand 或 React Context
+hooks/queries.ts  TanStack Query server-state hooks
+state/            若客户端 UI 状态跨页面共享，再考虑 Zustand 或 React Context
 ```
 
 状态管理策略：
@@ -246,10 +247,20 @@ state/            Stage 6 起若跨页面共享状态变多，使用 Zustand 或
 Stage 4-5:
 - local state + api.ts 足够。
 
-Stage 6 起:
-- 如果 planned/open/closed trades、alerts、summary 在多个页面共享，引入 Zustand 或 React Context。
-- 如果暂不引入，必须在阶段总结中说明暂缓理由和触发重构的条件。
+Stage 21 起:
+- 后端拥有的数据使用 TanStack Query：trades, readiness, summary, rules, open attention。
+- 组件临时状态继续留在 local state：表单草稿、筛选器、展开状态、inline edit draft。
+- 如果纯客户端 UI 状态跨页面共享，再考虑 Zustand。
 ```
+
+Server state 和 local UI state 的区别：
+
+- Server state: 来自 API，可能被其他页面、请求或后端流程改变，需要缓存、重新获取、失效刷新。
+- Local UI state: 当前页面自己的临时交互状态，不需要后端持久化。
+
+TanStack Query 用于 server state，因为它提供 query keys、loading/error 状态、缓存、refetch 和 mutation invalidation。Zustand 不用于 server data，因为它不会自动理解 API 缓存和失效规则；后续如果有跨页面的纯 UI 状态，再单独评估 Zustand。
+
+UI primitives 只抽取稳定小模式，例如 Button、StatusBadge、Panel、Field。不要把它扩张成完整设计系统；只在触及的组件中使用，避免大范围视觉重写。
 
 ### 5.4 Domain Model 优先
 

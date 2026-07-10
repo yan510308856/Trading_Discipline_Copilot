@@ -1,38 +1,22 @@
 import { useEffect, useState } from "react";
 
-import { APIError, getTrades } from "../api";
+import { APIError } from "../api";
 import type { Trade, TradeHorizon } from "../types";
+import { useTradesQuery } from "./queries";
 
 export function useTrades(status?: Trade["status"], tradeHorizon?: TradeHorizon) {
   const [trades, setTrades] = useState<Trade[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState("");
+  const tradesQuery = useTradesQuery(status, tradeHorizon);
 
   useEffect(() => {
-    const controller = new AbortController();
-    setIsLoading(true);
-    void getTrades(status, tradeHorizon)
-      .then((loadedTrades) => {
-        if (!controller.signal.aborted) {
-          setTrades(loadedTrades);
-          setError("");
-        }
-      })
-      .catch((requestError: unknown) => {
-        if (!controller.signal.aborted) {
-          setError(
-            requestError instanceof APIError
-              ? `${requestError.code}: ${requestError.message}`
-              : "Trades could not be loaded. Confirm that the backend is running.",
-          );
-        }
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setIsLoading(false);
-      });
+    if (tradesQuery.data) setTrades(tradesQuery.data);
+  }, [tradesQuery.data]);
 
-    return () => controller.abort();
-  }, [status, tradeHorizon]);
+  const error = tradesQuery.error
+    ? tradesQuery.error instanceof APIError
+      ? `${tradesQuery.error.code}: ${tradesQuery.error.message}`
+      : "Trades could not be loaded. Confirm that the backend is running."
+    : "";
 
-  return { trades, setTrades, isLoading, error };
+  return { trades, setTrades, isLoading: tradesQuery.isLoading, error };
 }

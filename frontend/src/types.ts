@@ -75,15 +75,15 @@ export interface DailyReadinessUpdatePayload {
 export type ConnectionState = "checking" | "connected" | "unavailable";
 
 export type Market =
-  | "futures"
   | "stocks"
-  | "crypto"
-  | "forex"
   | "options"
-  | "other";
+  | "futures"
+  | "other"
+  | "crypto"
+  | "forex";
 
 export type Direction = "long" | "short";
-export type TradeHorizon = "intraday" | "swing" | "other";
+export type TradeHorizon = "swing" | "intraday" | "leap" | "other";
 export type FollowedPlan = "yes" | "partial" | "no";
 export type RuleStatus = "allowed" | "warning" | "blocked";
 export type RuleSeverity = "blocker" | "warning" | "reminder";

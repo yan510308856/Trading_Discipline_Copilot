@@ -34,7 +34,7 @@ export const initialForm: TradeFormState = {
   symbol: "",
   option_contract: "",
   trade_horizon: "intraday",
-  market: "futures",
+  market: "stocks",
   direction: "long",
   setup: "",
   market_context: "",
@@ -347,7 +347,7 @@ export function TradeChecklist() {
               <input
                 value={form.symbol}
                 onChange={(event) => updateField("symbol", event.target.value)}
-                placeholder={form.market === "options" ? "AAPL" : "ES"}
+                placeholder={form.market === "options" ? "AAPL" : "SPY"}
                 maxLength={32}
               />
               {form.market === "options" && (
@@ -365,11 +365,9 @@ export function TradeChecklist() {
                   updateField("market", event.target.value as TradeFormState["market"])
                 }
               >
-                <option value="futures">Futures</option>
                 <option value="stocks">Stocks</option>
-                <option value="crypto">Crypto</option>
-                <option value="forex">Forex</option>
                 <option value="options">Options</option>
+                <option value="futures">Futures</option>
                 <option value="other">Other</option>
               </select>
             </label>
@@ -401,8 +399,9 @@ export function TradeChecklist() {
                   )
                 }
               >
-                <option value="intraday">Intraday</option>
                 <option value="swing">Swing</option>
+                <option value="intraday">Intraday</option>
+                <option value="leap">Leap</option>
                 <option value="other">Other</option>
               </select>
               <small>

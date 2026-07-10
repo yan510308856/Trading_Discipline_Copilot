@@ -1207,3 +1207,30 @@ maintainability refactor, not a product behavior change.
 - Product features.
 - Persistent warning acknowledgement.
 - Broker integration.
+
+## Stage 21 - Frontend Server State and Small UI Primitives
+
+### Summary
+
+Stage 21 introduces TanStack Query for frontend server state and extracts a few
+small reusable UI primitives. The goal is consistency and maintainability, not a
+full UI redesign.
+
+### Acceptance criteria
+
+- The React app is wrapped in `QueryClientProvider`.
+- Key API data has query hooks for summaries, readiness, trades, rules, and open attention.
+- Mutations exist for common write paths and invalidate related query data.
+- Dashboard, Daily Readiness, and trade-list loading use query-backed state.
+- Small primitives exist for Button, StatusBadge, Panel, and Field.
+- Touched UI keeps blocker/warning/danger states visually distinct.
+
+### Deferred
+
+- Full design system.
+- Zustand for server data.
+- Broad component rewrite.
+- Daily Readiness movement.
+- Options behavior changes.
+- Broker integration.
+- Persistent warning acknowledgement.

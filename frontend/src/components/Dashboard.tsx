@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 
-import { APIError, getDailySummary, getHealth, refreshOpenPrices } from "../api";
-import type { ConnectionState, DailySummaryData, Trade } from "../types";
+import { APIError, getHealth, refreshOpenPrices } from "../api";
+import { useDailySummaryQuery } from "../hooks/queries";
+import type { ConnectionState, Trade } from "../types";
+import { groupTradesByMarket } from "../utils/tradeGrouping";
 import { calculateCurrentR } from "../utils/tradeCalculations";
 import {
   HorizonFilter,
@@ -10,6 +12,9 @@ import {
 } from "./HorizonFilter";
 import { IntradayReadinessPanel } from "./IntradayReadinessPanel";
 import { SummaryCards } from "./SummaryCards";
+import { Button } from "./ui/Button";
+import { Panel } from "./ui/Panel";
+import { StatusBadge } from "./ui/StatusBadge";
 
 const connectionCopy: Record<ConnectionState, string> = {
   checking: "Checking backend…",
@@ -25,13 +30,17 @@ function requestErrorMessage(error: unknown): string {
 
 export function Dashboard() {
   const [connection, setConnection] = useState<ConnectionState>("checking");
-  const [summary, setSummary] = useState<DailySummaryData | null>(null);
   const [summaryHorizon, setSummaryHorizon] = useState<HorizonFilterValue>("all");
-  const [summaryError, setSummaryError] = useState("");
   const [isLoadingSummary, setIsLoadingSummary] = useState(true);
   const [openTrades, setOpenTrades] = useState<Trade[]>([]);
   const [quoteError, setQuoteError] = useState("");
   const [isRefreshingQuotes, setIsRefreshingQuotes] = useState(false);
+  const summaryQuery = useDailySummaryQuery(undefined, horizonForApi(summaryHorizon));
+  const summary = summaryQuery.data ?? null;
+  const openTradeGroups = groupTradesByMarket(openTrades);
+  const summaryError = summaryQuery.error
+    ? requestErrorMessage(summaryQuery.error)
+    : "";
 
   const refreshQuotes = useCallback(async () => {
     setIsRefreshingQuotes(true);
@@ -53,7 +62,6 @@ export function Dashboard() {
 
   const refreshDashboard = useCallback(async () => {
     setConnection("checking");
-    setSummaryError("");
     setIsLoadingSummary(true);
 
     try {
@@ -66,14 +74,13 @@ export function Dashboard() {
     }
 
     try {
-      setSummary(await getDailySummary(undefined, horizonForApi(summaryHorizon)));
       await refreshQuotes();
     } catch (error) {
-      setSummaryError(requestErrorMessage(error));
+      setQuoteError(requestErrorMessage(error));
     } finally {
       setIsLoadingSummary(false);
     }
-  }, [refreshQuotes, summaryHorizon]);
+  }, [refreshQuotes]);
 
   useEffect(() => {
     void refreshDashboard();
@@ -90,7 +97,7 @@ export function Dashboard() {
         </p>
       </div>
 
-      <section className="dashboard-summary" aria-labelledby="today-summary-title">
+      <Panel className="dashboard-summary" aria-labelledby="today-summary-title">
         <div className="section-heading">
           <div>
             <p className="eyebrow">Daily discipline</p>
@@ -108,9 +115,11 @@ export function Dashboard() {
           />
         </div>
 
-        {isLoadingSummary && <p className="empty-state">Loading today&apos;s summary…</p>}
+        {(isLoadingSummary || summaryQuery.isLoading) && (
+          <p className="empty-state">Loading today&apos;s summary…</p>
+        )}
         {summaryError && <p className="form-message error-message">{summaryError}</p>}
-        {!isLoadingSummary && !summaryError && summary?.total_trades === 0 && (
+        {!isLoadingSummary && !summaryQuery.isLoading && !summaryError && summary?.total_trades === 0 && (
           <div className="empty-state">
             <strong>No trades recorded today.</strong>
             <p>Create a plan when the next valid setup appears.</p>
@@ -119,7 +128,7 @@ export function Dashboard() {
         {!isLoadingSummary && summary && summary.total_trades > 0 && (
           <SummaryCards summary={summary} />
         )}
-      </section>
+      </Panel>
 
       <details className="unrealized-positions">
         <summary>
@@ -127,9 +136,8 @@ export function Dashboard() {
             <strong>{openTrades.length} unrealized position{openTrades.length === 1 ? "" : "s"}</strong>
             <small>Open to inspect current return and remaining quantity</small>
           </span>
-          <button
-            className="secondary-button"
-            type="button"
+          <Button
+            variant="secondary"
             disabled={isRefreshingQuotes}
             onClick={(event) => {
               event.preventDefault();
@@ -137,34 +145,43 @@ export function Dashboard() {
             }}
           >
             {isRefreshingQuotes ? "Refreshing…" : "Refresh prices"}
-          </button>
+          </Button>
         </summary>
         {quoteError && <p className="form-message error-message">{quoteError}</p>}
         {openTrades.length === 0 ? (
           <p className="rule-empty">No open positions.</p>
         ) : (
           <div className="unrealized-list">
-            {openTrades.map((trade) => {
-              const entry = trade.actual_entry ?? trade.planned_entry;
-              const currentR = trade.current_price === null
-                ? null
-                : calculateCurrentR(trade.direction, entry, trade.stop_loss, trade.current_price);
-              const priceReturn = trade.current_price === null || entry === 0
-                ? null
-                : ((trade.direction === "long" ? trade.current_price - entry : entry - trade.current_price) / entry) * 100;
-              const remaining = trade.position_size === null
-                ? null
-                : Math.max(trade.position_size - trade.partial_exit_quantity, 0);
-              return (
-                <article className="unrealized-row" key={trade.id}>
-                  <div><strong>{trade.symbol}</strong><span>{trade.direction}</span></div>
-                  <div><span>Remaining</span><strong>{remaining ?? "—"}</strong></div>
-                  <div><span>Current price</span><strong>{trade.current_price ?? "Not available"}</strong></div>
-                  <div><span>Current R</span><strong>{currentR === null || !Number.isFinite(currentR) ? "—" : `${currentR >= 0 ? "+" : ""}${currentR.toFixed(2)}R`}</strong></div>
-                  <div><span>Price return</span><strong>{priceReturn === null ? "—" : `${priceReturn >= 0 ? "+" : ""}${priceReturn.toFixed(2)}%`}</strong></div>
-                </article>
-              );
-            })}
+            {openTradeGroups.map((group) => (
+              <section className="market-trade-group compact" key={group.key}>
+                <div className="market-group-heading">
+                  <h3>{group.label}</h3>
+                </div>
+                <div className="market-group-list">
+                  {group.trades.map((trade) => {
+                    const entry = trade.actual_entry ?? trade.planned_entry;
+                    const currentR = trade.current_price === null
+                      ? null
+                      : calculateCurrentR(trade.direction, entry, trade.stop_loss, trade.current_price);
+                    const priceReturn = trade.current_price === null || entry === 0
+                      ? null
+                      : ((trade.direction === "long" ? trade.current_price - entry : entry - trade.current_price) / entry) * 100;
+                    const remaining = trade.position_size === null
+                      ? null
+                      : Math.max(trade.position_size - trade.partial_exit_quantity, 0);
+                    return (
+                      <article className="unrealized-row" key={trade.id}>
+                        <div><strong>{trade.symbol}</strong><span>{trade.direction}</span></div>
+                        <div><span>Remaining</span><strong>{remaining ?? "—"}</strong></div>
+                        <div><span>Current price</span><strong>{trade.current_price ?? "Not available"}</strong></div>
+                        <div><span>Current R</span><strong>{currentR === null || !Number.isFinite(currentR) ? "—" : `${currentR >= 0 ? "+" : ""}${currentR.toFixed(2)}R`}</strong></div>
+                        <div><span>Price return</span><strong>{priceReturn === null ? "—" : `${priceReturn >= 0 ? "+" : ""}${priceReturn.toFixed(2)}%`}</strong></div>
+                      </article>
+                    );
+                  })}
+                </div>
+              </section>
+            ))}
           </div>
         )}
       </details>
@@ -176,18 +193,23 @@ export function Dashboard() {
               <p className="eyebrow">System status</p>
               <h3>Backend connection</h3>
             </div>
-            <span className={`status-badge status-${connection}`}>
-              <span aria-hidden="true" />
+            <StatusBadge variant={connection} showDot>
               {connectionCopy[connection]}
-            </span>
+            </StatusBadge>
           </div>
           <p className="muted">
             Summary data comes from the FastAPI <code>/summary/daily</code> endpoint.
           </p>
           {connection === "unavailable" && (
-            <button className="secondary-button" onClick={refreshDashboard}>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                void refreshDashboard();
+                void summaryQuery.refetch();
+              }}
+            >
               Check again
-            </button>
+            </Button>
           )}
         </article>
 
