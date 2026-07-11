@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { navigation } from "../App";
-import { hashForPage, pageFromHash } from "./navigation";
+import { contextFromHash, hashForPage, hashWithContext, pageFromHash } from "./navigation";
 
 describe("page navigation", () => {
   it("restores a known page from the URL hash", () => {
@@ -13,11 +13,24 @@ describe("page navigation", () => {
   });
 
   it("creates a stable URL hash for a page", () => {
-    expect(hashForPage("rule-alerts")).toBe("#rule-alerts");
+    expect(hashForPage("attention")).toBe("#attention");
+    expect(pageFromHash("#rule-alerts")).toBe("attention");
   });
 
   it("keeps navigation scannable without single-letter initials", () => {
     expect(navigation.every((item) => item.icon.length > 0)).toBe(true);
     expect(navigation.every((item) => item.shortLabel.length > 1)).toBe(true);
+  });
+
+  it("preserves deep-link context across reload parsing", () => {
+    const hash = hashWithContext("open-trades", { trade_id: 123, section: "price-alerts" });
+    expect(pageFromHash(hash)).toBe("open-trades");
+    expect(contextFromHash(hash).get("trade_id")).toBe("123");
+    expect(contextFromHash(hash).get("section")).toBe("price-alerts");
+  });
+
+  it("renames Rule Alerts to Attention", () => {
+    expect(navigation.find((item) => item.id === "attention")?.label).toBe("Attention");
+    expect(navigation.some((item) => item.label === "Rule Alerts")).toBe(false);
   });
 });

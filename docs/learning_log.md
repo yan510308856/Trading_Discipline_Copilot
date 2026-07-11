@@ -634,3 +634,9 @@ No trading behavior changed. This stage improves frontend maintainability so rea
 - Durable email outcomes belong in persisted alert events, while lightweight loop liveness can remain process-local for a single-process local app.
 - Additive nullable columns preserve old data while API create validation can enforce stronger requirements for all new records.
 - Option risk stays coherent when quote refresh, alerts, and R calculations all use the same underlying-price model.
+## Stage 24 learning notes
+
+- A useful attention feed is a projection of unresolved work, not a list of entities or historical events.
+- Backend normalization keeps stale prices, failed delivery, and pending-review decisions consistent within the dedicated Attention workflow.
+- Hash query context provides lightweight reload-safe deep links without introducing a routing dependency.
+- State mutation and cache invalidation are one workflow concern: resolving a runner warning or review must update every Attention consumer.

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { APIError, createReview } from "../api";
 import { useTrades } from "../hooks/useTrades";
@@ -21,6 +21,8 @@ import {
   type HorizonFilterValue,
   horizonForApi,
 } from "./HorizonFilter";
+import { contextFromHash } from "../utils/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 
 const mistakeOptions = [
   ["no_stop_loss", "No stop loss (veto)"],
@@ -319,9 +321,9 @@ interface TradeReviewAccordionProps {
   onDeleted: (tradeId: number) => void;
 }
 
-function TradeReviewAccordion({ trade, onReviewed, onDeleted }: TradeReviewAccordionProps) {
+function TradeReviewAccordion({ trade, onReviewed, onDeleted, selected = false }: TradeReviewAccordionProps & { selected?: boolean }) {
   return (
-    <details className="trade-accordion review-accordion">
+    <details id={`review-trade-${trade.id}`} className="trade-accordion review-accordion" open={selected}>
       <summary className="trade-summary review-summary">
         <div>
           <p className="eyebrow">Closed {formatDateTime(trade.closed_at)}</p>
@@ -350,6 +352,7 @@ function TradeReviewAccordion({ trade, onReviewed, onDeleted }: TradeReviewAccor
 }
 
 export function PostTradeReview() {
+  const queryClient = useQueryClient();
   const [horizonFilter, setHorizonFilter] = useState<HorizonFilterValue>("all");
   const { trades, setTrades, isLoading, error } = useTrades(
     "closed",
@@ -367,6 +370,13 @@ export function PostTradeReview() {
     }),
     [endDate, reviewFilter, startDate, trades],
   );
+  const selectedTradeId = Number(contextFromHash(window.location.hash).get("trade_id"));
+  const selectedTrade = trades.find((trade) => trade.id === selectedTradeId);
+
+  useEffect(() => {
+    if (!selectedTrade) return;
+    window.setTimeout(() => document.getElementById(`review-trade-${selectedTrade.id}`)?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
+  }, [selectedTrade]);
 
   function handleReviewed(
     tradeId: number,
@@ -385,6 +395,7 @@ export function PostTradeReview() {
           : trade,
       ),
     );
+    void queryClient.invalidateQueries({ queryKey: ["attention"] });
   }
 
   function clearFilters() {
@@ -431,6 +442,8 @@ export function PostTradeReview() {
 
       {isLoading && <p className="empty-state">Loading closed trades…</p>}
       {error && <p className="form-message error-message">{error}</p>}
+      {Number.isInteger(selectedTradeId) && !isLoading && !selectedTrade && <p className="form-message error-message">The requested closed trade was not found.</p>}
+      {selectedTrade?.has_review && <p className="form-message success-message">This trade has already been reviewed.</p>}
       {!isLoading && !error && filteredTrades.length === 0 && (
         <div className="empty-state">
           <strong>No closed trades match these filters.</strong>
@@ -442,6 +455,7 @@ export function PostTradeReview() {
           <TradeReviewAccordion
             key={trade.id}
             trade={trade}
+            selected={trade.id === selectedTradeId}
             onReviewed={handleReviewed}
             onDeleted={(tradeId) =>
               setTrades((current) => current.filter((item) => item.id !== tradeId))

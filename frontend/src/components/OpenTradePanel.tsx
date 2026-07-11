@@ -31,6 +31,9 @@ import {
   type HorizonFilterValue,
   horizonForApi,
 } from "./HorizonFilter";
+import { usePriceAlertEventsQuery } from "../hooks/queries";
+import { useQueryClient } from "@tanstack/react-query";
+import { contextFromHash, hashWithContext } from "../utils/navigation";
 
 interface TradeCardProps {
   trade: Trade;
@@ -172,6 +175,7 @@ function requiredActionText(alert: RuleAlert | null): string {
 }
 
 function TradeCard({ trade, onUpdated, defaultExpanded, onDeleted, onAutoClosed }: TradeCardProps) {
+  const priceAlerts = usePriceAlertEventsQuery(trade.id);
   const [actualEntry, setActualEntry] = useState(
     trade.actual_entry?.toString() ?? trade.planned_entry.toString(),
   );
@@ -320,7 +324,7 @@ function TradeCard({ trade, onUpdated, defaultExpanded, onDeleted, onAutoClosed 
 
   if (trade.status === "planned") {
     return (
-      <details className="trade-accordion planned-trade-card" open={defaultExpanded}>
+      <details id={`trade-${trade.id}`} className="trade-accordion planned-trade-card" open={defaultExpanded}>
         <summary className="trade-summary">
           <div className="trade-summary-primary">
             <div>
@@ -390,7 +394,7 @@ function TradeCard({ trade, onUpdated, defaultExpanded, onDeleted, onAutoClosed 
   }
 
   return (
-    <details className="trade-accordion" open={defaultExpanded}>
+    <details id={`trade-${trade.id}`} className="trade-accordion" open={defaultExpanded}>
       <summary className="trade-summary">
         <div className="trade-summary-primary">
           <div>
@@ -489,7 +493,8 @@ function TradeCard({ trade, onUpdated, defaultExpanded, onDeleted, onAutoClosed 
 
       <section className="management-section">
         <h3>Record Exit Execution</h3>
-        <div className="action-row">
+        <div className="action-row exit-runner-row">
+          <div className="exit-execution-fields">
           <label className="partial-quantity-field">
             {trade.market === "options" ? "Underlying exit price" : "Exit price"}
             <input aria-label={`Exit execution price for ${trade.symbol}`} type="number" step="0.01" value={partialPrice} onChange={(event) => setPartialPrice(event.target.value)} />
@@ -510,6 +515,38 @@ function TradeCard({ trade, onUpdated, defaultExpanded, onDeleted, onAutoClosed 
               setConfirmingExit(true);
             }
           }}>Record Exit</button>
+          </div>
+          <div className="inline-runner-controls">
+            <label className="runner-stop-field">
+              Runner stop
+              <input
+                aria-label={`Runner stop for ${trade.symbol}`}
+                type="number"
+                step="0.01"
+                value={runnerStop}
+                disabled={trade.runner_active || isSaving}
+                onChange={(event) => setRunnerStop(event.target.value)}
+                onBlur={() => {
+                  const value = numberOrNull(runnerStop);
+                  if (!trade.runner_active && value !== trade.runner_stop) void update({ runner_stop: value });
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") event.currentTarget.blur();
+                  if (event.key === "Escape") {
+                    setRunnerStop(trade.runner_stop === null ? "" : formatDecimal(trade.runner_stop));
+                  }
+                }}
+              />
+            </label>
+            <button
+              className="secondary-button"
+              disabled={isSaving || (!trade.runner_active && quantity.runner === 0)}
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => update(trade.runner_active
+                ? { runner_active: false }
+                : { runner_stop: numberOrNull(runnerStop), runner_enabled: true, runner_active: true })}
+            >{trade.runner_active ? "Mark Runner Inactive" : "Activate Runner"}</button>
+          </div>
         </div>
       </section>
 
@@ -534,18 +571,9 @@ function TradeCard({ trade, onUpdated, defaultExpanded, onDeleted, onAutoClosed 
         </section></div>;
       })()}
 
-      <section className="management-section">
-        <h3>Runner management</h3>
-        <div className="runner-control-row">
-          <label>
-            Runner stop
-            <input aria-label={`Runner stop for ${trade.symbol}`} type="number" step="any" value={runnerStop} onChange={(event) => setRunnerStop(event.target.value)} />
-          </label>
-          <button className="secondary-button" disabled={isSaving || numberOrNull(runnerStop) === null} onClick={() => update({ runner_stop: numberOrNull(runnerStop) })}>Save Runner Stop</button>
-          <button className="secondary-button" disabled={isSaving || trade.runner_active || quantity.runner === 0} onClick={() => update({ runner_enabled: true, runner_active: true })}>Runner Active</button>
-          <button className="secondary-button" disabled={isSaving || !trade.runner_active} onClick={() => update({ runner_active: false })}>Runner Closed</button>
-        </div>
-      </section>
+      {trade.executions.length > 0 && <details className="trade-history-section"><summary>Execution Preview</summary><div className="execution-preview-list">{trade.executions.map((execution, index) => { const exited = trade.executions.slice(0, index + 1).reduce((sum, item) => sum + (item.quantity ?? 0), 0); const remaining = trade.position_size === null ? null : Math.max(0, trade.position_size - exited); return <div key={execution.id}><span>#{index + 1}</span><strong>{formatDecimal(execution.price)}</strong><span>Qty {execution.quantity === null ? "—" : formatDecimal(execution.quantity)}</span><span>{execution.exit_reason?.replaceAll("_", " ") ?? "—"}</span><span>Remaining {remaining === null ? "—" : formatDecimal(remaining)}</span></div>; })}</div></details>}
+
+      <details className="trade-history-section" id={`trade-${trade.id}-price-alerts`} open={defaultExpanded && contextFromHash(window.location.hash).get("section") === "price-alerts"}><summary>Price Alert History</summary>{priceAlerts.isLoading ? <p>Loading alert history…</p> : (priceAlerts.data?.length ?? 0) === 0 ? <p>No threshold alerts recorded</p> : <div className="price-alert-history">{priceAlerts.data?.map((event) => <div key={event.id} className={`email-status-${event.notification_status}`}><strong>{event.alert_kind.replaceAll("_", " ")}</strong><span>Threshold {formatDecimal(event.threshold_price)}</span><span>Observed {formatDecimal(event.observed_price)}</span><span>{new Date(event.triggered_at).toLocaleString()}</span><span>{event.notification_status}</span><span>{event.attempt_count} attempt{event.attempt_count === 1 ? "" : "s"}</span>{event.last_error && <small>{event.last_error}</small>}</div>)}</div>}</details>
 
       <RuleAlertPanel
         status={evaluation.status}
@@ -570,6 +598,7 @@ function TradeCard({ trade, onUpdated, defaultExpanded, onDeleted, onAutoClosed 
 }
 
 export function OpenTradePanel() {
+  const queryClient = useQueryClient();
   const [horizonFilter, setHorizonFilter] = useState<HorizonFilterValue>("all");
   const [closeNotice, setCloseNotice] = useState<Trade | null>(null);
   const loaded = useTrades(undefined, horizonForApi(horizonFilter));
@@ -586,6 +615,13 @@ export function OpenTradePanel() {
     [loaded.trades],
   );
   const tradeGroups = useMemo(() => groupTradesByMarket(trades), [trades]);
+  const selectedTradeId = Number(contextFromHash(window.location.hash).get("trade_id"));
+  const hasSelectedTrade = Number.isInteger(selectedTradeId) && trades.some((trade) => trade.id === selectedTradeId);
+
+  useEffect(() => {
+    if (!hasSelectedTrade) return;
+    window.setTimeout(() => document.getElementById(`trade-${selectedTradeId}`)?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
+  }, [hasSelectedTrade, selectedTradeId]);
 
   function replaceTrade(updatedTrade: Trade) {
     setTrades((current) =>
@@ -595,6 +631,7 @@ export function OpenTradePanel() {
             trade.id === updatedTrade.id ? updatedTrade : trade,
           ),
     );
+    void queryClient.invalidateQueries({ queryKey: ["attention"] });
   }
 
   return (
@@ -612,12 +649,14 @@ export function OpenTradePanel() {
 
       {closeNotice && <div className="page-success-notice" role="status">
         <strong>{closeNotice.symbol} trade #{closeNotice.id} closed automatically.</strong>
-        <span>Total exited quantity reached the full position size{closeNotice.final_r === null ? "." : ` at ${closeNotice.final_r.toFixed(2)}R.`}</span>
+        <span>Final underlying R: {closeNotice.final_r === null ? "—" : `${closeNotice.final_r.toFixed(2)}R`} · Exit reason: {closeNotice.exit_reason?.replaceAll("_", " ") ?? "—"}</span>
+        <button type="button" onClick={() => { window.location.hash = hashWithContext("post-trade-review", { trade_id: closeNotice.id }); }}>Review This Trade</button>
         <button type="button" onClick={() => setCloseNotice(null)}>Dismiss</button>
       </div>}
 
       {isLoading && <p className="empty-state">Loading active trades…</p>}
       {error && <p className="form-message error-message">{error}</p>}
+      {Number.isInteger(selectedTradeId) && !isLoading && !hasSelectedTrade && <p className="form-message error-message">The requested active trade was not found.</p>}
       {!isLoading && !error && trades.length === 0 && (
         <div className="empty-state">
           <strong>No planned or open trades.</strong>
@@ -640,7 +679,7 @@ export function OpenTradePanel() {
                     setTrades((current) => current.filter((item) => item.id !== tradeId))
                   }
                   onAutoClosed={setCloseNotice}
-                  defaultExpanded={false}
+                  defaultExpanded={trade.id === selectedTradeId}
                 />
               ))}
             </div>

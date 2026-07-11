@@ -256,3 +256,8 @@ docker-compose.yml      Local two-container application
 The Dashboard now reports whether the local price monitor is actually running, whether email delivery is fully configured, the last monitor cycle, and the latest persisted alert-email result. Open positions show price source and freshness; automatic quotes older than 120 seconds are marked stale. Runtime monitor timestamps are process-local and reset whenever the backend restarts.
 
 New trade plans require a positive position size so total planned risk can be calculated before creation. Options continue to use underlying entry, stop, target, current, and exit prices for every R calculation. The app does not calculate option-premium return, option P&L, or option-based R.
+# Stage 24: Attention and manage-to-review workflow
+
+Rule Alerts is now the operational **Attention Center**. It contains only active work: blockers, warnings, meaningful reminders, stale critical prices, failed alert emails, pending reviews, and notification configuration problems. Attention is intentionally opened as a dedicated page; navigation and Dashboard do not repeat its count or item list.
+
+Attention links retain trade context in the URL, for example `#open-trades?trade_id=123` and `#post-trade-review?trade_id=123`. Open trades now include inline runner-stop editing, one context-aware runner-state action, collapsed price-alert history, execution preview, and a direct review handoff after a full exit.

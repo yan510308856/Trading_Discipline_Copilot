@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { APIError, getHealth, refreshOpenPrices } from "../api";
 import { useDailySummaryQuery, useNotificationStatusQuery, useTestEmailMutation } from "../hooks/queries";
+import { contextFromHash } from "../utils/navigation";
 import type { ConnectionState, Trade } from "../types";
 import { groupTradesByMarket } from "../utils/tradeGrouping";
 import { calculateCurrentR, calculatePositionBreakdown, resolvedUnderlyingDirection } from "../utils/tradeCalculations";
@@ -98,6 +99,11 @@ export function Dashboard() {
     void refreshDashboard();
   }, [refreshDashboard]);
 
+  useEffect(() => {
+    if (contextFromHash(window.location.hash).get("focus") !== "notifications") return;
+    window.setTimeout(() => document.getElementById("notifications")?.scrollIntoView({ behavior: "smooth", block: "center" }), 0);
+  }, []);
+
   return (
     <section className="dashboard" aria-label="Dashboard">
 
@@ -192,7 +198,7 @@ export function Dashboard() {
       </details>
 
       <div className="dashboard-grid">
-        <article className="status-card">
+        <article className="status-card" id="notifications">
           <div className="card-heading">
             <div>
               <p className="eyebrow">System status</p>

@@ -16,6 +16,7 @@ import type {
   TradeCreatePayload,
   ExitReason,
   NotificationStatus,
+  AttentionResponse,
   PriceAlertEvent,
   TradeHorizon,
   TradePatchPayload,
@@ -124,6 +125,11 @@ export function getQuote(symbol: string): Promise<QuoteResult> {
 
 export function getOpenTradeAttention(): Promise<OpenTradeAttention[]> {
   return apiRequest<OpenTradeAttention[]>("/rules/open-attention");
+}
+
+export function getAttention(tradeHorizon?: TradeHorizon): Promise<AttentionResponse> {
+  const query = tradeHorizon ? `?trade_horizon=${encodeURIComponent(tradeHorizon)}` : "";
+  return apiRequest<AttentionResponse>(`/attention${query}`);
 }
 
 export function evaluateRules(
