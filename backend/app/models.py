@@ -31,6 +31,11 @@ class Trade(Base):
     )
     symbol: Mapped[str] = mapped_column(String(32), index=True)
     option_contract: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    option_type: Mapped[Optional[str]] = mapped_column(String(8), nullable=True)
+    option_expiration: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    option_strike: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    option_entry_price: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    option_current_price: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     trade_horizon: Mapped[str] = mapped_column(String(16), default="intraday", index=True)
     market: Mapped[str] = mapped_column(String(32))
     direction: Mapped[str] = mapped_column(String(8))
@@ -73,6 +78,9 @@ class Trade(Base):
         back_populates="trade",
         cascade="all, delete-orphan",
         order_by="TradeExecution.executed_at",
+    )
+    price_alert_events: Mapped[list["TradePriceAlertEvent"]] = relationship(
+        back_populates="trade", cascade="all, delete-orphan"
     )
 
     @property
@@ -140,8 +148,35 @@ class TradeExecution(Base):
     execution_type: Mapped[str] = mapped_column(String(16))
     price: Mapped[float] = mapped_column(Float)
     quantity: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    exit_reason: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    option_price: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
 
     trade: Mapped[Trade] = relationship(back_populates="executions")
+
+
+class TradePriceAlertEvent(Base):
+    __tablename__ = "trade_price_alert_events"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    trade_id: Mapped[int] = mapped_column(
+        ForeignKey("trades.id", ondelete="CASCADE"), index=True
+    )
+    alert_kind: Mapped[str] = mapped_column(String(16))
+    threshold_price: Mapped[float] = mapped_column(Float)
+    observed_price: Mapped[float] = mapped_column(Float)
+    normalized_threshold_price: Mapped[str] = mapped_column(String(32))
+    dedupe_key: Mapped[str] = mapped_column(String(128), unique=True, index=True)
+    notification_status: Mapped[str] = mapped_column(String(16), default="pending")
+    attempt_count: Mapped[int] = mapped_column(Integer, default=0)
+    last_error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    triggered_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    sent_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now
+    )
+
+    trade: Mapped[Trade] = relationship(back_populates="price_alert_events")
 
 
 class DailyReadiness(Base):

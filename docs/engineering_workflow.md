@@ -605,3 +605,7 @@ Visible tradeoffs
 Clean commits
 Documented learning
 ```
+# Stage 22 operations
+
+Keep monitoring disabled during tests, use fake market/email providers, migrate
+before startup, and verify Compose forwards SMTP secrets only at runtime.

@@ -14,6 +14,9 @@ import type {
   Trade,
   TradeClosePayload,
   TradeCreatePayload,
+  ExitReason,
+  NotificationStatus,
+  PriceAlertEvent,
   TradeHorizon,
   TradePatchPayload,
 } from "./types";
@@ -178,10 +181,11 @@ export function patchTrade(
 export function openTrade(
   tradeId: number,
   actualEntry: number | null,
+  optionEntryPrice?: number | null,
 ): Promise<Trade> {
   return apiRequest<Trade>(`/trades/${tradeId}/open`, {
     method: "POST",
-    body: JSON.stringify({ actual_entry: actualEntry }),
+    body: JSON.stringify({ actual_entry: actualEntry, option_entry_price: optionEntryPrice ?? null }),
   });
 }
 
@@ -199,11 +203,25 @@ export function recordPartialExit(
   tradeId: number,
   price: number,
   quantity: number,
+  exitReason: ExitReason,
+  optionPrice?: number | null,
 ): Promise<Trade> {
   return apiRequest<Trade>(`/trades/${tradeId}/partial-exits`, {
     method: "POST",
-    body: JSON.stringify({ price, quantity }),
+    body: JSON.stringify({ price, quantity, exit_reason: exitReason, option_price: optionPrice ?? null }),
   });
+}
+
+export function getNotificationStatus(): Promise<NotificationStatus> {
+  return apiRequest<NotificationStatus>("/notifications/status");
+}
+
+export function getPriceAlertEvents(tradeId: number): Promise<PriceAlertEvent[]> {
+  return apiRequest<PriceAlertEvent[]>(`/trades/${tradeId}/price-alert-events`);
+}
+
+export function sendTestEmail(): Promise<{ status: string }> {
+  return apiRequest<{ status: string }>("/notifications/test-email", { method: "POST" });
 }
 
 export function createReview(

@@ -2,9 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import {
   APIError,
-  closeTrade,
   evaluateRules,
-  getQuote,
   openTrade,
   patchTrade,
   recordPartialExit,
@@ -13,15 +11,16 @@ import { useTrades } from "../hooks/useTrades";
 import type {
   RuleAlert,
   RuleEvaluationResult,
-  QuoteResult,
   Trade,
   TradePatchPayload,
+  ExitReason,
 } from "../types";
 import { formatDecimal, parseDecimalInput } from "../utils/decimal";
 import { groupTradesByMarket } from "../utils/tradeGrouping";
 import {
   calculateCurrentR,
   calculatePositionBreakdown,
+  resolvedUnderlyingDirection,
 } from "../utils/tradeCalculations";
 import { PriceLadder } from "./PriceLadder";
 import { RuleAlertPanel } from "./RuleAlertPanel";
@@ -37,6 +36,7 @@ interface TradeCardProps {
   onUpdated: (trade: Trade) => void;
   defaultExpanded: boolean;
   onDeleted: (tradeId: number) => void;
+  onAutoClosed: (trade: Trade) => void;
 }
 
 function numberOrNull(value: string): number | null {
@@ -81,7 +81,7 @@ function EditableMetric({
           aria-label={label}
           autoFocus
           type="number"
-          step="any"
+          step="0.01"
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
           onKeyDown={(event) => {
@@ -105,14 +105,21 @@ function EditableMetric({
     <div className="editable-metric">
       <span>{label}</span>
       <button type="button" onClick={() => setIsEditing(true)}>
-        {value ?? "—"}
+        {value === null ? "—" : formatDecimal(value)}
       </button>
     </div>
   );
 }
 
 function displayPrice(value: number | null): string {
-  return value === null ? "—" : value.toString();
+  return value === null ? "—" : formatDecimal(value);
+}
+
+function tradeDirectionLabel(trade: Trade): string {
+  if (trade.market === "options") {
+    return trade.direction === "long" ? "Buy" : "Sell";
+  }
+  return trade.direction === "long" ? "Long" : "Short";
 }
 
 export function tradingViewUrl(symbol: string): string {
@@ -163,12 +170,15 @@ function requiredActionText(alert: RuleAlert | null): string {
   return fallbackActions[alert.rule_id] ?? alert.message;
 }
 
-function TradeCard({ trade, onUpdated, defaultExpanded, onDeleted }: TradeCardProps) {
+function TradeCard({ trade, onUpdated, defaultExpanded, onDeleted, onAutoClosed }: TradeCardProps) {
   const [actualEntry, setActualEntry] = useState(
     trade.actual_entry?.toString() ?? trade.planned_entry.toString(),
   );
   const [currentPrice, setCurrentPrice] = useState(
     trade.current_price?.toString() ?? "",
+  );
+  const [plannedOptionEntry, setPlannedOptionEntry] = useState(
+    trade.option_entry_price?.toString() ?? "",
   );
   const [currentStop, setCurrentStop] = useState(
     trade.current_stop?.toString() ?? trade.stop_loss.toString(),
@@ -179,30 +189,29 @@ function TradeCard({ trade, onUpdated, defaultExpanded, onDeleted }: TradeCardPr
   const [partialQuantity, setPartialQuantity] = useState("");
   const [partialPrice, setPartialPrice] = useState("");
   const [note, setNote] = useState(trade.notes ?? "");
-  const [exitPrice, setExitPrice] = useState("");
-  const [exitReason, setExitReason] = useState("manual_exit");
+  const [exitReason, setExitReason] = useState<ExitReason>("partial_profit");
+  const [confirmingExit, setConfirmingExit] = useState(false);
   const [evaluation, setEvaluation] = useState<RuleEvaluationResult>({
     status: "allowed",
     alerts: [],
   });
-  const [underlyingQuote, setUnderlyingQuote] = useState<QuoteResult | null>(null);
-  const [quoteMessage, setQuoteMessage] = useState("");
-  const [isFetchingQuote, setIsFetchingQuote] = useState(false);
+  const [optionExitPrice, setOptionExitPrice] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState("");
 
   const parsedEntry = numberOrNull(actualEntry);
+  const parsedPlannedOptionEntry = numberOrNull(plannedOptionEntry);
   const parsedPrice = numberOrNull(currentPrice);
   const currentR = useMemo(() => {
     if (parsedEntry === null || parsedPrice === null) return null;
     const value = calculateCurrentR(
-      trade.direction,
+      trade.market === "options" ? resolvedUnderlyingDirection(trade.direction, trade.option_type, parsedEntry, trade.stop_loss) : trade.direction,
       parsedEntry,
       trade.stop_loss,
       parsedPrice,
     );
     return Number.isFinite(value) ? value : null;
-  }, [parsedEntry, parsedPrice, trade.direction, trade.stop_loss]);
+  }, [parsedEntry, parsedPrice, trade.direction, trade.market, trade.option_type, trade.stop_loss]);
   const quantity = calculatePositionBreakdown(
     trade.position_size,
     trade.partial_exit_quantity,
@@ -216,12 +225,16 @@ function TradeCard({ trade, onUpdated, defaultExpanded, onDeleted }: TradeCardPr
       : numberOrNull(currentStop);
   const parsedPartialQuantity = numberOrNull(partialQuantity);
   const parsedPartialPrice = numberOrNull(partialPrice);
+  const parsedOptionExitPrice = numberOrNull(optionExitPrice);
   const partialQuantityIsValid =
     parsedPartialQuantity !== null &&
-    parsedPartialQuantity >= 0 &&
-    (trade.position_size === null ||
-      parsedPartialQuantity < trade.position_size - trade.partial_exit_quantity);
-  const primaryRequiredAction = requiredAction(evaluation.alerts);
+    parsedPartialQuantity > 0 &&
+    trade.position_size !== null &&
+    quantity.runner !== null &&
+    parsedPartialQuantity <= quantity.runner;
+  const primaryRequiredAction = trade.position_size === null
+    ? ({ rule_id: "position_size_required", severity: "blocker", message: "Position size is required before recording exits.", checklist: [], discipline_sentence: "", next_actions: ["Set position size before recording exits."] } as RuleAlert)
+    : requiredAction(evaluation.alerts);
 
   useEffect(() => {
     if (trade.status !== "open") return;
@@ -272,48 +285,35 @@ function TradeCard({ trade, onUpdated, defaultExpanded, onDeleted }: TradeCardPr
     return runAction(() => patchTrade(trade.id, updates));
   }
 
+  function updateExitQuantity(value: string) {
+    const requested = numberOrNull(value);
+    if (requested === null || trade.position_size === null) {
+      setPartialQuantity(value);
+      return;
+    }
+    const remaining = quantity.runner ?? 0;
+    setPartialQuantity(requested > remaining ? formatDecimal(remaining) : value);
+  }
+
   async function savePartialExit() {
     if (parsedPartialQuantity === null || parsedPartialPrice === null) return;
     setIsSaving(true);
     setError("");
     try {
-      onUpdated(
-        await recordPartialExit(trade.id, parsedPartialPrice, parsedPartialQuantity),
+      const updated = await recordPartialExit(
+        trade.id, parsedPartialPrice, parsedPartialQuantity, exitReason,
+        trade.market === "options" ? parsedOptionExitPrice : null,
       );
+      onUpdated(updated);
+      if (updated.status === "closed") onAutoClosed(updated);
+      setConfirmingExit(false);
       setPartialPrice("");
       setPartialQuantity("");
+      setOptionExitPrice("");
     } catch (requestError) {
       setError(errorMessage(requestError));
     } finally {
       setIsSaving(false);
-    }
-  }
-
-  async function fetchUnderlyingReference() {
-    setIsFetchingQuote(true);
-    setQuoteMessage("");
-    setUnderlyingQuote(null);
-    try {
-      const result = await getQuote(trade.symbol);
-      setUnderlyingQuote(result);
-      if (result.price === null) {
-        setQuoteMessage(result.message ?? "Underlying price could not be fetched.");
-        return;
-      }
-      const formattedPrice = formatDecimal(result.price);
-      setCurrentPrice(formattedPrice);
-      onUpdated(await patchTrade(trade.id, { current_price: result.price }));
-      setQuoteMessage(
-        `${trade.symbol} underlying price fetched and saved. This is not option premium.`,
-      );
-    } catch (requestError) {
-      setQuoteMessage(
-        requestError instanceof APIError
-          ? `${requestError.code}: ${requestError.message}`
-          : "Underlying price could not be fetched.",
-      );
-    } finally {
-      setIsFetchingQuote(false);
     }
   }
 
@@ -324,7 +324,7 @@ function TradeCard({ trade, onUpdated, defaultExpanded, onDeleted }: TradeCardPr
           <div className="trade-summary-primary">
             <div>
               <p className="eyebrow">Planned trade #{trade.id}</p>
-              <h2>{trade.symbol} <span>{trade.direction}</span></h2>
+              <h2>{trade.symbol} <span>{tradeDirectionLabel(trade)}</span></h2>
             </div>
             <div className="trade-link-actions">
               <a
@@ -355,6 +355,7 @@ function TradeCard({ trade, onUpdated, defaultExpanded, onDeleted }: TradeCardPr
           <div><span>Planned entry</span><strong>{trade.planned_entry}</strong></div>
           <div><span>Initial stop</span><strong>{trade.stop_loss}</strong></div>
           <div><span>Target 1</span><strong>{trade.target_1}</strong></div>
+          <EditableMetric label="Position size" value={trade.position_size} required onSave={(value) => update({ position_size: value })} />
           {trade.option_contract && (
             <div><span>Option contract</span><strong>{trade.option_contract}</strong></div>
           )}
@@ -370,13 +371,15 @@ function TradeCard({ trade, onUpdated, defaultExpanded, onDeleted }: TradeCardPr
               onChange={(event) => setActualEntry(event.target.value)}
             />
           </label>
+          {trade.market === "options" && <label>Option entry price<input aria-label={`Option entry price for ${trade.symbol}`} type="number" min="0.01" step="0.01" value={plannedOptionEntry} onChange={(event) => setPlannedOptionEntry(event.target.value)} /></label>}
           <button
             className="primary-button"
-            disabled={isSaving || parsedEntry === null}
-            onClick={() => runAction(() => openTrade(trade.id, parsedEntry))}
+            disabled={isSaving || parsedEntry === null || trade.position_size === null || (trade.market === "options" && parsedPlannedOptionEntry === null)}
+            onClick={() => runAction(() => openTrade(trade.id, parsedEntry, parsedPlannedOptionEntry))}
           >
             {isSaving ? "Opening…" : "Mark Entry Filled"}
           </button>
+          {trade.position_size === null && <small className="form-message error-message">Set position size before marking the entry filled.</small>}
         </div>
         {error && <p className="form-message error-message">{error}</p>}
         <DeleteTradeButton trade={trade} onDeleted={onDeleted} />
@@ -391,7 +394,7 @@ function TradeCard({ trade, onUpdated, defaultExpanded, onDeleted }: TradeCardPr
         <div className="trade-summary-primary">
           <div>
             <p className="eyebrow">Open trade #{trade.id}</p>
-            <h2>{trade.symbol} <span>{trade.direction}</span></h2>
+            <h2>{trade.symbol} <span>{tradeDirectionLabel(trade)}</span></h2>
           </div>
           <div className="trade-link-actions">
             <a
@@ -440,9 +443,16 @@ function TradeCard({ trade, onUpdated, defaultExpanded, onDeleted }: TradeCardPr
         {trade.option_contract && (
           <div><span>Option contract</span><strong>{trade.option_contract}</strong></div>
         )}
-        <div><span>Initial stop</span><strong>{trade.stop_loss}</strong></div>
-        <div><span>Current stop</span><strong>{displayPrice(trade.current_stop)}</strong></div>
-        <div><span>Current price</span><strong>{displayPrice(trade.current_price)}</strong></div>
+        <div><span>Initial stop</span><strong>{formatDecimal(trade.stop_loss)}</strong></div>
+        <EditableMetric label="Current stop" value={trade.current_stop} required onSave={async (value) => {
+          setCurrentStop(value === null ? "" : formatDecimal(value));
+          await update({ current_stop: value });
+        }} />
+        <EditableMetric label={trade.market === "options" ? "Underlying price" : "Current price"} value={trade.current_price} onSave={async (value) => {
+          setCurrentPrice(value === null ? "" : formatDecimal(value));
+          await update({ current_price: value });
+        }} />
+        {trade.market === "options" && <EditableMetric label="Option entry" value={trade.option_entry_price} required onSave={(value) => update({ option_entry_price: value })} />}
         <EditableMetric
           label="Target 1"
           value={trade.target_1}
@@ -459,37 +469,10 @@ function TradeCard({ trade, onUpdated, defaultExpanded, onDeleted }: TradeCardPr
           value={trade.position_size}
           onSave={(value) => update({ position_size: value })}
         />
-        <div><span>Partial quantity</span><strong>{quantity.taken}</strong></div>
-        <div><span>Runner remaining</span><strong>{quantity.runner ?? "—"}</strong></div>
+        <div><span>Partial quantity</span><strong>{formatDecimal(quantity.taken)}</strong></div>
+        <div><span>Runner remaining</span><strong>{quantity.runner === null ? "—" : formatDecimal(quantity.runner)}</strong></div>
         <div><span>Runner state</span><strong>{trade.runner_active ? "Active" : "Inactive"}</strong></div>
       </div>
-
-      {trade.market === "options" && (
-        <section className="management-section">
-          <h3>Underlying reference</h3>
-          <div className="option-underlying-reference">
-            <button
-              className="secondary-button"
-              type="button"
-              disabled={isFetchingQuote}
-              onClick={() => void fetchUnderlyingReference()}
-            >
-              {isFetchingQuote ? "Fetching..." : `Fetch ${trade.symbol} price`}
-            </button>
-            {underlyingQuote?.price !== null && underlyingQuote?.price !== undefined && (
-              <div>
-                <span>Underlying price</span>
-                <strong>{formatDecimal(underlyingQuote.price)}</strong>
-                <small>
-                  {underlyingQuote.source} ·{" "}
-                  {new Date(underlyingQuote.fetched_at).toLocaleString()}
-                </small>
-              </div>
-            )}
-            {quoteMessage && <p>{quoteMessage}</p>}
-          </div>
-        </section>
-      )}
 
       <PriceLadder
         entry={trade.actual_entry}
@@ -501,37 +484,51 @@ function TradeCard({ trade, onUpdated, defaultExpanded, onDeleted }: TradeCardPr
       />
 
       <section className="management-section">
-        <h3>Price and stop management</h3>
-        <div className="management-grid">
-          <label>
-            {trade.market === "options" ? "Underlying price" : "Current price"}
-            <input aria-label={`${trade.market === "options" ? "Underlying price" : "Current price"} for ${trade.symbol}`} type="number" step="any" value={currentPrice} onChange={(event) => setCurrentPrice(event.target.value)} />
-          </label>
-          <button className="secondary-button" disabled={isSaving || parsedPrice === null} onClick={() => update({ current_price: parsedPrice })}>
-            {trade.market === "options" ? "Save Underlying Price" : "Update Price"}
-          </button>
-          <label>
-            Structure stop
-            <input aria-label={`Structure stop for ${trade.symbol}`} type="number" step="any" value={currentStop} onChange={(event) => setCurrentStop(event.target.value)} />
-          </label>
-          <button className="secondary-button" disabled={isSaving || numberOrNull(currentStop) === null} onClick={() => update({ current_stop: numberOrNull(currentStop) })}>Move Stop by Structure</button>
-        </div>
+        <h3>Record Exit Execution</h3>
         <div className="action-row">
           <label className="partial-quantity-field">
-            Partial exit price
-            <input aria-label={`Partial exit price for ${trade.symbol}`} type="number" step="any" value={partialPrice} onChange={(event) => setPartialPrice(event.target.value)} />
+            {trade.market === "options" ? "Underlying exit price" : "Exit price"}
+            <input aria-label={`Exit execution price for ${trade.symbol}`} type="number" step="0.01" value={partialPrice} onChange={(event) => setPartialPrice(event.target.value)} />
           </label>
+          {trade.market === "options" && <label className="partial-quantity-field">Option exit price<input aria-label={`Option exit price for ${trade.symbol}`} type="number" min="0.01" step="0.01" value={optionExitPrice} onChange={(event) => setOptionExitPrice(event.target.value)} /></label>}
           <label className="partial-quantity-field">
-            Quantity taken
-            <input aria-label={`Partial quantity for ${trade.symbol}`} type="number" min="0" step="any" value={partialQuantity} onChange={(event) => setPartialQuantity(event.target.value)} />
+            Exit quantity
+            <input aria-label={`Exit quantity for ${trade.symbol}`} type="number" min="0.01" max={quantity.runner ?? undefined} step="0.01" value={partialQuantity} onChange={(event) => updateExitQuantity(event.target.value)} />
           </label>
-          <button className="secondary-button" disabled={isSaving || !partialQuantityIsValid || parsedPartialPrice === null} onClick={() => {
+          <label>Exit reason<select value={exitReason} onChange={(event) => setExitReason(event.target.value as ExitReason)}>
+            <option value="partial_profit">Partial profit</option><option value="target_hit">Target hit</option>
+            <option value="stop_hit">Stop hit</option><option value="runner_stop">Runner stop</option>
+            <option value="risk_reduction">Risk reduction</option><option value="invalidated_setup">Invalidated setup</option>
+            <option value="time_exit">Time exit</option><option value="manual_exit">Manual exit</option><option value="other">Other</option>
+          </select></label>
+          <button className="secondary-button" disabled={isSaving || !partialQuantityIsValid || parsedPartialPrice === null || (trade.market === "options" && parsedOptionExitPrice === null)} onClick={() => {
             if (parsedPartialQuantity !== null && parsedPartialPrice !== null) {
-              void savePartialExit();
+              setConfirmingExit(true);
             }
-          }}>Record Partial Profit</button>
+          }}>Record Exit</button>
         </div>
       </section>
+
+      {confirmingExit && parsedPartialQuantity !== null && parsedPartialPrice !== null && trade.position_size !== null && (() => {
+        const remainingBefore = quantity.runner ?? 0;
+        const remainingAfter = Math.max(0, Number((remainingBefore - parsedPartialQuantity).toFixed(2)));
+        const isFullExit = Math.abs(parsedPartialQuantity - remainingBefore) < 0.005;
+        return <div className="confirmation-backdrop" role="presentation" onMouseDown={(event) => {
+          if (event.target === event.currentTarget) setConfirmingExit(false);
+        }}><section className="exit-confirmation" role="dialog" aria-modal="true" aria-labelledby={`exit-confirmation-${trade.id}`}>
+          <span className={isFullExit ? "confirmation-icon full-exit" : "confirmation-icon"} aria-hidden="true">{isFullExit ? "!" : "✓"}</span>
+          <div><p className="eyebrow">{isFullExit ? "Full position exit" : "Partial position exit"}</p><h3 id={`exit-confirmation-${trade.id}`}>{isFullExit ? `Exit the entire ${trade.symbol} position?` : `Confirm partial exit for ${trade.symbol}`}</h3></div>
+          <dl className="exit-confirmation-details">
+            <div><dt>Exit price</dt><dd>{formatDecimal(parsedPartialPrice)}</dd></div>
+            {trade.market === "options" && <div><dt>Option exit price</dt><dd>{parsedOptionExitPrice === null ? "—" : formatDecimal(parsedOptionExitPrice)}</dd></div>}
+            <div><dt>Exit quantity</dt><dd>{formatDecimal(parsedPartialQuantity)}</dd></div>
+            <div><dt>Reason</dt><dd>{exitReason.replaceAll("_", " ")}</dd></div>
+            <div><dt>Remaining after</dt><dd>{formatDecimal(remainingAfter)}</dd></div>
+          </dl>
+          {isFullExit && <p className="full-exit-warning">This will close the trade and move it out of Open Trades.</p>}
+          <div className="confirmation-actions"><button type="button" className="secondary-button" onClick={() => setConfirmingExit(false)}>Cancel</button><button type="button" className={isFullExit ? "danger-button" : "primary-button"} disabled={isSaving} onClick={() => void savePartialExit()}>{isSaving ? "Recording…" : isFullExit ? "Yes, exit position" : "Confirm partial exit"}</button></div>
+        </section></div>;
+      })()}
 
       <section className="management-section">
         <h3>Runner management</h3>
@@ -552,36 +549,13 @@ function TradeCard({ trade, onUpdated, defaultExpanded, onDeleted }: TradeCardPr
       />
 
       <section className="management-section">
-        <h3>Notes and exit</h3>
+        <h3>Trade notes</h3>
         <label className="notes-field">
           Trade note
           <textarea rows={3} value={note} onChange={(event) => setNote(event.target.value)} />
         </label>
         <button className="secondary-button" disabled={isSaving} onClick={() => update({ notes: note.trim() || null })}>Add Note</button>
 
-        <div className="exit-row">
-          <label>
-            Exit price
-            <input aria-label={`Exit price for ${trade.symbol}`} type="number" step="any" value={exitPrice} onChange={(event) => setExitPrice(event.target.value)} />
-          </label>
-          <label>
-            Exit reason
-            <select value={exitReason} onChange={(event) => setExitReason(event.target.value)}>
-              <option value="target_hit">Target hit</option>
-              <option value="stop_hit">Stop hit</option>
-              <option value="manual_exit">Manual exit</option>
-              <option value="runner_stop">Runner stop</option>
-              <option value="invalidated_setup">Invalidated setup</option>
-              <option value="time_exit">Time exit</option>
-            </select>
-          </label>
-          <button className="danger-button" disabled={isSaving || numberOrNull(exitPrice) === null} onClick={() => {
-            const price = numberOrNull(exitPrice);
-            if (price !== null) {
-              void runAction(() => closeTrade(trade.id, { exit_price: price, exit_reason: exitReason }));
-            }
-          }}>Exit Trade</button>
-        </div>
       </section>
 
       {error && <p className="form-message error-message">{error}</p>}
@@ -593,6 +567,7 @@ function TradeCard({ trade, onUpdated, defaultExpanded, onDeleted }: TradeCardPr
 
 export function OpenTradePanel() {
   const [horizonFilter, setHorizonFilter] = useState<HorizonFilterValue>("all");
+  const [closeNotice, setCloseNotice] = useState<Trade | null>(null);
   const loaded = useTrades(undefined, horizonForApi(horizonFilter));
   const { setTrades, isLoading, error } = loaded;
   const trades = useMemo(
@@ -631,6 +606,12 @@ export function OpenTradePanel() {
         </div>
       </div>
 
+      {closeNotice && <div className="page-success-notice" role="status">
+        <strong>{closeNotice.symbol} trade #{closeNotice.id} closed automatically.</strong>
+        <span>Total exited quantity reached the full position size{closeNotice.final_r === null ? "." : ` at ${closeNotice.final_r.toFixed(2)}R.`}</span>
+        <button type="button" onClick={() => setCloseNotice(null)}>Dismiss</button>
+      </div>}
+
       {isLoading && <p className="empty-state">Loading active trades…</p>}
       {error && <p className="form-message error-message">{error}</p>}
       {!isLoading && !error && trades.length === 0 && (
@@ -646,7 +627,7 @@ export function OpenTradePanel() {
               <h3>{group.label}</h3>
             </div>
             <div className="market-group-list">
-              {group.trades.map((trade, index) => (
+              {group.trades.map((trade) => (
                 <TradeCard
                   key={trade.id}
                   trade={trade}
@@ -654,7 +635,8 @@ export function OpenTradePanel() {
                   onDeleted={(tradeId) =>
                     setTrades((current) => current.filter((item) => item.id !== tradeId))
                   }
-                  defaultExpanded={group.key === tradeGroups[0]?.key && index === 0}
+                  onAutoClosed={setCloseNotice}
+                  defaultExpanded={false}
                 />
               ))}
             </div>

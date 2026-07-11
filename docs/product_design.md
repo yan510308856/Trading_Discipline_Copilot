@@ -181,7 +181,7 @@ Worst Mistake: Chased breakout without FT
 
 ```yaml
 symbol: string
-trade_horizon: intraday | swing | other
+trade_horizon: intraday | swing | leap | other
 market: futures | stocks | crypto | forex | options | other
 direction: long | short
 setup:
@@ -221,6 +221,7 @@ notes: string
 
 - `intraday`
 - `swing`
+- `leap`
 - `other`
 
 `intraday` trades require today's Daily Readiness checklist to be cleared before
@@ -229,7 +230,7 @@ Readiness, because that checklist is specifically an intraday preparation gate.
 
 Stage 18 makes `trade_horizon` a reusable filter dimension across operational
 screens. Open Trades, Post-Trade Review, Daily Summary, and the Dashboard daily
-summary can narrow their data to all trades, intraday, swing, or other trades.
+summary can narrow their data to all trades, intraday, swing, leap, or other trades.
 Open Trade management also supports direct inline edits for active target and
 position-size metrics, and recorded partial exits are shown on the price map.
 
@@ -279,6 +280,7 @@ Target 1 distance: 18 points
 - 缺少 `option_contract` 是 warning，不是 blocker；用户必须确认后才能继续创建计划。
 - Stage 16 不获取实时 option premium，不做 option chain，不计算 Greeks。
 - Symbol price lookup 对 options 只显示 underlying price，不能当作 option premium。
+- Option premium 由用户手动记录；系统不会获取或虚构 premium。期权 Gross P&L 使用 premium 差额、合约数量和标准 100 multiplier，并排除手续费。
 
 如果 `market != options`，`option_contract` 不需要填写。
 

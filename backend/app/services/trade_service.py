@@ -2,17 +2,41 @@
 
 from __future__ import annotations
 
+import logging
+from decimal import Decimal, ROUND_HALF_UP
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from app import models, schemas
 from app.errors import APIError
+from app.services.option_contract_service import (
+    build_option_contract,
+    resolved_underlying_direction,
+    underlying_direction,
+)
+
+logger = logging.getLogger(__name__)
+
+
+def _quantity(value: float) -> Decimal:
+    return Decimal(str(value)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+
+def _apply_option_contract(data: dict) -> dict:
+    if data.get("market") != "options":
+        data.update(option_contract=None, option_type=None, option_expiration=None, option_strike=None, option_entry_price=None)
+    elif all(data.get(field) is not None for field in ("option_type", "option_expiration", "option_strike")):
+        data["option_contract"] = build_option_contract(
+            data["symbol"], data["option_type"], data["option_expiration"], data["option_strike"]
+        )
+    return data
 
 
 def create_planned_trade(database: Session, trade_data: schemas.TradeCreate) -> models.Trade:
     """Persist a new trade plan in the initial planned state."""
 
-    trade = models.Trade(**trade_data.model_dump(), status="planned")
+    trade = models.Trade(**_apply_option_contract(trade_data.model_dump()), status="planned")
     database.add(trade)
     database.commit()
     database.refresh(trade)
@@ -55,9 +79,16 @@ def update_trade(
 ) -> models.Trade:
     trade = get_trade(database, trade_id)
     updates = trade_data.model_dump(exclude_unset=True)
+    if trade.status == "planned":
+        prospective = {field: getattr(trade, field) for field in (
+            "symbol", "market", "option_contract", "option_type", "option_expiration", "option_strike", "option_entry_price"
+        )}
+        prospective.update(updates)
+        updates.update(_apply_option_contract(prospective))
     management_fields = {
         "current_stop",
         "current_price",
+        "option_entry_price",
         "runner_enabled",
         "runner_active",
         "runner_stop",
@@ -110,6 +141,9 @@ def update_trade(
         setattr(trade, field, value)
     database.commit()
     database.refresh(trade)
+    if "current_price" in updates:
+        from app.services.price_alert_service import evaluate_trade_price_alerts
+        evaluate_trade_price_alerts(database, trade)
     return trade
 
 
@@ -131,9 +165,12 @@ def calculate_final_r(trade: models.Trade, exit_price: float) -> float:
         if trade.actual_entry is not None
         else trade.planned_entry
     )
+    price_direction = resolved_underlying_direction(
+        trade.market, trade.direction, trade.option_type, entry_price, trade.stop_loss
+    )
     initial_risk = (
         entry_price - trade.stop_loss
-        if trade.direction == "long"
+        if price_direction == "long"
         else trade.stop_loss - entry_price
     )
     if initial_risk <= 0:
@@ -150,7 +187,7 @@ def calculate_final_r(trade: models.Trade, exit_price: float) -> float:
 
     price_change = (
         exit_price - entry_price
-        if trade.direction == "long"
+        if price_direction == "long"
         else entry_price - exit_price
     )
     return round(price_change / initial_risk, 4)
@@ -169,33 +206,23 @@ def _validate_price_structure(
         )
 
 
-def _weighted_final_r(trade: models.Trade, final_price: float) -> float:
-    partials = [item for item in trade.executions if item.execution_type == "partial"]
+def _weighted_execution_r(trade: models.Trade, executions: list[models.TradeExecution]) -> float:
     if trade.position_size is None:
-        if partials:
-            raise APIError(
-                422,
-                "POSITION_SIZE_REQUIRED",
-                "Position size is required to calculate weighted R after partial exits.",
-                {"trade_id": trade.id},
-            )
-        return calculate_final_r(trade, final_price)
-
-    partial_quantity = sum(item.quantity or 0.0 for item in partials)
-    remaining_quantity = trade.position_size - partial_quantity
-    if remaining_quantity < 0:
+        raise APIError(422, "POSITION_SIZE_REQUIRED", "Position size is required to calculate weighted R.", {"trade_id": trade.id})
+    total = sum((_quantity(item.quantity or 0) for item in executions), Decimal("0.00"))
+    position = _quantity(trade.position_size)
+    if total != position:
         raise APIError(
             409,
             "INVALID_EXECUTION_QUANTITY",
-            "Recorded exits exceed the initial position size.",
-            {"trade_id": trade.id},
+            "Recorded exit quantities must equal the initial position size before closing.",
+            {"trade_id": trade.id, "recorded_quantity": float(total), "position_size": float(position)},
         )
     weighted_r = sum(
-        calculate_final_r(trade, item.price) * (item.quantity or 0.0)
-        for item in partials
+        Decimal(str(calculate_final_r(trade, item.price))) * _quantity(item.quantity or 0)
+        for item in executions
     )
-    weighted_r += calculate_final_r(trade, final_price) * remaining_quantity
-    return round(weighted_r / trade.position_size, 4)
+    return round(float(weighted_r / position), 4)
 
 
 def record_partial_exit(
@@ -210,28 +237,46 @@ def record_partial_exit(
             "Position size is required before recording a partial exit.",
             {"trade_id": trade.id},
         )
-    exited_quantity = sum(item.quantity or 0.0 for item in trade.executions)
-    if exited_quantity + exit_data.quantity >= trade.position_size:
+    exited_quantity = sum((_quantity(item.quantity or 0) for item in trade.executions), Decimal("0.00"))
+    position_size = _quantity(trade.position_size)
+    requested = _quantity(exit_data.quantity)
+    remaining = position_size - exited_quantity
+    if remaining <= 0:
+        raise APIError(409, "INVALID_EXECUTION_QUANTITY", "No position quantity remains to exit.", {"trade_id": trade.id})
+    if requested > remaining:
         raise APIError(
             422,
             "INVALID_PARTIAL_QUANTITY",
-            "A partial exit must leave a positive quantity for the final exit.",
+            "Exit quantity cannot exceed the remaining position quantity.",
             {
-                "position_size": trade.position_size,
-                "already_exited": exited_quantity,
-                "requested_quantity": exit_data.quantity,
+                "position_size": float(position_size),
+                "already_exited": float(exited_quantity),
+                "requested_quantity": float(requested),
+                "remaining_quantity": float(remaining),
             },
         )
-    database.add(
-        models.TradeExecution(
-            trade=trade,
-            execution_type="partial",
-            price=exit_data.price,
-            quantity=exit_data.quantity,
-        )
+    is_final = requested == remaining
+    execution = models.TradeExecution(
+        trade=trade,
+        execution_type="final" if is_final else "partial",
+        price=exit_data.price,
+        quantity=float(requested),
+        exit_reason=exit_data.exit_reason,
+        option_price=exit_data.option_price if trade.market == "options" else None,
     )
-    trade.partial_exit_quantity = exited_quantity + exit_data.quantity
-    trade.partial_taken = True
+    database.add(execution)
+    database.flush()
+    if is_final:
+        trade.exit_price = exit_data.price
+        trade.exit_reason = exit_data.exit_reason
+        trade.final_r = _weighted_execution_r(trade, list(trade.executions))
+        trade.status = "closed"
+        trade.closed_at = models.utc_now()
+        trade.runner_active = False
+        logger.info("trade_auto_closed trade_id=%s quantity=%s", trade.id, requested)
+    else:
+        trade.partial_exit_quantity = float(exited_quantity + requested)
+        trade.partial_taken = True
     database.commit()
     database.refresh(trade)
     return trade
@@ -247,8 +292,11 @@ def open_trade(
         if trade_data.actual_entry is None
         else trade_data.actual_entry
     )
+    if trade.market == "options" and trade_data.option_entry_price is not None:
+        trade.option_entry_price = round(trade_data.option_entry_price, 2)
     _validate_price_structure(
-        trade.direction, trade.actual_entry, trade.stop_loss, trade.target_1
+        underlying_direction(trade.market, trade.direction, trade.option_type),
+        trade.actual_entry, trade.stop_loss, trade.target_1
     )
     trade.current_stop = trade.stop_loss
     trade.status = "open"
@@ -265,28 +313,26 @@ def close_trade(
     _require_status(trade, "open", "closed")
     trade.exit_price = trade_data.exit_price
     trade.exit_reason = trade_data.exit_reason
-    trade.final_r = _weighted_final_r(trade, trade_data.exit_price)
-    trade.status = "closed"
-    trade.closed_at = models.utc_now()
-    trade.runner_active = False
-    remaining_quantity = (
-        None
-        if trade.position_size is None
-        else trade.position_size
-        - sum(
-            item.quantity or 0.0
-            for item in trade.executions
-            if item.execution_type == "partial"
-        )
-    )
-    database.add(
-        models.TradeExecution(
+    if trade.position_size is None:
+        trade.final_r = calculate_final_r(trade, trade_data.exit_price)
+        remaining_quantity = None
+    else:
+        exited = sum((_quantity(item.quantity or 0) for item in trade.executions), Decimal("0.00"))
+        remaining_quantity = float(_quantity(trade.position_size) - exited)
+    final_execution = models.TradeExecution(
             trade=trade,
             execution_type="final",
             price=trade_data.exit_price,
             quantity=remaining_quantity,
+            exit_reason=trade_data.exit_reason,
         )
-    )
+    database.add(final_execution)
+    database.flush()
+    if trade.position_size is not None:
+        trade.final_r = _weighted_execution_r(trade, list(trade.executions))
+    trade.status = "closed"
+    trade.closed_at = models.utc_now()
+    trade.runner_active = False
     database.commit()
     database.refresh(trade)
     return trade

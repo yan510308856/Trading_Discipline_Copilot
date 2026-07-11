@@ -10,6 +10,10 @@ import {
 const readyEnoughForm: TradeFormState = {
   symbol: "ES",
   option_contract: "",
+  option_type: null,
+  option_expiration: "",
+  option_strike: "",
+  option_entry_price: "",
   trade_horizon: "intraday",
   market: "futures",
   direction: "long",

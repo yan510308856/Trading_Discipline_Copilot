@@ -4,7 +4,8 @@ import { APIError, getHealth, refreshOpenPrices } from "../api";
 import { useDailySummaryQuery } from "../hooks/queries";
 import type { ConnectionState, Trade } from "../types";
 import { groupTradesByMarket } from "../utils/tradeGrouping";
-import { calculateCurrentR } from "../utils/tradeCalculations";
+import { calculateCurrentR, calculatePositionBreakdown, resolvedUnderlyingDirection } from "../utils/tradeCalculations";
+import { formatDecimal } from "../utils/decimal";
 import {
   HorizonFilter,
   type HorizonFilterValue,
@@ -87,15 +88,7 @@ export function Dashboard() {
   }, [refreshDashboard]);
 
   return (
-    <section className="dashboard" aria-labelledby="dashboard-title">
-      <div className="hero-card">
-        <p className="eyebrow">Today&apos;s operating state</p>
-        <h2 id="dashboard-title">Discipline status and active risk.</h2>
-        <p>
-          Check readiness, open risk, blocker pressure, and review quality before
-          adding another trade.
-        </p>
-      </div>
+    <section className="dashboard" aria-label="Dashboard">
 
       <Panel className="dashboard-summary" aria-labelledby="today-summary-title">
         <div className="section-heading">
@@ -132,10 +125,7 @@ export function Dashboard() {
 
       <details className="unrealized-positions">
         <summary>
-          <span>
-            <strong>{openTrades.length} unrealized position{openTrades.length === 1 ? "" : "s"}</strong>
-            <small>Open to inspect current return and remaining quantity</small>
-          </span>
+          <div className="unrealized-heading-copy"><span className="unrealized-count">{openTrades.length}</span><div><p className="eyebrow">Active positions</p><strong>Unrealized performance</strong><small>Current return and remaining quantity</small></div></div>
           <Button
             variant="secondary"
             disabled={isRefreshingQuotes}
@@ -147,7 +137,7 @@ export function Dashboard() {
             {isRefreshingQuotes ? "Refreshing…" : "Refresh prices"}
           </Button>
         </summary>
-        {quoteError && <p className="form-message error-message">{quoteError}</p>}
+        {quoteError && <p className="unrealized-data-note"><span aria-hidden="true">i</span>{quoteError}</p>}
         {openTrades.length === 0 ? (
           <p className="rule-empty">No open positions.</p>
         ) : (
@@ -155,27 +145,31 @@ export function Dashboard() {
             {openTradeGroups.map((group) => (
               <section className="market-trade-group compact" key={group.key}>
                 <div className="market-group-heading">
-                  <h3>{group.label}</h3>
+                  <h3>{group.label}</h3><span>{group.trades.length} position{group.trades.length === 1 ? "" : "s"}</span>
                 </div>
                 <div className="market-group-list">
                   {group.trades.map((trade) => {
                     const entry = trade.actual_entry ?? trade.planned_entry;
+                    const priceDirection = trade.market === "options"
+                      ? resolvedUnderlyingDirection(trade.direction, trade.option_type, entry, trade.stop_loss)
+                      : trade.direction;
                     const currentR = trade.current_price === null
                       ? null
-                      : calculateCurrentR(trade.direction, entry, trade.stop_loss, trade.current_price);
+                      : calculateCurrentR(priceDirection, entry, trade.stop_loss, trade.current_price);
                     const priceReturn = trade.current_price === null || entry === 0
                       ? null
-                      : ((trade.direction === "long" ? trade.current_price - entry : entry - trade.current_price) / entry) * 100;
-                    const remaining = trade.position_size === null
-                      ? null
-                      : Math.max(trade.position_size - trade.partial_exit_quantity, 0);
+                      : ((priceDirection === "long" ? trade.current_price - entry : entry - trade.current_price) / entry) * 100;
+                    const remaining = calculatePositionBreakdown(
+                      trade.position_size,
+                      trade.partial_exit_quantity,
+                    ).runner;
                     return (
                       <article className="unrealized-row" key={trade.id}>
-                        <div><strong>{trade.symbol}</strong><span>{trade.direction}</span></div>
-                        <div><span>Remaining</span><strong>{remaining ?? "—"}</strong></div>
-                        <div><span>Current price</span><strong>{trade.current_price ?? "Not available"}</strong></div>
-                        <div><span>Current R</span><strong>{currentR === null || !Number.isFinite(currentR) ? "—" : `${currentR >= 0 ? "+" : ""}${currentR.toFixed(2)}R`}</strong></div>
-                        <div><span>Price return</span><strong>{priceReturn === null ? "—" : `${priceReturn >= 0 ? "+" : ""}${priceReturn.toFixed(2)}%`}</strong></div>
+                        <div className="unrealized-symbol"><strong>{trade.symbol}</strong><span>{trade.market === "options" ? (trade.direction === "long" ? "Buy" : "Sell") : trade.direction}</span>{trade.option_contract && <small>{trade.option_contract}</small>}</div>
+                        <div><span>Remaining</span><strong>{remaining === null ? "—" : remaining.toFixed(2)}</strong></div>
+                        <div><span>{trade.market === "options" ? "Underlying" : "Current price"}</span><strong>{trade.current_price === null ? "—" : formatDecimal(trade.current_price)}</strong></div>
+                        <div className={currentR !== null && currentR < 0 ? "metric-negative" : "metric-positive"}><span>Current R</span><strong>{currentR === null || !Number.isFinite(currentR) ? "—" : `${currentR >= 0 ? "+" : ""}${currentR.toFixed(2)}R`}</strong></div>
+                        <div className={priceReturn !== null && priceReturn < 0 ? "metric-negative" : "metric-positive"}><span>Price return</span><strong>{priceReturn === null ? "—" : `${priceReturn >= 0 ? "+" : ""}${priceReturn.toFixed(2)}%`}</strong></div>
                       </article>
                     );
                   })}

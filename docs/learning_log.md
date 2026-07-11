@@ -620,3 +620,11 @@ No trading behavior changed. This stage improves frontend maintainability so rea
 - Not every API call is refactored yet.
 - UI primitives are intentionally tiny and not a full design system.
 - Persistent warning acknowledgement remains deferred.
+# Stage 22 learning notes
+
+- Lifespan-managed scheduling makes startup and shutdown explicit.
+- Idempotency combines a normalized business key and a database unique constraint.
+- An SMTP protocol isolates delivery and keeps tests away from real email.
+- Execution-led lifecycle derives closure from cumulative quantity; weighted R uses every fill.
+- Wizard state and accessible pressed buttons reduce repeated interaction.
+- Additive nullable migrations preserve legacy option and execution records.

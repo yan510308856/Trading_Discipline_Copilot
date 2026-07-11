@@ -7,11 +7,15 @@ import {
   getDailyReadiness,
   getDailySummary,
   getOpenTradeAttention,
+  getNotificationStatus,
+  getPriceAlertEvents,
   getRules,
   getTodayDailyReadiness,
   getTrades,
   openTrade,
   patchTrade,
+  recordPartialExit,
+  sendTestEmail,
   updateDailyReadiness,
 } from "../api";
 import type {
@@ -22,6 +26,7 @@ import type {
   TradeCreatePayload,
   TradeHorizon,
   TradePatchPayload,
+  ExitReason,
 } from "../types";
 
 export const queryKeys = {
@@ -32,6 +37,8 @@ export const queryKeys = {
     ["trades", status ?? "all", tradeHorizon ?? "all"] as const,
   rules: () => ["rules"] as const,
   openTradeAttention: () => ["open-trade-attention"] as const,
+  notificationStatus: () => ["notification-status"] as const,
+  priceAlertEvents: (tradeId: number) => ["price-alert-events", tradeId] as const,
 };
 
 function invalidateTradesAndSummary(queryClient: ReturnType<typeof useQueryClient>) {
@@ -72,6 +79,31 @@ export function useOpenTradeAttentionQuery() {
     queryKey: queryKeys.openTradeAttention(),
     queryFn: getOpenTradeAttention,
   });
+}
+
+export function useNotificationStatusQuery() {
+  return useQuery({ queryKey: queryKeys.notificationStatus(), queryFn: getNotificationStatus });
+}
+
+export function usePriceAlertEventsQuery(tradeId: number) {
+  return useQuery({ queryKey: queryKeys.priceAlertEvents(tradeId), queryFn: () => getPriceAlertEvents(tradeId) });
+}
+
+export function useRecordExitMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ tradeId, price, quantity, exitReason, optionPrice }: { tradeId: number; price: number; quantity: number; exitReason: ExitReason; optionPrice?: number | null }) =>
+      recordPartialExit(tradeId, price, quantity, exitReason, optionPrice),
+    onSuccess: (_, variables) => {
+      invalidateTradesAndSummary(queryClient);
+      void queryClient.invalidateQueries({ queryKey: queryKeys.openTradeAttention() });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.priceAlertEvents(variables.tradeId) });
+    },
+  });
+}
+
+export function useTestEmailMutation() {
+  return useMutation({ mutationFn: sendTestEmail });
 }
 
 export function useUpdateDailyReadinessMutation() {
