@@ -1,5 +1,8 @@
 """FastAPI application entry point and shared error responses."""
 
+import asyncio
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
@@ -8,9 +11,20 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.api import router
 from app.errors import APIError
+from app.services.price_alert_monitor import monitor_enabled, run_monitor
 
 
-app = FastAPI(title="Trading Discipline Copilot API")
+@asynccontextmanager
+async def lifespan(application: FastAPI):
+    stop_event = asyncio.Event()
+    task = asyncio.create_task(run_monitor(stop_event)) if monitor_enabled() else None
+    yield
+    if task is not None:
+        stop_event.set()
+        await task
+
+
+app = FastAPI(title="Trading Discipline Copilot API", lifespan=lifespan)
 app.include_router(router)
 
 

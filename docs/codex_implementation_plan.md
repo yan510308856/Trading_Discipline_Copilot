@@ -1234,3 +1234,7 @@ full UI redesign.
 - Options behavior changes.
 - Broker integration.
 - Persistent warning acknowledgement.
+# Stage 22 implementation
+
+Stage 22 adds durable email alerts, execution-led closure, inline cockpit editing,
+and a three-step option-aware planner. See `stage22_live_alerts_and_execution_workflow.md`.

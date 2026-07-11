@@ -20,6 +20,11 @@ TradeClassification = Literal[
     "bad_trade_loser",
 ]
 ReadinessStatus = Literal["not_cleared", "partially_ready", "cleared"]
+OptionType = Literal["call", "put"]
+ExitReason = Literal[
+    "partial_profit", "target_hit", "stop_hit", "runner_stop", "risk_reduction",
+    "invalidated_setup", "time_exit", "manual_exit", "other",
+]
 
 
 class ReviewSummary(BaseModel):
@@ -49,11 +54,17 @@ class TradeExecutionRead(BaseModel):
     execution_type: Literal["partial", "final"]
     price: float
     quantity: Optional[float]
+    exit_reason: Optional[ExitReason]
+    option_price: Optional[float]
 
 
 class TradeCreate(BaseModel):
     symbol: str = Field(min_length=1, max_length=32)
     option_contract: Optional[str] = Field(default=None, max_length=128)
+    option_type: Optional[OptionType] = None
+    option_expiration: Optional[date] = None
+    option_strike: Optional[float] = Field(default=None, gt=0)
+    option_entry_price: Optional[float] = Field(default=None, gt=0)
     trade_horizon: TradeHorizon = "intraday"
     market: Market
     direction: Direction
@@ -76,6 +87,7 @@ class TradeCreate(BaseModel):
         "stop_loss",
         "target_1",
         "target_2",
+        "option_entry_price",
         "position_size",
         "risk_per_trade",
     )
@@ -95,6 +107,14 @@ class TradeCreate(BaseModel):
     def clear_option_contract_for_non_options(self) -> "TradeCreate":
         if self.market != "options":
             self.option_contract = None
+            self.option_type = None
+            self.option_expiration = None
+            self.option_strike = None
+            self.option_entry_price = None
+        elif any((self.option_type, self.option_expiration, self.option_strike)) and not all(
+            (self.option_type, self.option_expiration, self.option_strike)
+        ):
+            raise ValueError("Structured option fields must be supplied together.")
         return self
 
 
@@ -109,6 +129,7 @@ class TradeRead(TradeCreate):
     status: TradeStatus
     current_stop: Optional[float]
     current_price: Optional[float]
+    option_current_price: Optional[float]
     runner_stop: Optional[float]
     partial_taken: bool
     partial_exit_quantity: float
@@ -127,6 +148,10 @@ class TradeRead(TradeCreate):
 class TradePatch(BaseModel):
     symbol: Optional[str] = Field(default=None, min_length=1, max_length=32)
     option_contract: Optional[str] = Field(default=None, max_length=128)
+    option_type: Optional[OptionType] = None
+    option_expiration: Optional[date] = None
+    option_strike: Optional[float] = Field(default=None, gt=0)
+    option_entry_price: Optional[float] = Field(default=None, gt=0)
     trade_horizon: Optional[TradeHorizon] = None
     market: Optional[Market] = None
     direction: Optional[Direction] = None
@@ -137,6 +162,7 @@ class TradePatch(BaseModel):
     stop_loss: Optional[float] = None
     current_stop: Optional[float] = None
     current_price: Optional[float] = None
+    option_current_price: Optional[float] = Field(default=None, gt=0)
     target_1: Optional[float] = None
     target_2: Optional[float] = None
     runner_enabled: Optional[bool] = None
@@ -152,6 +178,8 @@ class TradePatch(BaseModel):
         "stop_loss",
         "current_stop",
         "current_price",
+        "option_entry_price",
+        "option_current_price",
         "target_1",
         "target_2",
         "runner_stop",
@@ -199,16 +227,44 @@ class TradePatch(BaseModel):
 
 class TradeOpen(BaseModel):
     actual_entry: Optional[float] = None
+    option_entry_price: Optional[float] = Field(default=None, gt=0)
 
 
 class TradeClose(BaseModel):
     exit_price: float
-    exit_reason: str = Field(min_length=1, max_length=128)
+    exit_reason: ExitReason
 
 
 class PartialExitCreate(BaseModel):
     price: float
     quantity: float = Field(gt=0)
+    exit_reason: ExitReason = "partial_profit"
+    option_price: Optional[float] = Field(default=None, gt=0)
+
+
+class TradePriceAlertEventRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    trade_id: int
+    alert_kind: Literal["target_1", "target_2", "stop"]
+    threshold_price: float
+    observed_price: float
+    normalized_threshold_price: str
+    notification_status: Literal["pending", "sent", "failed"]
+    attempt_count: int
+    last_error: Optional[str]
+    triggered_at: datetime
+    sent_at: Optional[datetime]
+
+
+class NotificationStatus(BaseModel):
+    email_enabled: bool
+    recipient_configured: bool
+    smtp_configured: bool
+    monitor_enabled: bool
+    poll_seconds: int
+    provider_name: str
 
 
 class ChecklistAnswerBatch(BaseModel):

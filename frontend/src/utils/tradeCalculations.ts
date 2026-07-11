@@ -1,4 +1,29 @@
-import type { Direction } from "../types";
+import type { Direction, TradeExecution } from "../types";
+
+export function optionUnderlyingDirection(
+  action: Direction,
+  optionType: "call" | "put" | null,
+): Direction {
+  if (optionType === null) return action;
+  const isBullish =
+    (action === "long" && optionType === "call") ||
+    (action === "short" && optionType === "put");
+  return isBullish ? "long" : "short";
+}
+
+export function resolvedUnderlyingDirection(
+  action: Direction,
+  optionType: "call" | "put" | null,
+  entryPrice: number,
+  stopPrice: number,
+): Direction {
+  const expected = optionUnderlyingDirection(action, optionType);
+  const expectedRisk = expected === "long"
+    ? entryPrice - stopPrice
+    : stopPrice - entryPrice;
+  if (expectedRisk > 0) return expected;
+  return stopPrice < entryPrice ? "long" : "short";
+}
 import { roundToTwoDecimals } from "./decimal";
 
 export interface RiskReward {
@@ -49,6 +74,33 @@ export function calculatePositionBreakdown(
     runner:
       initialQuantity === null
         ? null
-        : Math.max(initialQuantity - partialExitQuantity, 0),
+        : Math.max(roundToTwoDecimals(initialQuantity - partialExitQuantity), 0),
   };
+}
+
+export interface ExecutionProfitPoint {
+  execution: TradeExecution;
+  profit: number;
+  cumulativeProfit: number;
+}
+
+export function calculateExecutionProfitCurve(
+  direction: Direction,
+  entryPrice: number,
+  executions: TradeExecution[],
+  useOptionPrices = false,
+  multiplier = 1,
+): ExecutionProfitPoint[] {
+  let cumulativeProfit = 0;
+  return executions
+    .filter((execution) => execution.quantity !== null && (!useOptionPrices || execution.option_price !== null))
+    .map((execution) => {
+      const exitPrice = useOptionPrices ? execution.option_price ?? 0 : execution.price;
+      const priceChange = direction === "long"
+        ? exitPrice - entryPrice
+        : entryPrice - exitPrice;
+      const profit = roundToTwoDecimals(priceChange * (execution.quantity ?? 0) * multiplier);
+      cumulativeProfit = roundToTwoDecimals(cumulativeProfit + profit);
+      return { execution, profit, cumulativeProfit };
+    });
 }

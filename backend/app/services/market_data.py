@@ -165,4 +165,7 @@ def refresh_open_trade_prices(
     database.commit()
     for trade in trades:
         database.refresh(trade)
+        if trade.current_price is not None:
+            from app.services.price_alert_service import evaluate_trade_price_alerts
+            evaluate_trade_price_alerts(database, trade)
     return trades, errors

@@ -15,10 +15,12 @@ It is not a practice-mode simulator; blockers are part of the real workflow.
 ## Features
 
 - Pre-trade form with blocker, warning, and reminder rules loaded from YAML.
-- Required trade horizon classification: intraday, swing, or other.
+- Required trade horizon classification: intraday, swing, leap, or other.
 - Intraday trade plans are blocked until today's Daily Readiness checklist is cleared.
 - Planned and open trade lifecycle stored in SQLite.
 - Open-trade R tracking, stop management, partial-profit recording, and runners.
+- Durable price-threshold email alerts and execution-based automatic local closing.
+- Three-step click-first planning with structured option contract suggestions.
 - Optional Finnhub quotes for open US stock positions; the API key stays server-side.
 - Post-trade discipline scoring with YAML-configured bonuses, penalties, and vetoes.
 - Persistent post-trade history with date and review-status filters.
@@ -52,6 +54,10 @@ Open:
 The backend automatically runs `alembic upgrade head` before it starts. SQLite
 data is kept in the named Docker volume `trading_data`, so it survives container
 restarts.
+
+Email and polling are disabled by default. Configure the Stage 22 variables in
+`.env.example`, then enable them. The backend/container must remain running for
+background alerts; SMTP secrets are runtime-only and never returned by the API.
 
 Back up the live Docker database without stopping the application:
 
@@ -144,7 +150,7 @@ Tests use isolated temporary SQLite databases and do not modify
 1. Open **Dashboard** and confirm the backend is connected.
 2. Complete **Today's Intraday Readiness** at the bottom of the Dashboard before planning intraday trades.
 3. Open **New Trade**.
-4. Classify the plan as **Intraday**, **Swing**, or **Other**.
+4. Classify the plan as **Intraday**, **Swing**, **LEAP**, or **Other**.
 5. Leave stop loss empty and confirm the plan is blocked.
 6. Enter a structural stop loss.
 7. Select the `breakout` setup without follow-through and inspect the warning.
@@ -153,7 +159,7 @@ Tests use isolated temporary SQLite databases and do not modify
 10. Enter a current price that reaches at least `1R`.
 11. Confirm the partial-profit reminder appears.
 12. Record partial profit, activate the runner, and give it a protective stop.
-13. Enter an exit price and close the trade.
+13. Record the exact remaining exit quantity to close the local trade automatically.
 14. Open **Post-Trade Review**, expand the trade, and save a review.
 15. Return to **Dashboard** and confirm the discipline score and R are included.
 

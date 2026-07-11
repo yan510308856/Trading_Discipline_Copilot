@@ -1,0 +1,56 @@
+"""Non-secret notification configuration and alert history routes."""
+
+from __future__ import annotations
+
+import os
+from typing import Annotated
+
+from fastapi import APIRouter, Depends
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from app import models, schemas
+from app.database import get_db
+from app.errors import APIError
+from app.services import trade_service
+from app.services.email_sender import EmailSettings, configured_email_sender, env_bool
+
+router = APIRouter()
+Database = Annotated[Session, Depends(get_db)]
+
+
+@router.get("/notifications/status", response_model=schemas.NotificationStatus)
+def notification_status() -> dict[str, object]:
+    settings = EmailSettings.from_env()
+    sender = configured_email_sender(settings)
+    return {
+        "email_enabled": settings.enabled,
+        "recipient_configured": bool(settings.recipient),
+        "smtp_configured": settings.smtp_configured,
+        "monitor_enabled": env_bool("PRICE_ALERT_MONITOR_ENABLED"),
+        "poll_seconds": max(5, int(os.getenv("PRICE_ALERT_POLL_SECONDS", "60"))),
+        "provider_name": sender.provider_name,
+    }
+
+
+@router.get("/trades/{trade_id}/price-alert-events", response_model=list[schemas.TradePriceAlertEventRead])
+def price_alert_events(trade_id: int, database: Database) -> list[models.TradePriceAlertEvent]:
+    trade_service.get_trade(database, trade_id)
+    return list(database.scalars(
+        select(models.TradePriceAlertEvent)
+        .where(models.TradePriceAlertEvent.trade_id == trade_id)
+        .order_by(models.TradePriceAlertEvent.triggered_at.desc())
+    ))
+
+
+@router.post("/notifications/test-email")
+def test_email() -> dict[str, str]:
+    settings = EmailSettings.from_env()
+    sender = configured_email_sender(settings)
+    if sender.provider_name == "disabled":
+        raise APIError(503, "EMAIL_NOT_CONFIGURED", "Email notifications are disabled or incomplete.")
+    try:
+        sender.send_test_email()
+    except Exception as error:
+        raise APIError(502, "EMAIL_SEND_FAILED", "The test email could not be sent.", {"error_type": type(error).__name__}) from error
+    return {"status": "sent"}

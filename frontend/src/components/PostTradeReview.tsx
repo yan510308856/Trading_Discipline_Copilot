@@ -13,6 +13,8 @@ import {
   filterAndSortReviewTrades,
   type ReviewFilter,
 } from "../utils/reviewFilters";
+import { formatDecimal } from "../utils/decimal";
+import { calculateExecutionProfitCurve } from "../utils/tradeCalculations";
 import { DeleteTradeButton } from "./DeleteTradeButton";
 import {
   HorizonFilter,
@@ -75,6 +77,58 @@ interface ReviewFormProps {
   onReviewed: (review: Review) => void;
 }
 
+function formatSignedAmount(value: number): string {
+  return `${value >= 0 ? "+" : "−"}${Math.abs(value).toFixed(2)}`;
+}
+
+function ExecutionHistory({ trade }: { trade: Trade }) {
+  const isOption = trade.market === "options";
+  const entryPrice = isOption
+    ? trade.option_entry_price
+    : trade.actual_entry ?? trade.planned_entry;
+  const points = calculateExecutionProfitCurve(
+    trade.direction,
+    entryPrice ?? 0,
+    trade.executions,
+    isOption,
+    isOption ? 100 : 1,
+  );
+  const chartValues = [0, ...points.map((point) => point.cumulativeProfit)];
+  const minimum = Math.min(...chartValues);
+  const maximum = Math.max(...chartValues);
+  const range = Math.max(maximum - minimum, 1);
+  const chartPoints = chartValues.map((value, index) => {
+    const x = 34 + (index / Math.max(chartValues.length - 1, 1)) * 532;
+    const y = 148 - ((value - minimum) / range) * 116;
+    return { x, y, value };
+  });
+  const polyline = chartPoints.map((point) => `${point.x},${point.y}`).join(" ");
+  const finalProfit = points.at(-1)?.cumulativeProfit ?? null;
+
+  return <section className="execution-review-section">
+    <div className="execution-review-heading"><div><p className="eyebrow">Exit executions</p><h3>Takeoff history</h3></div>{finalProfit !== null && <div className={finalProfit < 0 ? "execution-total negative" : "execution-total positive"}><span>Gross P&amp;L</span><strong>{formatSignedAmount(finalProfit)}</strong></div>}</div>
+    {trade.executions.length === 0 ? <p className="execution-empty">No execution records are available for this trade.</p> : <div className="execution-history-list">
+      {trade.executions.map((execution, index) => {
+        const profitPoint = points.find((point) => point.execution.id === execution.id);
+        return <div className={`execution-history-row ${isOption ? "option-execution-row" : ""}`} key={execution.id}>
+          <span className={`execution-sequence ${execution.execution_type}`}>{index + 1}</span>
+          <div><strong>{execution.execution_type === "final" ? "Final exit" : `Partial takeoff ${index + 1}`}</strong><small>{formatDateTime(execution.executed_at)}</small></div>
+          <div><span>{isOption ? "Underlying" : "Price"}</span><strong>{formatDecimal(execution.price)}</strong></div>
+          {isOption && <div><span>Option price</span><strong>{execution.option_price === null ? "—" : formatDecimal(execution.option_price)}</strong></div>}
+          <div><span>Quantity</span><strong>{execution.quantity === null ? "—" : formatDecimal(execution.quantity)}</strong></div>
+          <div><span>Reason</span><strong>{execution.exit_reason?.replaceAll("_", " ") ?? "—"}</strong></div>
+          <div className={profitPoint && profitPoint.profit < 0 ? "negative" : "positive"}><span>P&amp;L</span><strong>{profitPoint ? formatSignedAmount(profitPoint.profit) : "—"}</strong></div>
+        </div>;
+      })}
+    </div>}
+    {entryPrice !== null && points.length > 0 && <div className="profit-curve-card"><div><strong>Cumulative profit curve</strong><small>{isOption ? "Option premium difference × contracts × 100" : "Price difference × exited quantity"}</small></div><svg viewBox="0 0 600 180" role="img" aria-label={`Cumulative gross profit ending at ${formatSignedAmount(finalProfit ?? 0)}`}>
+      <line className="profit-zero-line" x1="34" x2="566" y1={148 - ((0 - minimum) / range) * 116} y2={148 - ((0 - minimum) / range) * 116} />
+      <polyline className={finalProfit !== null && finalProfit < 0 ? "profit-line negative" : "profit-line"} points={polyline} />
+      {chartPoints.map((point, index) => <g key={index}><circle className="profit-point" cx={point.x} cy={point.y} r="5" /><text x={point.x} y={Math.max(18, point.y - 11)} textAnchor="middle">{formatSignedAmount(point.value)}</text></g>)}
+    </svg><p>{isOption ? "Uses the standard 100-share option contract multiplier; fees are excluded." : "Gross calculation before fees and market-specific contract multipliers."}</p></div>}
+  </section>;
+}
+
 function ReviewForm({ trade, onReviewed }: ReviewFormProps) {
   const [followedPlan, setFollowedPlan] = useState<FollowedPlan>("yes");
   const [mistakeTags, setMistakeTags] = useState<string[]>([]);
@@ -108,11 +162,15 @@ function ReviewForm({ trade, onReviewed }: ReviewFormProps) {
 
   return (
     <form className="review-card" onSubmit={handleSubmit}>
-      <div className="form-grid three-columns">
-        <div><span>Exit price</span><strong>{trade.exit_price ?? "—"}</strong></div>
-        <div><span>Exit reason</span><strong>{trade.exit_reason?.replaceAll("_", " ") ?? "—"}</strong></div>
-        <div><span>Final R</span><strong>{trade.final_r?.toFixed(2) ?? "—"}</strong></div>
+      <div className="review-exit-summary">
+        <div><span>Open time</span><strong className="summary-date-time">{formatDateTime(trade.opened_at)}</strong></div>
+        <div><span>{trade.market === "options" ? "Underlying entry" : "Open price"}</span><strong>{formatDecimal(trade.actual_entry ?? trade.planned_entry)}</strong></div>
+        <div><span>{trade.market === "options" ? "Underlying exit" : "Exit price"}</span><strong>{trade.exit_price === null ? "—" : formatDecimal(trade.exit_price)}</strong></div>
+        <div><span>Exit reason</span><strong>{trade.exit_reason ? trade.exit_reason.replaceAll("_", " ") : "—"}</strong></div>
+        <div className={trade.final_r !== null && trade.final_r < 0 ? "negative" : "positive"}><span>Final R</span><strong>{trade.final_r === null ? "—" : `${trade.final_r >= 0 ? "+" : ""}${trade.final_r.toFixed(2)}R`}</strong></div>
       </div>
+
+      <ExecutionHistory trade={trade} />
 
       <fieldset>
         <legend>Execution quality</legend>
@@ -222,6 +280,8 @@ function ReviewedTrade({ trade, review }: { trade: Trade; review: Review }) {
         <div><span>Followed plan</span><strong>{review.followed_plan}</strong></div>
       </div>
 
+      <ExecutionHistory trade={trade} />
+
       {(review.mistake_tags.length > 0 || review.positive_actions.length > 0) && (
         <div className="review-tag-groups">
           {review.mistake_tags.length > 0 && (
@@ -265,7 +325,8 @@ function TradeReviewAccordion({ trade, onReviewed, onDeleted }: TradeReviewAccor
       <summary className="trade-summary review-summary">
         <div>
           <p className="eyebrow">Closed {formatDateTime(trade.closed_at)}</p>
-          <h3>{trade.symbol} <span>{trade.direction}</span></h3>
+          <h3>{trade.symbol} <span>{trade.market === "options" ? (trade.direction === "long" ? "Buy" : "Sell") : trade.direction}</span></h3>
+          {trade.market === "options" && trade.option_contract && <p className="review-option-contract">{trade.option_contract}</p>}
         </div>
         <div className="review-summary-meta">
           {trade.review && <strong>{trade.review.discipline_score}/100</strong>}

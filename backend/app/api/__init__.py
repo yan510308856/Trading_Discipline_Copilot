@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter
 
-from app.api import daily_readiness, market_data, reviews, rules, summary, trades
+from app.api import daily_readiness, market_data, notifications, reviews, rules, summary, trades
 
 
 router = APIRouter()
@@ -12,3 +12,4 @@ router.include_router(rules.router)
 router.include_router(market_data.router)
 router.include_router(reviews.router)
 router.include_router(summary.router)
+router.include_router(notifications.router)

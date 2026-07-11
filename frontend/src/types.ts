@@ -110,6 +110,10 @@ export interface RuleDefinition {
 export interface TradeFormState {
   symbol: string;
   option_contract: string;
+  option_type: "call" | "put" | null;
+  option_expiration: string;
+  option_strike: string;
+  option_entry_price: string;
   trade_horizon: TradeHorizon;
   market: Market;
   direction: Direction;
@@ -132,6 +136,10 @@ export interface TradeFormState {
 export interface TradeCreatePayload {
   symbol: string;
   option_contract: string | null;
+  option_type: "call" | "put" | null;
+  option_expiration: string | null;
+  option_strike: number | null;
+  option_entry_price: number | null;
   trade_horizon: TradeHorizon;
   market: Market;
   direction: Direction;
@@ -156,6 +164,7 @@ export interface Trade extends TradeCreatePayload {
   actual_entry: number | null;
   current_stop: number | null;
   current_price: number | null;
+  option_current_price: number | null;
   runner_active: boolean;
   runner_stop: number | null;
   partial_taken: boolean;
@@ -187,12 +196,20 @@ export interface TradeExecution {
   execution_type: "partial" | "final";
   price: number;
   quantity: number | null;
+  exit_reason: ExitReason | null;
+  option_price: number | null;
 }
+
+export type ExitReason =
+  | "partial_profit" | "target_hit" | "stop_hit" | "runner_stop"
+  | "risk_reduction" | "invalidated_setup" | "time_exit" | "manual_exit" | "other";
 
 export interface TradePatchPayload {
   trade_horizon?: TradeHorizon;
   current_stop?: number | null;
   current_price?: number | null;
+  option_current_price?: number | null;
+  option_entry_price?: number | null;
   target_1?: number;
   target_2?: number | null;
   runner_enabled?: boolean;
@@ -205,6 +222,29 @@ export interface TradePatchPayload {
 export interface TradeClosePayload {
   exit_price: number;
   exit_reason: string;
+}
+
+export interface NotificationStatus {
+  email_enabled: boolean;
+  recipient_configured: boolean;
+  smtp_configured: boolean;
+  monitor_enabled: boolean;
+  poll_seconds: number;
+  provider_name: string;
+}
+
+export interface PriceAlertEvent {
+  id: number;
+  trade_id: number;
+  alert_kind: "target_1" | "target_2" | "stop";
+  threshold_price: number;
+  observed_price: number;
+  normalized_threshold_price: string;
+  notification_status: "pending" | "sent" | "failed";
+  attempt_count: number;
+  last_error: string | null;
+  triggered_at: string;
+  sent_at: string | null;
 }
 
 export interface ReviewPayload {

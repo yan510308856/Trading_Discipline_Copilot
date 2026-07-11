@@ -69,18 +69,18 @@ export function OpenTradeAlerts() {
         {items.map((item) => (
           <details className="trade-accordion attention-card" key={item.trade.id}>
             <summary className="trade-summary">
-              <div>
+              <div className="attention-identity">
                 <p className="eyebrow">Trade #{item.trade.id}</p>
                 <h3>{item.trade.symbol} <span>{item.trade.direction}</span></h3>
               </div>
-              <div className="attention-primary">
-                <strong>
-                  {item.current_r === null
-                    ? "Price unavailable"
-                    : `${item.current_r >= 0 ? "+" : ""}${item.current_r.toFixed(2)}R`}
-                </strong>
-                <span>{item.primary_alert?.message ?? "No active discipline warning"}</span>
-              </div>
+              <strong className={item.current_r !== null && item.current_r < 0 ? "attention-r negative" : "attention-r"}>
+                {item.current_r === null
+                  ? "—"
+                  : `${item.current_r >= 0 ? "+" : ""}${item.current_r.toFixed(2)}R`}
+              </strong>
+              <span className="attention-message">
+                {item.primary_alert?.message ?? "No active discipline warning"}
+              </span>
             </summary>
             <RuleAlertPanel status={item.status} alerts={item.alerts} />
           </details>
