@@ -1,7 +1,7 @@
 import { renderToString } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { PriceLadder } from "./PriceLadder";
+import { PriceLadder, spreadLabelPositions } from "./PriceLadder";
 
 describe("PriceLadder", () => {
   it("renders recorded partial exits on the price map", () => {
@@ -34,5 +34,21 @@ describe("PriceLadder", () => {
 
     expect(html).toContain("Stop");
     expect(html).toContain("745");
+  });
+
+  it("automatically separates left labels for nearby prices", () => {
+    const positions = spreadLabelPositions([120, 121, 122]);
+    const sorted = [...positions].sort((left, right) => left - right);
+
+    expect(sorted[1] - sorted[0]).toBeGreaterThanOrEqual(20);
+    expect(sorted[2] - sorted[1]).toBeGreaterThanOrEqual(20);
+  });
+
+  it("applies the same collision offset to labels and right-side prices", () => {
+    const html = renderToString(
+      <PriceLadder entry={245.3} currentPrice={245.34} currentStop={237.68} target1={257.25} target2={null} />,
+    );
+
+    expect(html.match(/transform:translateY\([^)]*px\)/g)).toHaveLength(8);
   });
 });

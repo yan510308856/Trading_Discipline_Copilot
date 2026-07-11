@@ -211,7 +211,7 @@ stop_loss: number
 target_1: number
 target_2: number | null
 runner_enabled: boolean
-position_size: number | null
+    position_size: number
 notes: string
 ```
 
@@ -280,7 +280,15 @@ Target 1 distance: 18 points
 - 缺少 `option_contract` 是 warning，不是 blocker；用户必须确认后才能继续创建计划。
 - Stage 16 不获取实时 option premium，不做 option chain，不计算 Greeks。
 - Symbol price lookup 对 options 只显示 underlying price，不能当作 option premium。
-- Option premium 由用户手动记录；系统不会获取或虚构 premium。期权 Gross P&L 使用 premium 差额、合约数量和标准 100 multiplier，并排除手续费。
+- Option premium may be recorded as execution context, but Stage 23 does not display or calculate premium return, option P&L, or option-based R. All option R and planned-risk calculations use underlying entry, stop, target, current, and exit prices only.
+
+#### Stage 23 operational trust
+
+The Dashboard operational card distinguishes configuration from actual runtime state for the local background monitor and email delivery. It shows the provider, poll interval, last cycle, and latest persisted email result without exposing credentials. Runtime monitor timestamps and errors are intentionally process-local for the single-process deployment and reset after a backend restart.
+
+Automatic option monitoring requests a stock quote for the underlying symbol and stores that underlying quote in `Trade.current_price`. Every stored current price includes a nullable source and update timestamp. Automatic quotes older than 120 seconds are visually stale; manual values remain explicitly labeled manual.
+
+Every newly created plan requires a positive position size. The database column remains nullable only for backward compatibility with legacy rows, which remain editable.
 
 如果 `market != options`，`option_contract` 不需要填写。
 

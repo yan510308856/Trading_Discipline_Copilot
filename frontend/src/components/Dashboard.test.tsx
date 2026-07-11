@@ -14,5 +14,8 @@ describe("Dashboard", () => {
 
     expect(html).toContain("Today at a glance");
     expect(html).toContain("Loading today");
+    expect(html).toContain("Operational health");
+    expect(html).toContain("Price alerts are not fully active");
+    expect(html.lastIndexOf("Intraday Readiness")).toBeGreaterThan(html.indexOf("Operational health"));
   });
 });

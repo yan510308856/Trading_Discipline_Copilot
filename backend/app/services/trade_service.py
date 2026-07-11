@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from decimal import Decimal, ROUND_HALF_UP
+from datetime import datetime, timezone
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
@@ -136,6 +137,10 @@ def update_trade(
         current_r = calculate_final_r(trade, current_price)
         trade.mfe_r = current_r if trade.mfe_r is None else max(trade.mfe_r, current_r)
         trade.mae_r = current_r if trade.mae_r is None else min(trade.mae_r, current_r)
+
+    if "current_price" in updates:
+        updates["current_price_source"] = "manual" if updates["current_price"] is not None else None
+        updates["current_price_updated_at"] = datetime.now(timezone.utc)
 
     for field, value in updates.items():
         setattr(trade, field, value)

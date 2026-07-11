@@ -251,3 +251,8 @@ docker-compose.yml      Local two-container application
 - [Implementation plan](docs/codex_implementation_plan.md)
 - [Engineering workflow](docs/engineering_workflow.md)
 - [Learning log](docs/learning_log.md)
+# Stage 23: operational trust and complete plans
+
+The Dashboard now reports whether the local price monitor is actually running, whether email delivery is fully configured, the last monitor cycle, and the latest persisted alert-email result. Open positions show price source and freshness; automatic quotes older than 120 seconds are marked stale. Runtime monitor timestamps are process-local and reset whenever the backend restarts.
+
+New trade plans require a positive position size so total planned risk can be calculated before creation. Options continue to use underlying entry, stop, target, current, and exit prices for every R calculation. The app does not calculate option-premium return, option P&L, or option-based R.

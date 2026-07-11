@@ -14,22 +14,37 @@ from app.database import get_db
 from app.errors import APIError
 from app.services import trade_service
 from app.services.email_sender import EmailSettings, configured_email_sender, env_bool
+from app.services.price_alert_monitor import runtime_state
 
 router = APIRouter()
 Database = Annotated[Session, Depends(get_db)]
 
 
 @router.get("/notifications/status", response_model=schemas.NotificationStatus)
-def notification_status() -> dict[str, object]:
+def notification_status(database: Database) -> dict[str, object]:
     settings = EmailSettings.from_env()
     sender = configured_email_sender(settings)
+    latest_email = database.scalar(
+        select(models.TradePriceAlertEvent)
+        .order_by(models.TradePriceAlertEvent.updated_at.desc())
+        .limit(1)
+    )
     return {
         "email_enabled": settings.enabled,
         "recipient_configured": bool(settings.recipient),
         "smtp_configured": settings.smtp_configured,
-        "monitor_enabled": env_bool("PRICE_ALERT_MONITOR_ENABLED"),
+        "monitor_configured": env_bool("PRICE_ALERT_MONITOR_ENABLED"),
+        "monitor_running": runtime_state.running,
         "poll_seconds": max(5, int(os.getenv("PRICE_ALERT_POLL_SECONDS", "60"))),
         "provider_name": sender.provider_name,
+        "last_monitor_cycle_at": runtime_state.last_monitor_cycle_at,
+        "last_price_refresh_at": runtime_state.last_price_refresh_at,
+        "last_monitor_error": runtime_state.last_monitor_error,
+        "latest_email_status": latest_email.notification_status if latest_email else None,
+        "latest_email_at": (
+            latest_email.sent_at or latest_email.updated_at or latest_email.triggered_at
+            if latest_email else None
+        ),
     }
 
 

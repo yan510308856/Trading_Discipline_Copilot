@@ -46,6 +46,10 @@ class Trade(Base):
     stop_loss: Mapped[float] = mapped_column(Float)
     current_stop: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     current_price: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    current_price_source: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    current_price_updated_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     target_1: Mapped[float] = mapped_column(Float)
     target_2: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     runner_enabled: Mapped[bool] = mapped_column(Boolean, default=False)

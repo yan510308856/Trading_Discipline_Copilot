@@ -3,6 +3,7 @@ import { APIError, createTrade, evaluateRules, getQuote, getTodayDailyReadiness,
 import type { QuoteResult, RuleEvaluationResult, TradeCreatePayload, TradeFormState } from "../types";
 import { parseDecimalInput } from "../utils/decimal";
 import { calculateRiskReward, optionUnderlyingDirection } from "../utils/tradeCalculations";
+import { optionContractSummary } from "../utils/optionContracts";
 import { buildLocalTradeAlerts, statusFromAlerts } from "../utils/tradePlanGate";
 import { hashForPage } from "../utils/navigation";
 import { ChoiceGroup } from "./ui/ChoiceGroup";
@@ -38,6 +39,12 @@ export function TradeChecklist() {
     ? optionUnderlyingDirection(form.direction, form.option_type)
     : form.direction;
   const riskReward = useMemo(() => entry === null || stop === null || target === null ? null : calculateRiskReward(underlyingDirection, entry, stop, target), [entry, stop, target, underlyingDirection]);
+  const target2 = parseDecimalInput(form.target_2);
+  const totalRisk = riskReward && positionSize !== null && positionSize > 0 ? riskReward.risk * positionSize : null;
+  const target2R = entry === null || stop === null || target2 === null ? null : calculateRiskReward(underlyingDirection, entry, stop, target2).targetR;
+  const canonicalOptionContract = form.market === "options" && form.option_type && form.option_expiration && parseDecimalInput(form.option_strike)
+    ? optionContractSummary(form.symbol, form.option_expiration, parseDecimalInput(form.option_strike)!, form.option_type)
+    : null;
 
   function update<K extends keyof TradeFormState>(field: K, value: TradeFormState[K]) {
     setForm((current) => ({ ...current, [field]: value }));
@@ -55,7 +62,7 @@ export function TradeChecklist() {
   useEffect(() => { void getTodayDailyReadiness().then(setReadiness).catch(() => setReadiness(null)); }, []);
   useEffect(() => {
     const controller = new AbortController();
-    const timer = window.setTimeout(() => void evaluateRules({ status: "planned", trade_horizon: form.trade_horizon, market: form.market, direction: underlyingDirection, setup: form.setup, market_context: form.market_context, planned_entry: entry, stop_loss: stop, target_1: target, follow_through_confirmed: form.follow_through_confirmed, recent_stop_loss: form.recent_stop_loss, is_immediate_reverse: form.is_immediate_reverse, second_leg_entry: form.second_leg_entry, big_bar_entry: form.big_bar_entry }, controller.signal).then(setEvaluation).catch((caught) => { if (!(caught instanceof DOMException && caught.name === "AbortError")) setError("Could not evaluate rules."); }), 250);
+    const timer = window.setTimeout(() => void evaluateRules({ status: "planned", trade_horizon: form.trade_horizon, market: form.market, direction: underlyingDirection, setup: form.setup, market_context: form.market_context, planned_entry: entry, stop_loss: stop, target_1: target, option_contract: canonicalOptionContract, option_type: form.option_type, option_expiration: form.option_expiration || null, option_strike: parseDecimalInput(form.option_strike), follow_through_confirmed: form.follow_through_confirmed, recent_stop_loss: form.recent_stop_loss, is_immediate_reverse: form.is_immediate_reverse, second_leg_entry: form.second_leg_entry, big_bar_entry: form.big_bar_entry }, controller.signal).then(setEvaluation).catch((caught) => { if (!(caught instanceof DOMException && caught.name === "AbortError")) setError("Could not evaluate rules."); }), 250);
     return () => { window.clearTimeout(timer); controller.abort(); };
   }, [form, entry, stop, target, underlyingDirection]);
 
@@ -64,6 +71,18 @@ export function TradeChecklist() {
   const warningGate = status === "warning" && !warningsAcknowledged;
   const step1Valid = Boolean(form.symbol.trim() && form.market && form.direction && form.trade_horizon);
   const step2Valid = Boolean(form.setup && form.market_context && (form.market !== "options" || (form.option_type && form.option_expiration && parseDecimalInput(form.option_strike))));
+  const riskValid = Boolean(riskReward && riskReward.risk > 0 && Number.isFinite(riskReward.targetR));
+  const createDisabled = busy || status === "blocked" || warningGate || !riskValid || positionSize === null || positionSize <= 0;
+  const disabledReason = step === 1 && !form.symbol.trim() ? "Enter a symbol."
+    : step === 2 && !form.setup ? "Choose a setup."
+    : step === 2 && !form.market_context ? "Choose a market context."
+    : step === 3 && (positionSize === null || positionSize <= 0) ? "Position size is required."
+    : step === 3 && !riskValid ? "Stop loss does not define valid risk."
+    : step === 3 && alerts.some((alert) => alert.rule_id === "intraday_daily_readiness_required") ? "Daily readiness is incomplete for an intraday trade."
+    : step === 3 && warningGate ? "Review and acknowledge the active warnings."
+    : step === 3 && status === "blocked" ? (alerts.find((alert) => alert.severity === "blocker")?.message ?? "Resolve the active blocker rules.")
+    : "";
+  const planSummary = <div className="plan-summary"><strong>{form.symbol.trim().toUpperCase() || "Symbol"} · {form.market === "options" ? "Options" : form.market} · {form.market === "options" ? `${form.direction === "long" ? "Buy" : "Sell"} ${form.option_type ? form.option_type[0].toUpperCase() + form.option_type.slice(1) : "Option"}` : form.direction} · {form.trade_horizon}</strong>{form.setup && <span>{form.setup.replaceAll("_", " ")} · {form.market_context.replaceAll("_", " ") || "Context pending"}</span>}{step === 3 && entry !== null && <small>Entry {entry.toFixed(2)} · Stop {stop?.toFixed(2) ?? "—"} · Target {target?.toFixed(2) ?? "—"}</small>}</div>;
 
   function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -72,12 +91,12 @@ export function TradeChecklist() {
   }
 
   async function createConfirmed() {
-    if (entry === null || stop === null || target === null) return;
+    if (entry === null || stop === null || target === null || positionSize === null || positionSize <= 0) return;
     const payload: TradeCreatePayload = {
       symbol: form.symbol.trim().toUpperCase(), market: form.market, direction: form.direction, trade_horizon: form.trade_horizon,
       setup: form.setup, market_context: form.market_context, planned_entry: entry, stop_loss: stop, target_1: target,
-      target_2: parseDecimalInput(form.target_2), position_size: parseDecimalInput(form.position_size), runner_enabled: form.runner_enabled,
-      notes: form.notes.trim() || null, option_contract: null, option_type: form.market === "options" ? form.option_type : null,
+      target_2: parseDecimalInput(form.target_2), position_size: positionSize, runner_enabled: form.runner_enabled,
+      notes: form.notes.trim() || null, option_contract: canonicalOptionContract, option_type: form.market === "options" ? form.option_type : null,
       option_expiration: form.market === "options" ? form.option_expiration : null, option_strike: form.market === "options" ? parseDecimalInput(form.option_strike) : null,
       option_entry_price: form.market === "options" ? parseDecimalInput(form.option_entry_price) : null,
     };
@@ -106,22 +125,23 @@ export function TradeChecklist() {
         <ChoiceGroup label={form.market === "options" ? "Action" : "Direction"} choices={form.market === "options" ? [{value:"long",label:"Buy"},{value:"short",label:"Sell"}] : [{value:"long",label:"Long"},{value:"short",label:"Short"}]} value={form.direction} onChange={(value) => update("direction", value)} />
         <ChoiceGroup label="Trade horizon" choices={[{value:"intraday",label:"Intraday"},{value:"swing",label:"Swing"},{value:"leap",label:"LEAP"},{value:"other",label:"Other"}]} value={form.trade_horizon} onChange={(value) => update("trade_horizon", value)} />
       </section>}
-      {step === 2 && <section><h3>Setup & Context</h3>
+      {step === 2 && <section>{planSummary}<h3>Setup & Context</h3>
         <ChoiceGroup label="Setup" choices={choices(setups)} value={form.setup || null} onChange={(value) => update("setup", value)} />
         <ChoiceGroup label="Market context" choices={choices(contexts)} value={form.market_context || null} onChange={(value) => update("market_context", value)} />
         {form.market === "options" && <div className="option-planning-block"><div className="option-quote-toolbar"><div><strong>{form.symbol.trim().toUpperCase() || "Option"} contract</strong><small>Select your date and contract details below.</small></div><button type="button" className="secondary-button" disabled={busy || !form.symbol.trim()} onClick={() => void fetchPrice()}>{busy ? "Fetching…" : "Get strike suggestions"}</button></div><OptionContractSelector symbol={form.symbol} quote={quote} type={form.option_type} expiration={form.option_expiration} strike={form.option_strike} onChange={(values) => setForm((current) => ({ ...current, option_type: values.type ?? current.option_type, option_expiration: values.expiration ?? current.option_expiration, option_strike: values.strike ?? current.option_strike }))} /></div>}
       </section>}
-      {step === 3 && <section><h3>Risk & Discipline</h3><div className="form-grid three-columns">
-        {["planned_entry", "stop_loss", "target_1", "target_2", "position_size"].map((field) => <label key={field}>{field.replaceAll("_", " ")}{["planned_entry","stop_loss","target_1"].includes(field) ? " *" : ""}<input type="number" step="0.01" value={String(form[field as keyof TradeFormState])} onChange={(event) => update(field as "planned_entry", event.target.value)} /></label>)}
+      {step === 3 && <section>{planSummary}<h3>Risk & Discipline</h3><div className="risk-cockpit"><div className="risk-inputs"><div className="form-grid three-columns">
+        {["planned_entry", "stop_loss", "target_1", "target_2", "position_size"].map((field) => <label key={field}>{field.replaceAll("_", " ")}{["planned_entry","stop_loss","target_1","position_size"].includes(field) ? " *" : ""}<input type="number" min={field === "position_size" ? "0.01" : undefined} step="0.01" value={String(form[field as keyof TradeFormState])} onChange={(event) => update(field as "planned_entry", event.target.value)} />{field === "position_size" && <small>Position size is required because total planned risk cannot be validated without it.</small>}</label>)}
       </div>
-      <div className="risk-summary"><div><span>Risk per unit</span><strong>{riskReward?.risk.toFixed(2) ?? "—"}</strong></div><div><span>Planned R/R</span><strong>{riskReward && Number.isFinite(riskReward.targetR) ? `${riskReward.targetR.toFixed(2)}R` : "—"}</strong></div><div><span>Total planned risk</span><strong>{riskReward && positionSize !== null ? (riskReward.risk * positionSize).toFixed(2) : "—"}</strong></div></div>
+      <label className="check-row"><input type="checkbox" checked={form.runner_enabled} onChange={(event) => update("runner_enabled", event.target.checked)} />Keep a runner after partial profit</label>
       <div className="check-list"><label className="check-row"><input type="checkbox" checked={form.recent_stop_loss} onChange={(event) => update("recent_stop_loss", event.target.checked)} />Recently stopped out</label>{form.setup === "breakout" && <label className="check-row"><input type="checkbox" checked={form.follow_through_confirmed} onChange={(event) => update("follow_through_confirmed", event.target.checked)} />Follow-through confirmed</label>}</div>
-      <RuleAlertPanel status={status} alerts={alerts} />{status === "warning" && <label className="warning-acknowledgement"><input type="checkbox" checked={warningsAcknowledged} onChange={(event) => setWarningsAcknowledged(event.target.checked)} />I reviewed and accept these warnings.</label>}
-      <label>Notes<textarea rows={3} value={form.notes} onChange={(event) => update("notes", event.target.value)} /></label><button className="primary-button" disabled={busy || status === "blocked" || warningGate || entry === null || stop === null || target === null}>Create Trade Plan</button>
+      <label>Notes<textarea rows={3} value={form.notes} onChange={(event) => update("notes", event.target.value)} /></label></div>
+      <aside className="risk-decision-panel"><RuleAlertPanel status={status} alerts={alerts} /><section className="required-action"><span>Required Action</span><strong>{disabledReason || "Review the complete plan before creating it."}</strong></section><div className="risk-summary"><div><span>Risk per unit</span><strong>{riskReward?.risk.toFixed(2) ?? "—"}</strong></div><div><span>Position size</span><strong>{positionSize?.toFixed(2) ?? "—"}</strong></div><div><span>Total planned risk</span><strong>{totalRisk?.toFixed(2) ?? "—"}</strong></div><div><span>Target 1 R</span><strong>{riskReward && Number.isFinite(riskReward.targetR) ? `${riskReward.targetR.toFixed(2)}R` : "—"}</strong></div>{target2 !== null && <div><span>Target 2 R</span><strong>{target2R !== null && Number.isFinite(target2R) ? `${target2R.toFixed(2)}R` : "—"}</strong></div>}<div><span>Decision</span><strong>{status[0].toUpperCase() + status.slice(1)}</strong></div></div>{status === "warning" && <label className="warning-acknowledgement"><input type="checkbox" checked={warningsAcknowledged} onChange={(event) => setWarningsAcknowledged(event.target.checked)} />I reviewed and accept these warnings.</label>}</aside></div>
+      <button className="primary-button" disabled={createDisabled}>Create Trade Plan</button>{createDisabled && disabledReason && <p className="disabled-action-reason">{disabledReason}</p>}
       </section>}
     </div>
-    <div className="wizard-actions">{step > 1 && <button type="button" className="wizard-back-button" onClick={() => setStep(step - 1)}><span aria-hidden="true">←</span> Back</button>}{step < 3 && <button type="button" className="primary-button" disabled={step === 1 ? !step1Valid : !step2Valid} onClick={() => setStep(step + 1)}>Continue</button>}</div>
-    {confirmingCreate && <div className="confirmation-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setConfirmingCreate(false); }}><section className="exit-confirmation create-confirmation" role="dialog" aria-modal="true" aria-labelledby="create-trade-confirmation"><span className="confirmation-icon" aria-hidden="true">✓</span><div><p className="eyebrow">Create trade plan</p><h3 id="create-trade-confirmation">Create this {form.symbol.trim().toUpperCase()} plan?</h3></div><dl className="exit-confirmation-details"><div><dt>Market</dt><dd>{form.market}</dd></div><div><dt>{form.market === "options" ? "Action" : "Direction"}</dt><dd>{form.market === "options" ? (form.direction === "long" ? "buy" : "sell") : form.direction}</dd></div><div><dt>Entry</dt><dd>{form.planned_entry}</dd></div><div><dt>Position size</dt><dd>{form.position_size || "—"}</dd></div></dl><p className="create-clear-note">After creation, this form will be cleared for the next trade.</p><div className="confirmation-actions"><button type="button" className="secondary-button" onClick={() => setConfirmingCreate(false)}>Cancel</button><button type="button" className="primary-button" disabled={busy} onClick={() => void createConfirmed()}>{busy ? "Creating…" : "Confirm and create"}</button></div></section></div>}
+    <div className="wizard-actions">{step > 1 && <button type="button" className="wizard-back-button" onClick={() => setStep(step - 1)}><span aria-hidden="true">←</span> Back</button>}{step < 3 && <button type="button" className="primary-button" disabled={step === 1 ? !step1Valid : !step2Valid} onClick={() => setStep(step + 1)}>Continue</button>}</div>{step < 3 && disabledReason && <p className="disabled-action-reason">{disabledReason}</p>}
+    {confirmingCreate && <div className="confirmation-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setConfirmingCreate(false); }}><section className={`exit-confirmation create-confirmation decision-${status}`} role="dialog" aria-modal="true" aria-labelledby="create-trade-confirmation"><span className="confirmation-icon" aria-hidden="true">✓</span><div><p className="eyebrow">Final plan verification · {status}</p><h3 id="create-trade-confirmation">Create this {form.symbol.trim().toUpperCase()} plan?</h3></div><dl className="exit-confirmation-details"><div><dt>Symbol</dt><dd>{form.symbol.trim().toUpperCase()}</dd></div><div><dt>Market</dt><dd>{form.market}</dd></div><div><dt>{form.market === "options" ? "Action" : "Direction"}</dt><dd>{form.market === "options" ? (form.direction === "long" ? "buy" : "sell") : form.direction}</dd></div><div><dt>Horizon</dt><dd>{form.trade_horizon}</dd></div><div><dt>Setup</dt><dd>{form.setup.replaceAll("_", " ")}</dd></div><div><dt>Context</dt><dd>{form.market_context.replaceAll("_", " ")}</dd></div>{canonicalOptionContract && <div><dt>Option contract</dt><dd>{canonicalOptionContract}</dd></div>}<div><dt>Entry</dt><dd>{entry?.toFixed(2)}</dd></div><div className="critical-plan-fact"><dt>Stop</dt><dd>{stop?.toFixed(2)}</dd></div><div><dt>Target 1</dt><dd>{target?.toFixed(2)}</dd></div><div><dt>Target 2</dt><dd>{target2?.toFixed(2) ?? "—"}</dd></div><div><dt>Position size</dt><dd>{positionSize?.toFixed(2)}</dd></div><div><dt>Risk per unit</dt><dd>{riskReward?.risk.toFixed(2)}</dd></div><div className="critical-plan-fact"><dt>Total planned risk</dt><dd>{totalRisk?.toFixed(2)}</dd></div><div><dt>Planned R/R</dt><dd>{riskReward?.targetR.toFixed(2)}R</dd></div><div><dt>Warning count</dt><dd>{alerts.filter((alert) => alert.severity === "warning").length}</dd></div></dl>{alerts.length > 0 && <ul className="confirmation-warnings">{alerts.map((alert) => <li key={alert.rule_id}>{alert.message}</li>)}</ul>}<div className="confirmation-actions"><button type="button" className="secondary-button" onClick={() => setConfirmingCreate(false)}>Cancel</button><button type="button" className="primary-button" disabled={createDisabled} onClick={() => void createConfirmed()}>{busy ? "Creating…" : "Confirm and create"}</button></div></section></div>}
     {message && <p className="form-message success-message">{message}</p>}{error && <p className="form-message error-message">{error}</p>}
   </form>;
 }

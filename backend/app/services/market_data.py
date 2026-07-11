@@ -150,19 +150,31 @@ def refresh_open_trade_prices(
         )
     )
     errors: list[dict[str, str]] = []
+    refreshed_at: datetime | None = None
     for trade in trades:
         try:
-            quote = provider.latest_quote(trade.symbol, trade.market)
+            quote_market = "stocks" if trade.market == "options" else trade.market
+            quote = provider.latest_quote(trade.symbol, quote_market)
         except APIError as error:
             errors.append({"symbol": trade.symbol, "message": error.message})
             continue
         if quote is None:
             continue
         trade.current_price = quote.price
+        trade.current_price_source = quote.source
+        trade.current_price_updated_at = (
+            datetime.fromtimestamp(quote.quoted_at, timezone.utc)
+            if quote.quoted_at is not None
+            else datetime.now(timezone.utc)
+        )
+        refreshed_at = datetime.now(timezone.utc)
         current_r = calculate_final_r(trade, quote.price)
         trade.mfe_r = current_r if trade.mfe_r is None else max(trade.mfe_r, current_r)
         trade.mae_r = current_r if trade.mae_r is None else min(trade.mae_r, current_r)
     database.commit()
+    if refreshed_at is not None:
+        from app.services.price_alert_monitor import record_price_refresh
+        record_price_refresh(refreshed_at)
     for trade in trades:
         database.refresh(trade)
         if trade.current_price is not None:

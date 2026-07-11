@@ -23,6 +23,7 @@ import {
   resolvedUnderlyingDirection,
 } from "../utils/tradeCalculations";
 import { PriceLadder } from "./PriceLadder";
+import { PriceFreshness } from "./PriceFreshness";
 import { RuleAlertPanel } from "./RuleAlertPanel";
 import { DeleteTradeButton } from "./DeleteTradeButton";
 import {
@@ -452,18 +453,21 @@ function TradeCard({ trade, onUpdated, defaultExpanded, onDeleted, onAutoClosed 
           setCurrentPrice(value === null ? "" : formatDecimal(value));
           await update({ current_price: value });
         }} />
+        <div className="price-freshness-fact"><span>Price status</span><PriceFreshness source={trade.current_price_source} updatedAt={trade.current_price_updated_at} /></div>
         {trade.market === "options" && <EditableMetric label="Option entry" value={trade.option_entry_price} required onSave={(value) => update({ option_entry_price: value })} />}
-        <EditableMetric
-          label="Target 1"
-          value={trade.target_1}
-          required
-          onSave={(value) => update({ target_1: value ?? trade.target_1 })}
-        />
-        <EditableMetric
-          label="Target 2"
-          value={trade.target_2}
-          onSave={(value) => update({ target_2: value })}
-        />
+        <div className="combined-targets-metric">
+          <EditableMetric
+            label="Target 1"
+            value={trade.target_1}
+            required
+            onSave={(value) => update({ target_1: value ?? trade.target_1 })}
+          />
+          <EditableMetric
+            label="Target 2"
+            value={trade.target_2}
+            onSave={(value) => update({ target_2: value })}
+          />
+        </div>
         <EditableMetric
           label="Position size"
           value={trade.position_size}
