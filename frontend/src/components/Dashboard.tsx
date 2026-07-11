@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { APIError, getHealth, refreshOpenPrices } from "../api";
-import { useDailySummaryQuery } from "../hooks/queries";
+import { useDailySummaryQuery, useNotificationStatusQuery, useTestEmailMutation } from "../hooks/queries";
 import type { ConnectionState, Trade } from "../types";
 import { groupTradesByMarket } from "../utils/tradeGrouping";
 import { calculateCurrentR, calculatePositionBreakdown, resolvedUnderlyingDirection } from "../utils/tradeCalculations";
@@ -16,6 +16,7 @@ import { SummaryCards } from "./SummaryCards";
 import { Button } from "./ui/Button";
 import { Panel } from "./ui/Panel";
 import { StatusBadge } from "./ui/StatusBadge";
+import { PriceFreshness } from "./PriceFreshness";
 
 const connectionCopy: Record<ConnectionState, string> = {
   checking: "Checking backend…",
@@ -37,11 +38,21 @@ export function Dashboard() {
   const [quoteError, setQuoteError] = useState("");
   const [isRefreshingQuotes, setIsRefreshingQuotes] = useState(false);
   const summaryQuery = useDailySummaryQuery(undefined, horizonForApi(summaryHorizon));
+  const notificationQuery = useNotificationStatusQuery();
+  const testEmail = useTestEmailMutation();
   const summary = summaryQuery.data ?? null;
   const openTradeGroups = groupTradesByMarket(openTrades);
   const summaryError = summaryQuery.error
     ? requestErrorMessage(summaryQuery.error)
     : "";
+  const notifications = notificationQuery.data;
+  const alertsReliable = connection === "connected" && Boolean(
+    notifications?.monitor_running && notifications.email_enabled &&
+    notifications.recipient_configured && notifications.smtp_configured &&
+    !notifications.last_monitor_error && notifications.latest_email_status !== "failed",
+  );
+  const monitorLabel = !notifications?.monitor_configured ? "Disabled" : !notifications.monitor_running ? "Misconfigured" : notifications.last_monitor_error ? "Error" : "Running";
+  const emailLabel = !notifications?.email_enabled ? "Disabled" : !notifications.recipient_configured || !notifications.smtp_configured ? "Misconfigured" : notifications.latest_email_status === "failed" ? "Last send failed" : "Active";
 
   const refreshQuotes = useCallback(async () => {
     setIsRefreshingQuotes(true);
@@ -167,7 +178,7 @@ export function Dashboard() {
                       <article className="unrealized-row" key={trade.id}>
                         <div className="unrealized-symbol"><strong>{trade.symbol}</strong><span>{trade.market === "options" ? (trade.direction === "long" ? "Buy" : "Sell") : trade.direction}</span>{trade.option_contract && <small>{trade.option_contract}</small>}</div>
                         <div><span>Remaining</span><strong>{remaining === null ? "—" : remaining.toFixed(2)}</strong></div>
-                        <div><span>{trade.market === "options" ? "Underlying" : "Current price"}</span><strong>{trade.current_price === null ? "—" : formatDecimal(trade.current_price)}</strong></div>
+                        <div><span>{trade.market === "options" ? "Underlying price" : "Current price"}</span><strong>{trade.current_price === null ? "—" : formatDecimal(trade.current_price)}</strong><PriceFreshness source={trade.current_price_source} updatedAt={trade.current_price_updated_at} /></div>
                         <div className={currentR !== null && currentR < 0 ? "metric-negative" : "metric-positive"}><span>Current R</span><strong>{currentR === null || !Number.isFinite(currentR) ? "—" : `${currentR >= 0 ? "+" : ""}${currentR.toFixed(2)}R`}</strong></div>
                         <div className={priceReturn !== null && priceReturn < 0 ? "metric-negative" : "metric-positive"}><span>Price return</span><strong>{priceReturn === null ? "—" : `${priceReturn >= 0 ? "+" : ""}${priceReturn.toFixed(2)}%`}</strong></div>
                       </article>
@@ -185,15 +196,26 @@ export function Dashboard() {
           <div className="card-heading">
             <div>
               <p className="eyebrow">System status</p>
-              <h3>Backend connection</h3>
+              <h3>Operational health</h3>
             </div>
             <StatusBadge variant={connection} showDot>
               {connectionCopy[connection]}
             </StatusBadge>
           </div>
-          <p className="muted">
-            Summary data comes from the FastAPI <code>/summary/daily</code> endpoint.
-          </p>
+          {!alertsReliable && <p className="alert-reliability-warning">Price alerts are not fully active. Do not rely on email notifications.</p>}
+          <dl className="operational-status-list">
+            <div><dt>Backend</dt><dd>{connection === "connected" ? "Connected" : "Unavailable"}</dd></div>
+            <div><dt>Price monitor</dt><dd>{monitorLabel}</dd></div>
+            <div><dt>Email notifications</dt><dd>{emailLabel}</dd></div>
+            <div><dt>Recipient configured</dt><dd>{notifications?.recipient_configured ? "Yes" : "No"}</dd></div>
+            <div><dt>Provider</dt><dd>{notifications?.provider_name ?? "—"}</dd></div>
+            <div><dt>Poll interval</dt><dd>{notifications ? `${notifications.poll_seconds} seconds` : "—"}</dd></div>
+            <div><dt>Last monitor cycle</dt><dd>{notifications?.last_monitor_cycle_at ? new Date(notifications.last_monitor_cycle_at).toLocaleString() : "Not recorded"}</dd></div>
+            <div><dt>Latest email result</dt><dd>{notifications?.latest_email_status ?? "No alert email recorded"}</dd></div>
+          </dl>
+          <Button variant="secondary" disabled={testEmail.isPending || !notifications?.email_enabled} onClick={() => testEmail.mutate()}>{testEmail.isPending ? "Sending…" : "Send Test Email"}</Button>
+          {testEmail.isSuccess && <p className="form-message success-message">Test email sent.</p>}
+          {testEmail.isError && <p className="form-message error-message">{requestErrorMessage(testEmail.error)}</p>}
           {connection === "unavailable" && (
             <Button
               variant="secondary"

@@ -1238,3 +1238,11 @@ full UI redesign.
 
 Stage 22 adds durable email alerts, execution-led closure, inline cockpit editing,
 and a three-step option-aware planner. See `stage22_live_alerts_and_execution_workflow.md`.
+# Stage 23 implementation
+
+- Add process-local monitor runtime state and persisted latest-email reporting.
+- Persist current-price source and timestamp with an additive migration.
+- Refresh option underlyings through the stock quote provider.
+- Require positive position size for new plans while preserving legacy nullable rows.
+- Expand Dashboard health, price freshness, risk cockpit, plan summaries, disabled reasons, and final confirmation.
+- Preserve Rule Alerts, OptionContractSelector, Daily Readiness placement, and underlying-only option R.

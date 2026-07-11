@@ -17,4 +17,10 @@ describe("TradeChecklist", () => {
   it("defaults new plans to intraday", () => {
     expect(initialForm.trade_horizon).toBe("intraday");
   });
+
+  it("explains disabled creation prerequisites and position-size risk", () => {
+    const html = renderToString(<TradeChecklist />);
+    expect(html).toContain("Enter a symbol.");
+    expect(initialForm.position_size).toBe("");
+  });
 });

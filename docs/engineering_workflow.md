@@ -609,3 +609,6 @@ Documented learning
 
 Keep monitoring disabled during tests, use fake market/email providers, migrate
 before startup, and verify Compose forwards SMTP secrets only at runtime.
+# Stage 23 verification note
+
+After pulling Stage 23, run `alembic upgrade head` before starting the backend. Operational health is process-local: restarting the backend clears last-cycle, last-refresh, and monitor-error timestamps until the next cycle. Verify automatic and manual price provenance separately, and never treat the status endpoint as a source of SMTP credentials.

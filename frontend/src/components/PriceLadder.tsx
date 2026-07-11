@@ -18,6 +18,41 @@ interface PriceLadderProps {
   partialExits?: PartialExitLevel[];
 }
 
+const TRACK_HEIGHT_PX = 260;
+const LABEL_MIN_GAP_PX = 20;
+const LABEL_EDGE_PADDING_PX = 8;
+
+export function spreadLabelPositions(
+  positions: number[],
+  minimumGap = LABEL_MIN_GAP_PX,
+  minimum = LABEL_EDGE_PADDING_PX,
+  maximum = TRACK_HEIGHT_PX - LABEL_EDGE_PADDING_PX,
+): number[] {
+  if (positions.length < 2) return [...positions];
+  const indexed = positions
+    .map((position, index) => ({ position, index }))
+    .sort((left, right) => left.position - right.position);
+  const adjusted = indexed.map((item) => item.position);
+
+  for (let index = 1; index < adjusted.length; index += 1) {
+    adjusted[index] = Math.max(adjusted[index], adjusted[index - 1] + minimumGap);
+  }
+  if (adjusted[adjusted.length - 1] > maximum) {
+    adjusted[adjusted.length - 1] = maximum;
+    for (let index = adjusted.length - 2; index >= 0; index -= 1) {
+      adjusted[index] = Math.min(adjusted[index], adjusted[index + 1] - minimumGap);
+    }
+  }
+  if (adjusted[0] < minimum) {
+    const shift = minimum - adjusted[0];
+    for (let index = 0; index < adjusted.length; index += 1) adjusted[index] += shift;
+  }
+
+  const restored = Array<number>(positions.length);
+  indexed.forEach((item, index) => { restored[item.index] = adjusted[index]; });
+  return restored;
+}
+
 export function PriceLadder({
   entry,
   currentPrice,
@@ -46,6 +81,12 @@ export function PriceLadder({
   const minimum = Math.min(...prices);
   const maximum = Math.max(...prices);
   const range = maximum - minimum || 1;
+  const markerTops = levels.map(
+    (level) => 7 + ((maximum - (level.value as number)) / range) * 86,
+  );
+  const labelTops = spreadLabelPositions(
+    markerTops.map((top) => (top / 100) * TRACK_HEIGHT_PX),
+  );
 
   return (
     <section className="price-ladder" aria-label="Trade price levels">
@@ -57,17 +98,18 @@ export function PriceLadder({
         <span>Manual price fallback</span>
       </div>
       <div className="price-ladder-track">
-        {levels.map((level) => {
-          const top = 7 + ((maximum - (level.value as number)) / range) * 86;
+        {levels.map((level, index) => {
+          const top = markerTops[index];
+          const labelOffset = labelTops[index] - (top / 100) * TRACK_HEIGHT_PX;
           return (
             <div
               className={`price-marker price-${level.kind}`}
               style={{ top: `${top}%` }}
               key={level.label}
             >
-              <span>{level.label}</span>
+              <span style={{ transform: `translateY(${labelOffset}px)` }}>{level.label}</span>
               <i aria-hidden="true" />
-              <strong>{level.value}</strong>
+              <strong style={{ transform: `translateY(${labelOffset}px)` }}>{level.value}</strong>
             </div>
           );
         })}

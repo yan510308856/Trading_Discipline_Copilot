@@ -77,7 +77,7 @@ class TradeCreate(BaseModel):
     target_2: Optional[float] = None
     runner_enabled: bool = False
     runner_active: bool = False
-    position_size: Optional[float] = Field(default=None, gt=0)
+    position_size: float = Field(gt=0)
     risk_per_trade: Optional[float] = Field(default=None, ge=0)
     notes: Optional[str] = None
 
@@ -129,6 +129,9 @@ class TradeRead(TradeCreate):
     status: TradeStatus
     current_stop: Optional[float]
     current_price: Optional[float]
+    current_price_source: Optional[str]
+    current_price_updated_at: Optional[datetime]
+    position_size: Optional[float] = None
     option_current_price: Optional[float]
     runner_stop: Optional[float]
     partial_taken: bool
@@ -262,9 +265,15 @@ class NotificationStatus(BaseModel):
     email_enabled: bool
     recipient_configured: bool
     smtp_configured: bool
-    monitor_enabled: bool
+    monitor_configured: bool
+    monitor_running: bool
     poll_seconds: int
     provider_name: str
+    last_monitor_cycle_at: Optional[datetime]
+    last_price_refresh_at: Optional[datetime]
+    last_monitor_error: Optional[str]
+    latest_email_status: Optional[Literal["pending", "sent", "failed"]]
+    latest_email_at: Optional[datetime]
 
 
 class ChecklistAnswerBatch(BaseModel):

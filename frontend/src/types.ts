@@ -150,11 +150,11 @@ export interface TradeCreatePayload {
   target_1: number;
   target_2: number | null;
   runner_enabled: boolean;
-  position_size: number | null;
+  position_size: number;
   notes: string | null;
 }
 
-export interface Trade extends TradeCreatePayload {
+export interface Trade extends Omit<TradeCreatePayload, "position_size"> {
   id: number;
   status: "planned" | "open" | "closed" | "cancelled";
   created_at: string;
@@ -164,6 +164,9 @@ export interface Trade extends TradeCreatePayload {
   actual_entry: number | null;
   current_stop: number | null;
   current_price: number | null;
+  current_price_source: string | null;
+  current_price_updated_at: string | null;
+  position_size: number | null;
   option_current_price: number | null;
   runner_active: boolean;
   runner_stop: number | null;
@@ -228,9 +231,15 @@ export interface NotificationStatus {
   email_enabled: boolean;
   recipient_configured: boolean;
   smtp_configured: boolean;
-  monitor_enabled: boolean;
+  monitor_configured: boolean;
+  monitor_running: boolean;
   poll_seconds: number;
   provider_name: string;
+  last_monitor_cycle_at: string | null;
+  last_price_refresh_at: string | null;
+  last_monitor_error: string | null;
+  latest_email_status: "pending" | "sent" | "failed" | null;
+  latest_email_at: string | null;
 }
 
 export interface PriceAlertEvent {

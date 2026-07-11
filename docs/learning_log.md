@@ -628,3 +628,9 @@ No trading behavior changed. This stage improves frontend maintainability so rea
 - Execution-led lifecycle derives closure from cumulative quantity; weighted R uses every fill.
 - Wizard state and accessible pressed buttons reduce repeated interaction.
 - Additive nullable migrations preserve legacy option and execution records.
+# Stage 23 learning notes
+
+- “Configured” and “running” are different operational facts; trustworthy status must report both.
+- Durable email outcomes belong in persisted alert events, while lightweight loop liveness can remain process-local for a single-process local app.
+- Additive nullable columns preserve old data while API create validation can enforce stronger requirements for all new records.
+- Option risk stays coherent when quote refresh, alerts, and R calculations all use the same underlying-price model.
