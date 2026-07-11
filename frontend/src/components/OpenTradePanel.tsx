@@ -33,7 +33,7 @@ import {
 } from "./HorizonFilter";
 import { usePriceAlertEventsQuery } from "../hooks/queries";
 import { useQueryClient } from "@tanstack/react-query";
-import { contextFromHash, hashWithContext } from "../utils/navigation";
+import { contextFromHash, hashWithContext, positiveIntegerContext } from "../utils/navigation";
 
 interface TradeCardProps {
   trade: Trade;
@@ -615,8 +615,8 @@ export function OpenTradePanel() {
     [loaded.trades],
   );
   const tradeGroups = useMemo(() => groupTradesByMarket(trades), [trades]);
-  const selectedTradeId = Number(contextFromHash(window.location.hash).get("trade_id"));
-  const hasSelectedTrade = Number.isInteger(selectedTradeId) && trades.some((trade) => trade.id === selectedTradeId);
+  const selectedTradeId = positiveIntegerContext(contextFromHash(window.location.hash), "trade_id");
+  const hasSelectedTrade = selectedTradeId !== null && trades.some((trade) => trade.id === selectedTradeId);
 
   useEffect(() => {
     if (!hasSelectedTrade) return;
@@ -656,7 +656,7 @@ export function OpenTradePanel() {
 
       {isLoading && <p className="empty-state">Loading active trades…</p>}
       {error && <p className="form-message error-message">{error}</p>}
-      {Number.isInteger(selectedTradeId) && !isLoading && !hasSelectedTrade && <p className="form-message error-message">The requested active trade was not found.</p>}
+      {selectedTradeId !== null && !isLoading && !hasSelectedTrade && <p className="form-message error-message">The requested active trade was not found.</p>}
       {!isLoading && !error && trades.length === 0 && (
         <div className="empty-state">
           <strong>No planned or open trades.</strong>

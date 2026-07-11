@@ -29,3 +29,13 @@ export function contextFromHash(hash: string): URLSearchParams {
   const query = hash.split("?")[1] ?? "";
   return new URLSearchParams(query);
 }
+
+export function positiveIntegerContext(
+  context: URLSearchParams,
+  key: string,
+): number | null {
+  const rawValue = context.get(key);
+  if (rawValue === null || !/^\d+$/.test(rawValue)) return null;
+  const value = Number(rawValue);
+  return Number.isSafeInteger(value) && value > 0 ? value : null;
+}

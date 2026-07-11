@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { navigation } from "../App";
-import { contextFromHash, hashForPage, hashWithContext, pageFromHash } from "./navigation";
+import { contextFromHash, hashForPage, hashWithContext, pageFromHash, positiveIntegerContext } from "./navigation";
 
 describe("page navigation", () => {
   it("restores a known page from the URL hash", () => {
@@ -32,5 +32,13 @@ describe("page navigation", () => {
   it("renames Rule Alerts to Attention", () => {
     expect(navigation.find((item) => item.id === "attention")?.label).toBe("Attention");
     expect(navigation.some((item) => item.label === "Rule Alerts")).toBe(false);
+  });
+
+  it("parses only explicitly provided positive integer trade IDs", () => {
+    expect(positiveIntegerContext(contextFromHash("#open-trades"), "trade_id")).toBeNull();
+    expect(positiveIntegerContext(contextFromHash("#open-trades?trade_id=abc"), "trade_id")).toBeNull();
+    expect(positiveIntegerContext(contextFromHash("#open-trades?trade_id=0"), "trade_id")).toBeNull();
+    expect(positiveIntegerContext(contextFromHash("#open-trades?trade_id=-2"), "trade_id")).toBeNull();
+    expect(positiveIntegerContext(contextFromHash("#open-trades?trade_id=123"), "trade_id")).toBe(123);
   });
 });
