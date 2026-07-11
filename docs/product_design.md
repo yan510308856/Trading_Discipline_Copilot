@@ -964,3 +964,10 @@ Stage 6 起:
 - 默认不接真实 broker、不自动交易，先做纪律工具和只读记录。
 
 推荐把 `engineering_workflow.md` 作为第三份核心文档，与 `product_design.md` 和 `codex_implementation_plan.md` 一起提供给 Codex。
+## Stage 24 — Attention Center and Manage-to-Review
+
+`Rule Alerts` is renamed `Attention`. The Attention Center is not general notification history: it includes only active items that require a user decision or correction. Backend normalization combines trade rules, missing management facts, stale prices, failed alert emails, pending reviews, and notification configuration into one stable shape and deterministic priority order.
+
+Attention does not show a navigation count and is not duplicated on Dashboard. Deep links preserve destination context after reload and select the exact open or closed trade. The workflow explicitly continues from Manage → Exit → Review, while Open Trades retains its local `RuleAlertPanel` for in-context management.
+
+Daily Readiness remains the final Dashboard section. Option risk and Final R continue to use underlying prices only. Stage 24 adds no premium-return metric, option P&L feature, broker integration, or order execution.

@@ -612,3 +612,6 @@ before startup, and verify Compose forwards SMTP secrets only at runtime.
 # Stage 23 verification note
 
 After pulling Stage 23, run `alembic upgrade head` before starting the backend. Operational health is process-local: restarting the backend clears last-cycle, last-refresh, and monitor-error timestamps until the next cycle. Verify automatic and manual price provenance separately, and never treat the status endpoint as a source of SMTP credentials.
+## Stage 24 operational checks
+
+When changing a state that can resolve an Attention item, invalidate the `attention` TanStack Query prefix so open Attention views update immediately. Test deep links both through in-app navigation and a full page reload. Attention sources must disappear when resolved; historical successful email delivery is never an active item.

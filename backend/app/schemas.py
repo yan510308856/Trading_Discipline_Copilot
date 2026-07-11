@@ -377,6 +377,40 @@ class OpenTradeAttention(BaseModel):
     alerts: list[RuleAlert]
 
 
+class AttentionItem(BaseModel):
+    id: str
+    source_type: Literal[
+        "trade_rule", "missing_position_size", "missing_stop",
+        "runner_unprotected", "profit_milestone", "green_to_red",
+        "stale_price", "failed_email", "pending_review",
+        "notification_configuration",
+    ]
+    severity: Literal["blocker", "warning", "reminder"]
+    title: str
+    message: str
+    required_action: str
+    trade_id: Optional[int] = None
+    symbol: Optional[str] = None
+    trade_horizon: Optional[TradeHorizon] = None
+    current_r: Optional[float] = None
+    detected_at: datetime
+    destination_page: Literal["dashboard", "open-trades", "post-trade-review"]
+    destination_context: dict[str, str] = Field(default_factory=dict)
+    time_sensitive: bool = False
+
+
+class AttentionCounts(BaseModel):
+    blocker: int
+    warning: int
+    reminder: int
+
+
+class AttentionResponse(BaseModel):
+    items: list[AttentionItem]
+    actionable_count: int
+    counts: AttentionCounts
+
+
 class MistakeFrequency(BaseModel):
     tag: str
     count: int

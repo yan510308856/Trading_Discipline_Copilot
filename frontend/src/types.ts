@@ -1,7 +1,7 @@
 export type PageId =
   | "dashboard"
   | "trade-checklist"
-  | "rule-alerts"
+  | "attention"
   | "open-trades"
   | "post-trade-review"
   | "daily-summary"
@@ -309,6 +309,36 @@ export interface OpenTradeAttention {
   status: RuleStatus;
   primary_alert: RuleAlert | null;
   alerts: RuleAlert[];
+}
+
+export type AttentionSeverity = "blocker" | "warning" | "reminder";
+export type AttentionSourceType =
+  | "trade_rule" | "missing_position_size" | "missing_stop"
+  | "runner_unprotected" | "profit_milestone" | "green_to_red"
+  | "stale_price" | "failed_email" | "pending_review"
+  | "notification_configuration";
+
+export interface AttentionItem {
+  id: string;
+  source_type: AttentionSourceType;
+  severity: AttentionSeverity;
+  title: string;
+  message: string;
+  required_action: string;
+  trade_id: number | null;
+  symbol: string | null;
+  trade_horizon: TradeHorizon | null;
+  current_r: number | null;
+  detected_at: string;
+  destination_page: "dashboard" | "open-trades" | "post-trade-review";
+  destination_context: Record<string, string>;
+  time_sensitive: boolean;
+}
+
+export interface AttentionResponse {
+  items: AttentionItem[];
+  actionable_count: number;
+  counts: Record<AttentionSeverity, number>;
 }
 
 export interface APIErrorEnvelope {

@@ -7,6 +7,7 @@ import {
   getDailyReadiness,
   getDailySummary,
   getOpenTradeAttention,
+  getAttention,
   getNotificationStatus,
   getPriceAlertEvents,
   getRules,
@@ -37,6 +38,7 @@ export const queryKeys = {
     ["trades", status ?? "all", tradeHorizon ?? "all"] as const,
   rules: () => ["rules"] as const,
   openTradeAttention: () => ["open-trade-attention"] as const,
+  attention: (tradeHorizon?: TradeHorizon) => ["attention", tradeHorizon ?? "all"] as const,
   notificationStatus: () => ["notification-status"] as const,
   priceAlertEvents: (tradeId: number) => ["price-alert-events", tradeId] as const,
 };
@@ -44,6 +46,7 @@ export const queryKeys = {
 function invalidateTradesAndSummary(queryClient: ReturnType<typeof useQueryClient>) {
   void queryClient.invalidateQueries({ queryKey: ["trades"] });
   void queryClient.invalidateQueries({ queryKey: ["daily-summary"] });
+  void queryClient.invalidateQueries({ queryKey: ["attention"] });
 }
 
 export function useDailySummaryQuery(date?: string, tradeHorizon?: TradeHorizon) {
@@ -78,6 +81,13 @@ export function useOpenTradeAttentionQuery() {
   return useQuery({
     queryKey: queryKeys.openTradeAttention(),
     queryFn: getOpenTradeAttention,
+  });
+}
+
+export function useAttentionQuery(tradeHorizon?: TradeHorizon) {
+  return useQuery({
+    queryKey: queryKeys.attention(tradeHorizon),
+    queryFn: () => getAttention(tradeHorizon),
   });
 }
 

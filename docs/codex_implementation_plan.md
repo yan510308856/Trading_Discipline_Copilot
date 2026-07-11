@@ -1246,3 +1246,11 @@ and a three-step option-aware planner. See `stage22_live_alerts_and_execution_wo
 - Require positive position size for new plans while preserving legacy nullable rows.
 - Expand Dashboard health, price freshness, risk cockpit, plan summaries, disabled reasons, and final confirmation.
 - Preserve Rule Alerts, OptionContractSelector, Daily Readiness placement, and underlying-only option R.
+## Stage 24 implementation
+
+- Normalize actionable work in a backend `/attention` endpoint.
+- Order blocker → warning → reminder, with time-sensitive and recency tie-breakers.
+- Rename Rule Alerts to a dedicated Attention page without a navigation count or Dashboard duplicate.
+- Add reload-safe deep links for open-trade, price-alert, notification, and post-review destinations.
+- Standardize runner controls, show collapsed alert history and execution preview, and provide close-to-review handoff.
+- Preserve RuleAlertPanel, OptionContractSelector, underlying-only option R, and bottom Dashboard readiness.
