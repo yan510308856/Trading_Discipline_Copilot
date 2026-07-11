@@ -21,7 +21,7 @@ import {
   type HorizonFilterValue,
   horizonForApi,
 } from "./HorizonFilter";
-import { contextFromHash } from "../utils/navigation";
+import { contextFromHash, positiveIntegerContext } from "../utils/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 
 const mistakeOptions = [
@@ -370,8 +370,8 @@ export function PostTradeReview() {
     }),
     [endDate, reviewFilter, startDate, trades],
   );
-  const selectedTradeId = Number(contextFromHash(window.location.hash).get("trade_id"));
-  const selectedTrade = trades.find((trade) => trade.id === selectedTradeId);
+  const selectedTradeId = positiveIntegerContext(contextFromHash(window.location.hash), "trade_id");
+  const selectedTrade = selectedTradeId === null ? undefined : trades.find((trade) => trade.id === selectedTradeId);
 
   useEffect(() => {
     if (!selectedTrade) return;
@@ -442,7 +442,7 @@ export function PostTradeReview() {
 
       {isLoading && <p className="empty-state">Loading closed trades…</p>}
       {error && <p className="form-message error-message">{error}</p>}
-      {Number.isInteger(selectedTradeId) && !isLoading && !selectedTrade && <p className="form-message error-message">The requested closed trade was not found.</p>}
+      {selectedTradeId !== null && !isLoading && !selectedTrade && <p className="form-message error-message">The requested closed trade was not found.</p>}
       {selectedTrade?.has_review && <p className="form-message success-message">This trade has already been reviewed.</p>}
       {!isLoading && !error && filteredTrades.length === 0 && (
         <div className="empty-state">
