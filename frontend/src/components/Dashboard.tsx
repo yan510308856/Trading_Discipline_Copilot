@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 
-import { APIError, getHealth, refreshOpenPrices } from "../api";
-import { useDailySummaryQuery, useNotificationStatusQuery, useTestEmailMutation } from "../hooks/queries";
+import { useDailySummaryQuery, useHealthQuery, useNotificationStatusQuery, useRefreshOpenPricesMutation, useTestEmailMutation, useTradesQuery } from "../hooks/queries";
 import { contextFromHash } from "../utils/navigation";
 import type { ConnectionState, Trade } from "../types";
 import { groupTradesByMarket } from "../utils/tradeGrouping";
@@ -18,6 +17,7 @@ import { Button } from "./ui/Button";
 import { Panel } from "./ui/Panel";
 import { StatusBadge } from "./ui/StatusBadge";
 import { PriceFreshness } from "./PriceFreshness";
+import { frontendErrorMessage } from "../utils/apiError";
 
 const connectionCopy: Record<ConnectionState, string> = {
   checking: "Checking backend…",
@@ -26,22 +26,21 @@ const connectionCopy: Record<ConnectionState, string> = {
 };
 
 function requestErrorMessage(error: unknown): string {
-  return error instanceof APIError
-    ? `${error.code}: ${error.message}`
-    : "Could not load today's discipline summary.";
+  return frontendErrorMessage(error, "Could not load today's discipline summary. Cached data may be stale.");
 }
 
 export function Dashboard() {
-  const [connection, setConnection] = useState<ConnectionState>("checking");
   const [summaryHorizon, setSummaryHorizon] = useState<HorizonFilterValue>("all");
-  const [isLoadingSummary, setIsLoadingSummary] = useState(true);
-  const [openTrades, setOpenTrades] = useState<Trade[]>([]);
   const [quoteError, setQuoteError] = useState("");
-  const [isRefreshingQuotes, setIsRefreshingQuotes] = useState(false);
   const summaryQuery = useDailySummaryQuery(undefined, horizonForApi(summaryHorizon));
+  const openTradesQuery = useTradesQuery("open");
+  const healthQuery = useHealthQuery();
+  const refreshPrices = useRefreshOpenPricesMutation();
   const notificationQuery = useNotificationStatusQuery();
   const testEmail = useTestEmailMutation();
   const summary = summaryQuery.data ?? null;
+  const openTrades: Trade[] = openTradesQuery.data ?? [];
+  const connection: ConnectionState = healthQuery.isLoading ? "checking" : healthQuery.data?.status === "ok" ? "connected" : "unavailable";
   const openTradeGroups = groupTradesByMarket(openTrades);
   const summaryError = summaryQuery.error
     ? requestErrorMessage(summaryQuery.error)
@@ -56,11 +55,9 @@ export function Dashboard() {
   const emailLabel = !notifications?.email_enabled ? "Disabled" : !notifications.recipient_configured || !notifications.smtp_configured ? "Misconfigured" : notifications.latest_email_status === "failed" ? "Last send failed" : "Active";
 
   const refreshQuotes = useCallback(async () => {
-    setIsRefreshingQuotes(true);
     setQuoteError("");
     try {
-      const result = await refreshOpenPrices();
-      setOpenTrades(result.trades);
+      const result = await refreshPrices.mutateAsync();
       if (result.source === "manual") {
         setQuoteError("Finnhub is not configured; showing the latest manually recorded prices.");
       } else if (result.errors.length > 0) {
@@ -68,36 +65,12 @@ export function Dashboard() {
       }
     } catch (error) {
       setQuoteError(requestErrorMessage(error));
-    } finally {
-      setIsRefreshingQuotes(false);
-    }
-  }, []);
-
-  const refreshDashboard = useCallback(async () => {
-    setConnection("checking");
-    setIsLoadingSummary(true);
-
-    try {
-      const health = await getHealth();
-      setConnection(health.status === "ok" ? "connected" : "unavailable");
-    } catch {
-      setConnection("unavailable");
-      setIsLoadingSummary(false);
-      return;
-    }
-
-    try {
-      await refreshQuotes();
-    } catch (error) {
-      setQuoteError(requestErrorMessage(error));
-    } finally {
-      setIsLoadingSummary(false);
-    }
-  }, [refreshQuotes]);
+    } finally { /* mutation exposes pending state */ }
+  }, [refreshPrices]);
 
   useEffect(() => {
-    void refreshDashboard();
-  }, [refreshDashboard]);
+    void refreshQuotes();
+  }, []); // initial operational refresh; mutation owns invalidation
 
   useEffect(() => {
     if (contextFromHash(window.location.hash).get("focus") !== "notifications") return;
@@ -125,17 +98,17 @@ export function Dashboard() {
           />
         </div>
 
-        {(isLoadingSummary || summaryQuery.isLoading) && (
+        {summaryQuery.isLoading && (
           <p className="empty-state">Loading today&apos;s summary…</p>
         )}
         {summaryError && <p className="form-message error-message">{summaryError}</p>}
-        {!isLoadingSummary && !summaryQuery.isLoading && !summaryError && summary?.total_trades === 0 && (
+        {!summaryQuery.isLoading && !summaryError && summary?.total_trades === 0 && (
           <div className="empty-state">
             <strong>No trades recorded today.</strong>
             <p>Create a plan when the next valid setup appears.</p>
           </div>
         )}
-        {!isLoadingSummary && summary && summary.total_trades > 0 && (
+        {summary && summary.total_trades > 0 && (
           <SummaryCards summary={summary} />
         )}
       </Panel>
@@ -145,13 +118,13 @@ export function Dashboard() {
           <div className="unrealized-heading-copy"><span className="unrealized-count">{openTrades.length}</span><div><p className="eyebrow">Active positions</p><strong>Unrealized performance</strong><small>Current return and remaining quantity</small></div></div>
           <Button
             variant="secondary"
-            disabled={isRefreshingQuotes}
+            disabled={refreshPrices.isPending}
             onClick={(event) => {
               event.preventDefault();
               void refreshQuotes();
             }}
           >
-            {isRefreshingQuotes ? "Refreshing…" : "Refresh prices"}
+            {refreshPrices.isPending ? "Refreshing…" : "Refresh prices"}
           </Button>
         </summary>
         {quoteError && <p className="unrealized-data-note"><span aria-hidden="true">i</span>{quoteError}</p>}
@@ -226,7 +199,8 @@ export function Dashboard() {
             <Button
               variant="secondary"
               onClick={() => {
-                void refreshDashboard();
+                void healthQuery.refetch();
+                void openTradesQuery.refetch();
                 void summaryQuery.refetch();
               }}
             >

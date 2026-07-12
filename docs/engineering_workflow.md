@@ -615,3 +615,8 @@ After pulling Stage 23, run `alembic upgrade head` before starting the backend. 
 ## Stage 24 operational checks
 
 When changing a state that can resolve an Attention item, invalidate the `attention` TanStack Query prefix so open Attention views update immediately. Test deep links both through in-app navigation and a full page reload. Attention sources must disappear when resolved; historical successful email delivery is never an active item.
+## Stage 25 state and audit workflow
+
+Before adding component data state, classify it as server state, edit draft, UI-only state, or derived data. Server state must use an existing query key or add one. Every mutation must declare its invalidation scope. Keep cached data rendered while refetching and show stale/error context without replacing it with an empty page.
+
+Domain services append WorkflowEvent rows before their existing commit so state and audit succeed or fail together. Email outcome events are appended after each SMTP attempt and committed with the durable delivery state. Planning-attempt events require a client session ID and explicit idempotency key. Never place secrets, full notes, or raw request bodies in event data.

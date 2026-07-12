@@ -1,16 +1,19 @@
-import { useEffect, useState } from "react";
+import type { SetStateAction } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 
 import { APIError } from "../api";
 import type { Trade, TradeHorizon } from "../types";
-import { useTradesQuery } from "./queries";
+import { queryKeys, useTradesQuery } from "./queries";
 
 export function useTrades(status?: Trade["status"], tradeHorizon?: TradeHorizon) {
-  const [trades, setTrades] = useState<Trade[]>([]);
+  const queryClient = useQueryClient();
   const tradesQuery = useTradesQuery(status, tradeHorizon);
-
-  useEffect(() => {
-    if (tradesQuery.data) setTrades(tradesQuery.data);
-  }, [tradesQuery.data]);
+  const trades = tradesQuery.data ?? [];
+  const setTrades = (update: SetStateAction<Trade[]>) => {
+    queryClient.setQueryData<Trade[]>(queryKeys.trades(status, tradeHorizon), (current = []) =>
+      typeof update === "function" ? update(current) : update,
+    );
+  };
 
   const error = tradesQuery.error
     ? tradesQuery.error instanceof APIError

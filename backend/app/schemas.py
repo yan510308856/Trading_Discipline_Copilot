@@ -411,6 +411,21 @@ class AttentionResponse(BaseModel):
     counts: AttentionCounts
 
 
+class WorkflowEventRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    event_type: str
+    trade_id: Optional[int]
+    readiness_date: Optional[date]
+    rule_id: Optional[str]
+    severity: Optional[str]
+    idempotency_key: Optional[str]
+    event_data: dict[str, Any]
+    occurred_at: datetime
+    created_at: datetime
+
+
 class MistakeFrequency(BaseModel):
     tag: str
     count: int

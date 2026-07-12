@@ -12,6 +12,7 @@ from app import models, schemas
 from app.database import get_db
 from app.services import trade_service
 from app.services.rule_engine import evaluate_trade, load_rules
+from app.services.workflow_event_service import append_event
 
 
 router = APIRouter()
@@ -36,12 +37,35 @@ def evaluate_rules(
 ) -> dict[str, Any]:
     request_values = request.model_dump(exclude_none=True)
     trade_id = request_values.pop("trade_id", None)
+    record_attempt = bool(request_values.pop("record_attempt", False))
+    planning_session_id = request_values.pop("planning_session_id", None)
+    attempt_idempotency_key = request_values.pop("idempotency_key", None)
     if trade_id is not None:
         trade = trade_service.get_trade(database, trade_id)
         trade_values = _model_values(trade) | request_values
     else:
         trade_values = {"status": "planned"} | request_values
     result = evaluate_trade(trade_values)
+    if record_attempt and planning_session_id and attempt_idempotency_key and result["alerts"]:
+        event_type = "plan_blocked" if result["status"] == "blocked" else "plan_warning_detected"
+        severities = [alert["severity"] for alert in result["alerts"]]
+        append_event(
+            database,
+            event_type,
+            severity="blocker" if event_type == "plan_blocked" else "warning",
+            idempotency_key=f"plan:{planning_session_id}:{attempt_idempotency_key}:{event_type}",
+            event_data={
+                "rule_ids": [alert["rule_id"] for alert in result["alerts"]],
+                "severity_counts": {
+                    severity: severities.count(severity)
+                    for severity in ("blocker", "warning", "reminder")
+                },
+                "horizon": trade_values.get("trade_horizon"),
+                "market": trade_values.get("market"),
+                "setup": trade_values.get("setup"),
+            },
+        )
+        database.commit()
     if trade_id is not None:
         existing_rule_ids = {alert.rule_id for alert in trade.alerts}
         for alert in result["alerts"]:

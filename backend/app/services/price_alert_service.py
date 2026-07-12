@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from app import models
 from app.services.email_sender import DisabledEmailSender, EmailSender, configured_email_sender
 from app.services.option_contract_service import resolved_underlying_direction
+from app.services.workflow_event_service import append_event
 
 logger = logging.getLogger(__name__)
 
@@ -83,11 +84,22 @@ def send_event(
     except Exception as error:  # provider failures become durable state
         event.notification_status = "failed"
         event.last_error = str(error)[:1000]
+        append_event(
+            database, "notification_email_failed", trade_id=trade.id,
+            severity="warning",
+            idempotency_key=f"email:{event.id}:attempt:{event.attempt_count}:failed",
+            event_data={"alert_kind": event.alert_kind, "attempt_count": event.attempt_count, "error_type": type(error).__name__},
+        )
         logger.warning("email_failed trade_id=%s event_id=%s error_type=%s", trade.id, event.id, type(error).__name__)
     else:
         event.notification_status = "sent"
         event.sent_at = models.utc_now()
         event.last_error = None
+        append_event(
+            database, "notification_email_sent", trade_id=trade.id,
+            idempotency_key=f"email:{event.id}:attempt:{event.attempt_count}:sent",
+            event_data={"alert_kind": event.alert_kind, "attempt_count": event.attempt_count},
+        )
         logger.info("email_sent trade_id=%s event_id=%s", trade.id, event.id)
 
 

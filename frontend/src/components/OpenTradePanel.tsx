@@ -1,11 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import {
-  APIError,
   evaluateRules,
-  openTrade,
-  patchTrade,
-  recordPartialExit,
 } from "../api";
 import { useTrades } from "../hooks/useTrades";
 import type {
@@ -31,9 +27,10 @@ import {
   type HorizonFilterValue,
   horizonForApi,
 } from "./HorizonFilter";
-import { usePriceAlertEventsQuery } from "../hooks/queries";
+import { useOpenTradeMutation, usePatchTradeMutation, usePriceAlertEventsQuery, useRecordExitMutation } from "../hooks/queries";
 import { useQueryClient } from "@tanstack/react-query";
 import { contextFromHash, hashWithContext, positiveIntegerContext } from "../utils/navigation";
+import { frontendErrorMessage } from "../utils/apiError";
 
 interface TradeCardProps {
   trade: Trade;
@@ -139,9 +136,7 @@ export function robinhoodUrl(symbol: string): string {
 }
 
 function errorMessage(error: unknown): string {
-  return error instanceof APIError
-    ? `${error.code}: ${error.message}`
-    : "The trade update failed. Confirm that the backend is running.";
+  return frontendErrorMessage(error, "The trade update failed. Confirm that the backend is running.");
 }
 
 const alertPriority: Record<RuleAlert["severity"], number> = {
@@ -176,6 +171,9 @@ function requiredActionText(alert: RuleAlert | null): string {
 
 function TradeCard({ trade, onUpdated, defaultExpanded, onDeleted, onAutoClosed }: TradeCardProps) {
   const priceAlerts = usePriceAlertEventsQuery(trade.id);
+  const patchMutation = usePatchTradeMutation();
+  const openMutation = useOpenTradeMutation();
+  const exitMutation = useRecordExitMutation();
   const [actualEntry, setActualEntry] = useState(
     trade.actual_entry?.toString() ?? trade.planned_entry.toString(),
   );
@@ -287,7 +285,7 @@ function TradeCard({ trade, onUpdated, defaultExpanded, onDeleted, onAutoClosed 
   }
 
   function update(updates: TradePatchPayload) {
-    return runAction(() => patchTrade(trade.id, updates));
+    return runAction(() => patchMutation.mutateAsync({ tradeId: trade.id, updates }));
   }
 
   function updateExitQuantity(value: string) {
@@ -305,10 +303,7 @@ function TradeCard({ trade, onUpdated, defaultExpanded, onDeleted, onAutoClosed 
     setIsSaving(true);
     setError("");
     try {
-      const updated = await recordPartialExit(
-        trade.id, parsedPartialPrice, parsedPartialQuantity, exitReason,
-        trade.market === "options" ? parsedOptionExitPrice : null,
-      );
+      const updated = await exitMutation.mutateAsync({ tradeId: trade.id, price: parsedPartialPrice, quantity: parsedPartialQuantity, exitReason, optionPrice: trade.market === "options" ? parsedOptionExitPrice : null });
       onUpdated(updated);
       if (updated.status === "closed") onAutoClosed(updated);
       setConfirmingExit(false);
@@ -380,7 +375,7 @@ function TradeCard({ trade, onUpdated, defaultExpanded, onDeleted, onAutoClosed 
           <button
             className="primary-button"
             disabled={isSaving || parsedEntry === null || trade.position_size === null || (trade.market === "options" && parsedPlannedOptionEntry === null)}
-            onClick={() => runAction(() => openTrade(trade.id, parsedEntry, parsedPlannedOptionEntry))}
+            onClick={() => runAction(() => openMutation.mutateAsync({ tradeId: trade.id, actualEntry: parsedEntry, optionEntryPrice: parsedPlannedOptionEntry }))}
           >
             {isSaving ? "Opening…" : "Mark Entry Filled"}
           </button>
@@ -494,7 +489,7 @@ function TradeCard({ trade, onUpdated, defaultExpanded, onDeleted, onAutoClosed 
       <section className="management-section">
         <h3>Record Exit Execution</h3>
         <div className="action-row exit-runner-row">
-          <div className="exit-execution-fields">
+          <div className={`exit-execution-fields ${trade.market === "options" ? "option-exit-fields" : ""}`}>
           <label className="partial-quantity-field">
             {trade.market === "options" ? "Underlying exit price" : "Exit price"}
             <input aria-label={`Exit execution price for ${trade.symbol}`} type="number" step="0.01" value={partialPrice} onChange={(event) => setPartialPrice(event.target.value)} />
@@ -504,13 +499,13 @@ function TradeCard({ trade, onUpdated, defaultExpanded, onDeleted, onAutoClosed 
             Exit quantity
             <input aria-label={`Exit quantity for ${trade.symbol}`} type="number" min="0.01" max={quantity.runner ?? undefined} step="0.01" value={partialQuantity} onChange={(event) => updateExitQuantity(event.target.value)} />
           </label>
-          <label>Exit reason<select value={exitReason} onChange={(event) => setExitReason(event.target.value as ExitReason)}>
+          <label className="exit-reason-field">Exit reason<select value={exitReason} onChange={(event) => setExitReason(event.target.value as ExitReason)}>
             <option value="partial_profit">Partial profit</option><option value="target_hit">Target hit</option>
             <option value="stop_hit">Stop hit</option><option value="runner_stop">Runner stop</option>
             <option value="risk_reduction">Risk reduction</option><option value="invalidated_setup">Invalidated setup</option>
             <option value="time_exit">Time exit</option><option value="manual_exit">Manual exit</option><option value="other">Other</option>
           </select></label>
-          <button className="secondary-button" disabled={isSaving || !partialQuantityIsValid || parsedPartialPrice === null || (trade.market === "options" && parsedOptionExitPrice === null)} onClick={() => {
+          <button className="secondary-button record-exit-button" disabled={isSaving || !partialQuantityIsValid || parsedPartialPrice === null || (trade.market === "options" && parsedOptionExitPrice === null)} onClick={() => {
             if (parsedPartialQuantity !== null && parsedPartialPrice !== null) {
               setConfirmingExit(true);
             }

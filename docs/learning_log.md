@@ -640,3 +640,10 @@ No trading behavior changed. This stage improves frontend maintainability so rea
 - Backend normalization keeps stale prices, failed delivery, and pending-review decisions consistent within the dedicated Attention workflow.
 - Hash query context provides lightweight reload-safe deep links without introducing a routing dependency.
 - State mutation and cache invalidation are one workflow concern: resolving a runner warning or review must update every Attention consumer.
+## Stage 25 learning notes
+
+- Copying query results into component state creates two authorities and timing bugs; controlled Query cache updates preserve a single owner.
+- A composed mutation can represent partial success honestly: the trade exists even if secondary checklist persistence failed.
+- Audit trails are most trustworthy when lifecycle events share the domain transaction.
+- External side effects need outcome events after the attempt, while idempotency prevents retry noise.
+- An audit log can support future analytics without turning the application into an event-sourced system.

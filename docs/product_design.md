@@ -971,3 +971,8 @@ Stage 6 起:
 Attention does not show a navigation count and is not duplicated on Dashboard. Deep links preserve destination context after reload and select the exact open or closed trade. The workflow explicitly continues from Manage → Exit → Review, while Open Trades retains its local `RuleAlertPanel` for in-context management.
 
 Daily Readiness remains the final Dashboard section. Option risk and Final R continue to use underlying prices only. Stage 24 adds no premium-return metric, option P&L feature, broker integration, or order execution.
+## Stage 25 — Server-state consistency and workflow audit
+
+Frontend ownership follows one rule: reads are query-owned, writes use mutation hooks, edit drafts and UI state remain local, and derived values are memoized. Cached server data remains visible during background refetch. New-plan creation treats checklist persistence as a second required step and reports partial success without encouraging duplicate trade creation.
+
+`WorkflowEvent` is an append-only audit record for meaningful workflow transitions, not a replacement for current-state tables. Lifecycle events share their domain transaction; email outcome events are recorded after delivery attempts; planning blocker/warning events require an explicit user attempt and idempotency key. Payloads are allow-listed and exclude notes, credentials, and complete request bodies.

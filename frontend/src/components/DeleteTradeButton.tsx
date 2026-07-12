@@ -1,7 +1,8 @@
 import { useState } from "react";
 
-import { APIError, deleteTrade } from "../api";
+import { useDeleteTradeMutation } from "../hooks/queries";
 import type { Trade } from "../types";
+import { frontendErrorMessage } from "../utils/apiError";
 
 interface DeleteTradeButtonProps {
   trade: Trade;
@@ -10,6 +11,7 @@ interface DeleteTradeButtonProps {
 
 export function DeleteTradeButton({ trade, onDeleted }: DeleteTradeButtonProps) {
   const [isDeleting, setIsDeleting] = useState(false);
+  const deleteMutation = useDeleteTradeMutation();
   const [error, setError] = useState("");
 
   async function handleDelete() {
@@ -21,14 +23,10 @@ export function DeleteTradeButton({ trade, onDeleted }: DeleteTradeButtonProps) 
     setIsDeleting(true);
     setError("");
     try {
-      await deleteTrade(trade.id);
+      await deleteMutation.mutateAsync(trade.id);
       onDeleted(trade.id);
     } catch (requestError) {
-      setError(
-        requestError instanceof APIError
-          ? `${requestError.code}: ${requestError.message}`
-          : "The trade could not be deleted.",
-      );
+      setError(frontendErrorMessage(requestError, "The trade could not be deleted."));
     } finally {
       setIsDeleting(false);
     }

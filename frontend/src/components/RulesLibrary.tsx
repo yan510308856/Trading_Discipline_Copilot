@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
-import { APIError, getRules } from "../api";
-import type { RuleDefinition } from "../types";
+import { APIError } from "../api";
+import { useRulesQuery } from "../hooks/queries";
 import { filterRules } from "../utils/ruleFilters";
 
 function readable(value: string): string {
@@ -15,23 +15,14 @@ function errorMessage(error: unknown): string {
 }
 
 export function RulesLibrary() {
-  const [rules, setRules] = useState<RuleDefinition[]>([]);
+  const rulesQuery = useRulesQuery();
+  const rules = rulesQuery.data ?? [];
   const [query, setQuery] = useState("");
   const [stage, setStage] = useState("all");
   const [severity, setSeverity] = useState("all");
   const [category, setCategory] = useState("all");
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    void getRules()
-      .then((loadedRules) => {
-        setRules(loadedRules);
-        setError("");
-      })
-      .catch((requestError) => setError(errorMessage(requestError)))
-      .finally(() => setIsLoading(false));
-  }, []);
+  const isLoading = rulesQuery.isLoading;
+  const error = rulesQuery.error ? errorMessage(rulesQuery.error) : "";
 
   const categories = useMemo(
     () => [...new Set(rules.map((rule) => rule.category))].sort(),
