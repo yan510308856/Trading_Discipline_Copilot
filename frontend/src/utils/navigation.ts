@@ -7,6 +7,7 @@ const pageIds: PageId[] = [
   "open-trades",
   "post-trade-review",
   "daily-summary",
+  "discipline-analytics",
   "rules-library",
 ];
 

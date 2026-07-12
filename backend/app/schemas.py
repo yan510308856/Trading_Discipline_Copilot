@@ -426,6 +426,93 @@ class WorkflowEventRead(BaseModel):
     created_at: datetime
 
 
+class AnalyticsPreparation(BaseModel):
+    readiness_days_recorded: int
+    readiness_days_cleared: int
+    readiness_completion_rate: Optional[float] = Field(description="Cleared / recorded readiness days; null when no days are recorded.")
+    average_required_items_completed: Optional[float] = Field(description="Null when no readiness days are recorded.")
+
+
+class AnalyticsPlanningQuality(BaseModel):
+    plans_created: int
+    blocked_plan_attempts: int
+    warning_finalization_attempts: int
+    percent_plans_with_valid_stop: Optional[float] = Field(description="Valid-stop plans / plans created; null when no plans exist.")
+    percent_plans_with_position_size: Optional[float] = Field(description="Positive-size plans / plans created; null when no plans exist.")
+    average_planned_risk_reward: Optional[float] = Field(description="Null when no valid positive-reward plan exists.")
+    average_total_planned_risk: Optional[float] = Field(description="Null when no valid sized plan exists.")
+
+
+class AnalyticsExecutionDiscipline(BaseModel):
+    trades_opened: int
+    trades_with_partial_exits: int
+    partial_exit_rate: Optional[float] = Field(description="Opened trades with partial exits / opened trades; null when none opened.")
+    trades_with_runner_activated: int
+    runner_without_stop_occurrences: int
+    green_to_red_warning_occurrences: int
+    average_number_of_exit_executions: Optional[float] = Field(description="Exit executions / opened trades; null when none opened.")
+    auto_closed_trade_count: int
+
+
+class AnalyticsReviewCompletion(BaseModel):
+    closed_trades: int
+    reviewed_trades: int
+    review_completion_rate: Optional[float] = Field(description="Reviewed closed trades / closed trades; null when none closed.")
+    median_close_to_review_minutes: Optional[float] = Field(description="Null when no selected closed trade has a review.")
+    reviews_within_24_hours: int
+    review_within_24_hours_rate: Optional[float] = Field(description="Reviews within 24 hours / reviewed closed trades; null when none reviewed.")
+    pending_review_count: int
+
+
+class AnalyticsNotificationReliability(BaseModel):
+    threshold_events: int
+    emails_sent: int
+    emails_failed: int
+    email_success_rate: Optional[float] = Field(description="Sent threshold emails / attempted threshold events; null when none attempted.")
+    retry_exhausted_events: int
+    latest_failure_at: Optional[datetime]
+
+
+class AnalyticsFrequency(BaseModel):
+    key: str
+    count: int
+
+
+class AnalyticsHorizonIssues(BaseModel):
+    horizon: TradeHorizon
+    issue_count: int
+
+
+class AnalyticsRecurringIssues(BaseModel):
+    most_frequent_mistake_tags: list[AnalyticsFrequency]
+    most_frequent_blocking_rules: list[AnalyticsFrequency]
+    most_frequent_warning_rules: list[AnalyticsFrequency]
+    issue_breakdown_by_horizon: list[AnalyticsHorizonIssues]
+
+
+class AnalyticsOutcomeContext(BaseModel):
+    total_underlying_r: float
+    average_underlying_r: Optional[float] = Field(description="Null when no selected closed trade has Final Underlying R.")
+    median_underlying_r: Optional[float] = Field(description="Null when no selected closed trade has Final Underlying R.")
+    average_discipline_score: Optional[float] = Field(description="Null when no selected reviewed trade has a discipline score.")
+
+
+class DisciplineAnalytics(BaseModel):
+    timezone: Literal["UTC"]
+    date_from: Optional[date]
+    date_to: Optional[date]
+    trade_horizon: Optional[TradeHorizon]
+    market: Optional[Market]
+    setup: Optional[str]
+    preparation: AnalyticsPreparation
+    planning_quality: AnalyticsPlanningQuality
+    execution_discipline: AnalyticsExecutionDiscipline
+    review_completion: AnalyticsReviewCompletion
+    notification_reliability: AnalyticsNotificationReliability
+    recurring_issues: AnalyticsRecurringIssues
+    outcome_context: AnalyticsOutcomeContext
+
+
 class MistakeFrequency(BaseModel):
     tag: str
     count: int

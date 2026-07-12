@@ -251,6 +251,13 @@ docker-compose.yml      Local two-container application
 - [Implementation plan](docs/codex_implementation_plan.md)
 - [Engineering workflow](docs/engineering_workflow.md)
 - [Learning log](docs/learning_log.md)
+- [Discipline analytics definitions](docs/discipline_analytics_definitions.md)
+
+## Stage 26: discipline effectiveness analytics
+
+**Discipline Analytics** follows Daily Summary and measures preparation, planning integrity, execution discipline, review timing, notification reliability, recurring issues, and outcome context. `GET /analytics/discipline` supports date, horizon, market, and setup filters. UTC date boundaries and null zero-denominator rates are documented explicitly.
+
+Options outcomes are labeled and calculated as **Underlying R**. No option premium return, option P&L, or option-based R is included.
 # Stage 23: operational trust and complete plans
 
 The Dashboard now reports whether the local price monitor is actually running, whether email delivery is fully configured, the last monitor cycle, and the latest persisted alert-email result. Open positions show price source and freshness; automatic quotes older than 120 seconds are marked stale. Runtime monitor timestamps are process-local and reset whenever the backend restarts.

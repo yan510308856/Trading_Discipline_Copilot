@@ -620,3 +620,9 @@ When changing a state that can resolve an Attention item, invalidate the `attent
 Before adding component data state, classify it as server state, edit draft, UI-only state, or derived data. Server state must use an existing query key or add one. Every mutation must declare its invalidation scope. Keep cached data rendered while refetching and show stale/error context without replacing it with an empty page.
 
 Domain services append WorkflowEvent rows before their existing commit so state and audit succeed or fail together. Email outcome events are appended after each SMTP attempt and committed with the durable delivery state. Planning-attempt events require a client session ID and explicit idempotency key. Never place secrets, full notes, or raw request bodies in event data.
+
+## Stage 26 analytics checks
+
+Define each metric's source, ownership timestamp, numerator, denominator, filters, and null behavior before implementation. Date tests must cover the instant before and at the exclusive UTC end boundary. Include LEAP filtering and an options Underlying R case.
+
+Analytics query keys include all filters. Relevant writes invalidate the `analytics` prefix; the page uses a five-minute stale time with no focus refetch. Future metric changes must update `discipline_analytics_definitions.md`.

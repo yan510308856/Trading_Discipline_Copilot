@@ -1262,3 +1262,12 @@ and a three-step option-aware planner. See `stage22_live_alerts_and_execution_wo
 - Add additive WorkflowEvent storage, filtered development API, and lifecycle integration.
 - Record planning attempts explicitly and idempotently; never audit debounced renders.
 - Keep current-state models authoritative; do not introduce event replay or analytics UI.
+
+## Stage 26 implementation
+
+- Add a read-only `/analytics/discipline` projection over current-state tables and WorkflowEvents.
+- Apply inclusive UTC dates plus horizon, market, and setup filters.
+- Return null for every zero-denominator rate and document each formula.
+- Add a low-frequency, query-backed Analytics page after Daily Summary.
+- Invalidate analytics after lifecycle, review, and readiness writes.
+- Preserve Attention, Dashboard readiness placement, OptionContractSelector, and underlying-only options R.

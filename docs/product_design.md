@@ -971,6 +971,12 @@ Stage 6 起:
 Attention does not show a navigation count and is not duplicated on Dashboard. Deep links preserve destination context after reload and select the exact open or closed trade. The workflow explicitly continues from Manage → Exit → Review, while Open Trades retains its local `RuleAlertPanel` for in-context management.
 
 Daily Readiness remains the final Dashboard section. Option risk and Final R continue to use underlying prices only. Stage 24 adds no premium-return metric, option P&L feature, broker integration, or order execution.
+
+## Stage 26 — Discipline effectiveness analytics
+
+Discipline Analytics is a reflection page after Daily Summary, not a Dashboard replacement. It separates process evidence into preparation, planning, execution, review, notification reliability, recurring issues, and outcome context. Every rate has an explicit numerator and denominator; missing evidence remains null, and readiness never assumes unrecorded market days.
+
+Outcome cards deliberately say Underlying R. Options continue to use underlying entry, stop, target, and exit values only. Attention remains the operational action inbox while Analytics is a slower historical view.
 ## Stage 25 — Server-state consistency and workflow audit
 
 Frontend ownership follows one rule: reads are query-owned, writes use mutation hooks, edit drafts and UI state remain local, and derived values are memoized. Cached server data remains visible during background refetch. New-plan creation treats checklist persistence as a second required step and reports partial success without encouraging duplicate trade creation.

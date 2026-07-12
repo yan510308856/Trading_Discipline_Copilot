@@ -152,7 +152,10 @@ def update_trade(
         setattr(trade, field, value)
     append_event(
         database, "trade_updated", trade_id=trade.id,
-        event_data={"fields": sorted(updates)},
+        event_data={
+            "fields": sorted(updates),
+            **({"runner_active": updates["runner_active"]} if "runner_active" in updates else {}),
+        },
     )
     database.commit()
     database.refresh(trade)
