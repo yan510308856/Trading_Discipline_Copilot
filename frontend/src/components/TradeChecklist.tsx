@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { APIError, createTrade, evaluateRules, getQuote, getTodayDailyReadiness, saveChecklistAnswers } from "../api";
+import { APIError, evaluateRules, getQuote } from "../api";
+import { useCreateTradePlanMutation, useDailyReadinessQuery } from "../hooks/queries";
 import type { QuoteResult, RuleEvaluationResult, TradeCreatePayload, TradeFormState } from "../types";
 import { parseDecimalInput } from "../utils/decimal";
 import { calculateRiskReward, optionUnderlyingDirection } from "../utils/tradeCalculations";
@@ -26,13 +27,17 @@ export function TradeChecklist() {
   const [form, setForm] = useState(initialForm);
   const [step, setStep] = useState(1);
   const [evaluation, setEvaluation] = useState<RuleEvaluationResult>({ status: "allowed", alerts: [] });
-  const [readiness, setReadiness] = useState<Awaited<ReturnType<typeof getTodayDailyReadiness>> | null>(null);
   const [quote, setQuote] = useState<QuoteResult | null>(null);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [warningsAcknowledged, setWarningsAcknowledged] = useState(false);
   const [busy, setBusy] = useState(false);
   const [confirmingCreate, setConfirmingCreate] = useState(false);
+  const [partialCreatedTradeId, setPartialCreatedTradeId] = useState<number | null>(null);
+  const [planningSessionId] = useState(() => globalThis.crypto?.randomUUID?.() ?? `plan-${Date.now()}`);
+  const readinessQuery = useDailyReadinessQuery();
+  const createPlanMutation = useCreateTradePlanMutation();
+  const readiness = readinessQuery.data ?? null;
   const entry = parseDecimalInput(form.planned_entry), stop = parseDecimalInput(form.stop_loss), target = parseDecimalInput(form.target_1);
   const positionSize = parseDecimalInput(form.position_size);
   const underlyingDirection = form.market === "options"
@@ -59,7 +64,6 @@ export function TradeChecklist() {
     finally { setBusy(false); }
   }
 
-  useEffect(() => { void getTodayDailyReadiness().then(setReadiness).catch(() => setReadiness(null)); }, []);
   useEffect(() => {
     const controller = new AbortController();
     const timer = window.setTimeout(() => void evaluateRules({ status: "planned", trade_horizon: form.trade_horizon, market: form.market, direction: underlyingDirection, setup: form.setup, market_context: form.market_context, planned_entry: entry, stop_loss: stop, target_1: target, option_contract: canonicalOptionContract, option_type: form.option_type, option_expiration: form.option_expiration || null, option_strike: parseDecimalInput(form.option_strike), follow_through_confirmed: form.follow_through_confirmed, recent_stop_loss: form.recent_stop_loss, is_immediate_reverse: form.is_immediate_reverse, second_leg_entry: form.second_leg_entry, big_bar_entry: form.big_bar_entry }, controller.signal).then(setEvaluation).catch((caught) => { if (!(caught instanceof DOMException && caught.name === "AbortError")) setError("Could not evaluate rules."); }), 250);
@@ -72,7 +76,7 @@ export function TradeChecklist() {
   const step1Valid = Boolean(form.symbol.trim() && form.market && form.direction && form.trade_horizon);
   const step2Valid = Boolean(form.setup && form.market_context && (form.market !== "options" || (form.option_type && form.option_expiration && parseDecimalInput(form.option_strike))));
   const riskValid = Boolean(riskReward && riskReward.risk > 0 && Number.isFinite(riskReward.targetR));
-  const createDisabled = busy || status === "blocked" || warningGate || !riskValid || positionSize === null || positionSize <= 0;
+  const createDisabled = busy || createPlanMutation.isPending || partialCreatedTradeId !== null || status === "blocked" || warningGate || !riskValid || positionSize === null || positionSize <= 0;
   const disabledReason = step === 1 && !form.symbol.trim() ? "Enter a symbol."
     : step === 2 && !form.setup ? "Choose a setup."
     : step === 2 && !form.market_context ? "Choose a market context."
@@ -84,9 +88,20 @@ export function TradeChecklist() {
     : "";
   const planSummary = <div className="plan-summary"><strong>{form.symbol.trim().toUpperCase() || "Symbol"} · {form.market === "options" ? "Options" : form.market} · {form.market === "options" ? `${form.direction === "long" ? "Buy" : "Sell"} ${form.option_type ? form.option_type[0].toUpperCase() + form.option_type.slice(1) : "Option"}` : form.direction} · {form.trade_horizon}</strong>{form.setup && <span>{form.setup.replaceAll("_", " ")} · {form.market_context.replaceAll("_", " ") || "Context pending"}</span>}{step === 3 && entry !== null && <small>Entry {entry.toFixed(2)} · Stop {stop?.toFixed(2) ?? "—"} · Target {target?.toFixed(2) ?? "—"}</small>}</div>;
 
+  async function recordPlanningAttempt(attempt: string) {
+    if (status !== "blocked" && status !== "warning") return;
+    try {
+      await evaluateRules({ status: "planned", trade_horizon: form.trade_horizon, market: form.market, direction: underlyingDirection, setup: form.setup, market_context: form.market_context, planned_entry: entry, stop_loss: stop, target_1: target, option_contract: canonicalOptionContract, record_attempt: true, planning_session_id: planningSessionId, idempotency_key: attempt });
+    } catch { /* audit failure does not change the discipline gate */ }
+  }
+
   function submit(event: React.FormEvent) {
     event.preventDefault();
-    if (status === "blocked" || warningGate || entry === null || stop === null || target === null) return;
+    if (status === "blocked" || warningGate || entry === null || stop === null || target === null) {
+      void recordPlanningAttempt("create-attempt");
+      return;
+    }
+    if (status === "warning") void recordPlanningAttempt("warning-final-create");
     setConfirmingCreate(true);
   }
 
@@ -100,10 +115,16 @@ export function TradeChecklist() {
       option_expiration: form.market === "options" ? form.option_expiration : null, option_strike: form.market === "options" ? parseDecimalInput(form.option_strike) : null,
       option_entry_price: form.market === "options" ? parseDecimalInput(form.option_entry_price) : null,
     };
-    setBusy(true); setError("");
+    setError("");
     try {
-      const trade = await createTrade(payload);
-      await saveChecklistAnswers(trade.id, { follow_through_confirmed: form.follow_through_confirmed, recent_stop_loss: form.recent_stop_loss, is_immediate_reverse: form.is_immediate_reverse, second_leg_entry: form.second_leg_entry, big_bar_entry: form.big_bar_entry, runner_enabled: form.runner_enabled });
+      const result = await createPlanMutation.mutateAsync({ trade: payload, answers: { follow_through_confirmed: form.follow_through_confirmed, recent_stop_loss: form.recent_stop_loss, is_immediate_reverse: form.is_immediate_reverse, second_leg_entry: form.second_leg_entry, big_bar_entry: form.big_bar_entry, runner_enabled: form.runner_enabled } });
+      const trade = result.trade;
+      if (!result.checklistSaved) {
+        setPartialCreatedTradeId(trade.id);
+        setConfirmingCreate(false);
+        setError(`Trade plan #${trade.id} was created, but checklist answers were not saved. Open the trade and retry the checklist save.`);
+        return;
+      }
       setMessage(`Trade plan #${trade.id} for ${trade.symbol} was created.`);
       setConfirmingCreate(false);
       setForm(initialForm);
@@ -112,7 +133,7 @@ export function TradeChecklist() {
       setWarningsAcknowledged(false);
       window.location.hash = hashForPage("open-trades");
     } catch (caught) { setError(caught instanceof APIError ? `${caught.code}: ${caught.message}` : "Could not create the trade plan."); }
-    finally { setBusy(false); }
+    finally { /* mutation exposes pending state */ }
   }
 
   return <form className="trade-form trade-wizard" onSubmit={submit}>
@@ -130,14 +151,36 @@ export function TradeChecklist() {
         <ChoiceGroup label="Market context" choices={choices(contexts)} value={form.market_context || null} onChange={(value) => update("market_context", value)} />
         {form.market === "options" && <div className="option-planning-block"><div className="option-quote-toolbar"><div><strong>{form.symbol.trim().toUpperCase() || "Option"} contract</strong><small>Select your date and contract details below.</small></div><button type="button" className="secondary-button" disabled={busy || !form.symbol.trim()} onClick={() => void fetchPrice()}>{busy ? "Fetching…" : "Get strike suggestions"}</button></div><OptionContractSelector symbol={form.symbol} quote={quote} type={form.option_type} expiration={form.option_expiration} strike={form.option_strike} onChange={(values) => setForm((current) => ({ ...current, option_type: values.type ?? current.option_type, option_expiration: values.expiration ?? current.option_expiration, option_strike: values.strike ?? current.option_strike }))} /></div>}
       </section>}
-      {step === 3 && <section>{planSummary}<h3>Risk & Discipline</h3><div className="risk-cockpit"><div className="risk-inputs"><div className="form-grid three-columns">
-        {["planned_entry", "stop_loss", "target_1", "target_2", "position_size"].map((field) => <label key={field}>{field.replaceAll("_", " ")}{["planned_entry","stop_loss","target_1","position_size"].includes(field) ? " *" : ""}<input type="number" min={field === "position_size" ? "0.01" : undefined} step="0.01" value={String(form[field as keyof TradeFormState])} onChange={(event) => update(field as "planned_entry", event.target.value)} />{field === "position_size" && <small>Position size is required because total planned risk cannot be validated without it.</small>}</label>)}
-      </div>
-      <label className="check-row"><input type="checkbox" checked={form.runner_enabled} onChange={(event) => update("runner_enabled", event.target.checked)} />Keep a runner after partial profit</label>
-      <div className="check-list"><label className="check-row"><input type="checkbox" checked={form.recent_stop_loss} onChange={(event) => update("recent_stop_loss", event.target.checked)} />Recently stopped out</label>{form.setup === "breakout" && <label className="check-row"><input type="checkbox" checked={form.follow_through_confirmed} onChange={(event) => update("follow_through_confirmed", event.target.checked)} />Follow-through confirmed</label>}</div>
-      <label>Notes<textarea rows={3} value={form.notes} onChange={(event) => update("notes", event.target.value)} /></label></div>
-      <aside className="risk-decision-panel"><RuleAlertPanel status={status} alerts={alerts} /><section className="required-action"><span>Required Action</span><strong>{disabledReason || "Review the complete plan before creating it."}</strong></section><div className="risk-summary"><div><span>Risk per unit</span><strong>{riskReward?.risk.toFixed(2) ?? "—"}</strong></div><div><span>Position size</span><strong>{positionSize?.toFixed(2) ?? "—"}</strong></div><div><span>Total planned risk</span><strong>{totalRisk?.toFixed(2) ?? "—"}</strong></div><div><span>Target 1 R</span><strong>{riskReward && Number.isFinite(riskReward.targetR) ? `${riskReward.targetR.toFixed(2)}R` : "—"}</strong></div>{target2 !== null && <div><span>Target 2 R</span><strong>{target2R !== null && Number.isFinite(target2R) ? `${target2R.toFixed(2)}R` : "—"}</strong></div>}<div><span>Decision</span><strong>{status[0].toUpperCase() + status.slice(1)}</strong></div></div>{status === "warning" && <label className="warning-acknowledgement"><input type="checkbox" checked={warningsAcknowledged} onChange={(event) => setWarningsAcknowledged(event.target.checked)} />I reviewed and accept these warnings.</label>}</aside></div>
-      <button className="primary-button" disabled={createDisabled}>Create Trade Plan</button>{createDisabled && disabledReason && <p className="disabled-action-reason">{disabledReason}</p>}
+      {step === 3 && <section>
+        {planSummary}
+        <h3>Risk & Discipline</h3>
+        <div className="risk-cockpit">
+          <div className="risk-inputs">
+            <div className="risk-price-row">
+              {(["planned_entry", "stop_loss", "target_1", "target_2"] as const).map((field) => <label key={field}>{field.replaceAll("_", " ")}{field !== "target_2" ? " *" : ""}<input type="number" step="0.01" value={form[field]} onChange={(event) => update(field, event.target.value)} /></label>)}
+            </div>
+            <label className="position-size-field">Position size *<input type="number" min="0.01" step="0.01" value={form.position_size} onChange={(event) => update("position_size", event.target.value)} /><small>Position size is required because total planned risk cannot be validated without it.</small></label>
+            <div className="risk-summary risk-summary-left">
+              <div><span>Risk per unit</span><strong>{riskReward?.risk.toFixed(2) ?? "—"}</strong></div>
+              <div><span>Position size</span><strong>{positionSize?.toFixed(2) ?? "—"}</strong></div>
+              <div><span>Total planned risk</span><strong>{totalRisk?.toFixed(2) ?? "—"}</strong></div>
+              <div><span>Target 1 R</span><strong>{riskReward && Number.isFinite(riskReward.targetR) ? `${riskReward.targetR.toFixed(2)}R` : "—"}</strong></div>
+              {target2 !== null && <div><span>Target 2 R</span><strong>{target2R !== null && Number.isFinite(target2R) ? `${target2R.toFixed(2)}R` : "—"}</strong></div>}
+              <div><span>Decision</span><strong>{status[0].toUpperCase() + status.slice(1)}</strong></div>
+            </div>
+            <label className="check-row"><input type="checkbox" checked={form.runner_enabled} onChange={(event) => update("runner_enabled", event.target.checked)} />Keep a runner after partial profit</label>
+            <div className="check-list"><label className="check-row"><input type="checkbox" checked={form.recent_stop_loss} onChange={(event) => update("recent_stop_loss", event.target.checked)} />Recently stopped out</label>{form.setup === "breakout" && <label className="check-row"><input type="checkbox" checked={form.follow_through_confirmed} onChange={(event) => update("follow_through_confirmed", event.target.checked)} />Follow-through confirmed</label>}</div>
+            <label>Notes<textarea rows={3} value={form.notes} onChange={(event) => update("notes", event.target.value)} /></label>
+          </div>
+          <aside className="risk-decision-panel">
+            <RuleAlertPanel status={status} alerts={alerts} />
+            <section className="required-action"><span>Required Action</span><strong>{disabledReason || "Review the complete plan before creating it."}</strong></section>
+            {status === "warning" && <label className="warning-acknowledgement"><input type="checkbox" checked={warningsAcknowledged} onChange={(event) => setWarningsAcknowledged(event.target.checked)} />I reviewed and accept these warnings.</label>}
+          </aside>
+        </div>
+        <button className="primary-button" disabled={createDisabled || createPlanMutation.isPending || partialCreatedTradeId !== null}>{createPlanMutation.isPending ? "Creating…" : "Create Trade Plan"}</button>
+        {createDisabled && disabledReason && <p className="disabled-action-reason">{disabledReason}</p>}
+        {partialCreatedTradeId !== null && <a className="secondary-button" href={hashForPage("open-trades")}>Open trade #{partialCreatedTradeId}</a>}
       </section>}
     </div>
     <div className="wizard-actions">{step > 1 && <button type="button" className="wizard-back-button" onClick={() => setStep(step - 1)}><span aria-hidden="true">←</span> Back</button>}{step < 3 && <button type="button" className="primary-button" disabled={step === 1 ? !step1Valid : !step2Valid} onClick={() => setStep(step + 1)}>Continue</button>}</div>{step < 3 && disabledReason && <p className="disabled-action-reason">{disabledReason}</p>}

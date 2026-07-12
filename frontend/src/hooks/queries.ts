@@ -16,6 +16,10 @@ import {
   openTrade,
   patchTrade,
   recordPartialExit,
+  refreshOpenPrices,
+  saveChecklistAnswers,
+  deleteTrade,
+  getHealth,
   sendTestEmail,
   updateDailyReadiness,
 } from "../api";
@@ -28,6 +32,7 @@ import type {
   TradeHorizon,
   TradePatchPayload,
   ExitReason,
+  HealthResponse,
 } from "../types";
 
 export const queryKeys = {
@@ -43,7 +48,7 @@ export const queryKeys = {
   priceAlertEvents: (tradeId: number) => ["price-alert-events", tradeId] as const,
 };
 
-function invalidateTradesAndSummary(queryClient: ReturnType<typeof useQueryClient>) {
+export function invalidateTradesAndSummary(queryClient: ReturnType<typeof useQueryClient>) {
   void queryClient.invalidateQueries({ queryKey: ["trades"] });
   void queryClient.invalidateQueries({ queryKey: ["daily-summary"] });
   void queryClient.invalidateQueries({ queryKey: ["attention"] });
@@ -74,6 +79,8 @@ export function useRulesQuery() {
   return useQuery({
     queryKey: queryKeys.rules(),
     queryFn: getRules,
+    staleTime: 60 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 }
 
@@ -88,11 +95,16 @@ export function useAttentionQuery(tradeHorizon?: TradeHorizon) {
   return useQuery({
     queryKey: queryKeys.attention(tradeHorizon),
     queryFn: () => getAttention(tradeHorizon),
+    refetchInterval: 30_000,
   });
 }
 
 export function useNotificationStatusQuery() {
-  return useQuery({ queryKey: queryKeys.notificationStatus(), queryFn: getNotificationStatus });
+  return useQuery({ queryKey: queryKeys.notificationStatus(), queryFn: getNotificationStatus, refetchInterval: 15_000 });
+}
+
+export function useHealthQuery() {
+  return useQuery<HealthResponse>({ queryKey: ["health"], queryFn: getHealth, refetchInterval: 30_000 });
 }
 
 export function usePriceAlertEventsQuery(tradeId: number) {
@@ -144,6 +156,41 @@ export function useCreateTradeMutation() {
   });
 }
 
+export function useCreateTradePlanMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ trade, answers }: { trade: TradeCreatePayload; answers: Record<string, boolean> }) => {
+      const created = await createTrade(trade);
+      try {
+        await saveChecklistAnswers(created.id, answers);
+        return { trade: created, checklistSaved: true as const, checklistError: null };
+      } catch (checklistError) {
+        return { trade: created, checklistSaved: false as const, checklistError };
+      }
+    },
+    onSettled: () => invalidateTradesAndSummary(queryClient),
+  });
+}
+
+export function useRefreshOpenPricesMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: refreshOpenPrices,
+    onSuccess: () => {
+      invalidateTradesAndSummary(queryClient);
+      void queryClient.invalidateQueries({ queryKey: ["price-alert-events"] });
+    },
+  });
+}
+
+export function useDeleteTradeMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: deleteTrade,
+    onSuccess: () => invalidateTradesAndSummary(queryClient),
+  });
+}
+
 export function usePatchTradeMutation() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -162,10 +209,12 @@ export function useOpenTradeMutation() {
     mutationFn: ({
       tradeId,
       actualEntry,
+      optionEntryPrice,
     }: {
       tradeId: number;
       actualEntry: number | null;
-    }) => openTrade(tradeId, actualEntry),
+      optionEntryPrice?: number | null;
+    }) => openTrade(tradeId, actualEntry, optionEntryPrice),
     onSuccess: () => {
       invalidateTradesAndSummary(queryClient);
       void queryClient.invalidateQueries({ queryKey: queryKeys.openTradeAttention() });

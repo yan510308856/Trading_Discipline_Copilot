@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app import models, schemas
 from app.errors import APIError
+from app.services.workflow_event_service import append_event
 
 
 READINESS_TEMPLATE: list[dict[str, Any]] = [
@@ -220,6 +221,16 @@ def update_readiness(
     record.checklist_items = merged_items
     record.notes = update.notes
     _apply_computed_fields(record)
+    append_event(
+        database,
+        "readiness_saved",
+        readiness_date=readiness_date,
+        event_data={
+            "completed_required_count": record.completed_required_count,
+            "total_required_count": record.total_required_count,
+            "cleared": record.is_cleared_for_intraday,
+        },
+    )
     database.commit()
     database.refresh(record)
     return _serialize(record)

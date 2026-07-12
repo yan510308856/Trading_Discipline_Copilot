@@ -86,6 +86,9 @@ class Trade(Base):
     price_alert_events: Mapped[list["TradePriceAlertEvent"]] = relationship(
         back_populates="trade", cascade="all, delete-orphan"
     )
+    workflow_events: Mapped[list["WorkflowEvent"]] = relationship(
+        back_populates="trade"
+    )
 
     @property
     def has_review(self) -> bool:
@@ -197,3 +200,26 @@ class DailyReadiness(Base):
     is_cleared_for_intraday: Mapped[bool] = mapped_column(Boolean, default=False)
     completed_required_count: Mapped[int] = mapped_column(Integer, default=0)
     total_required_count: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class WorkflowEvent(Base):
+    __tablename__ = "workflow_events"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    event_type: Mapped[str] = mapped_column(String(64), index=True)
+    trade_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("trades.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    readiness_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    rule_id: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    severity: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)
+    idempotency_key: Mapped[Optional[str]] = mapped_column(
+        String(192), nullable=True, unique=True, index=True
+    )
+    event_data: Mapped[dict] = mapped_column(JSON, default=dict)
+    occurred_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+    trade: Mapped[Optional[Trade]] = relationship(back_populates="workflow_events")

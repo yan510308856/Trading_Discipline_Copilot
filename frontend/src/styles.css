@@ -2806,8 +2806,13 @@ textarea {
 .operational-status-list dd { margin: 0; font-weight: 700; text-align: right; }
 .plan-summary { display: grid; gap: .3rem; margin-bottom: 1rem; padding: .8rem 1rem; border-left: 3px solid #6172f3; background: rgba(97,114,243,.08); border-radius: .4rem; text-transform: capitalize; }
 .risk-cockpit { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(18rem, 1fr); gap: 1.25rem; align-items: start; }
+.risk-inputs { display: grid; gap: 1rem; align-content: start; }
+.risk-price-row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .75rem; }
+.risk-price-row label, .position-size-field { display: grid; align-content: start; gap: .4rem; }
+.position-size-field { width: min(15rem, 100%); }
 .risk-decision-panel { position: sticky; top: 1rem; display: grid; gap: 1rem; }
 .risk-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .65rem; }
+.risk-summary-left { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .risk-summary > div { padding: .7rem; border-radius: .55rem; background: rgba(0,0,0,.04); }
 .risk-summary span, .risk-summary strong { display: block; }
 .disabled-action-reason { color: #b42318; font-weight: 700; }
@@ -2816,6 +2821,10 @@ textarea {
 @media (max-width: 760px) {
   .risk-cockpit, .operational-status-list { grid-template-columns: 1fr; }
   .risk-decision-panel { position: static; }
+  .risk-price-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 430px) {
+  .risk-price-row, .risk-summary-left { grid-template-columns: 1fr; }
 }
 .attention-counts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; margin: 1rem 0; }
 .attention-counts > div { padding: 1rem; border: 1px solid var(--line); border-radius: .75rem; background: #f8faf8; }
@@ -2830,6 +2839,16 @@ textarea {
 .attention-severity { text-transform: uppercase; font-size: .68rem; font-weight: 800; }
 .exit-runner-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1rem; align-items: stretch; }
 .exit-execution-fields { display: flex; align-items: end; flex-wrap: wrap; gap: .6rem; min-width: 0; }
+.exit-execution-fields .exit-reason-field { width: 9rem; }
+.exit-execution-fields .record-exit-button { min-height: 2.85rem; white-space: nowrap; }
+@media (min-width: 1100px) {
+  .option-exit-fields { flex-wrap: nowrap; }
+  .option-exit-fields label { white-space: nowrap; }
+  .option-exit-fields .partial-quantity-field { width: 7.25rem; flex: 0 1 7.25rem; }
+  .option-exit-fields .partial-quantity-field:first-child { width: 8.5rem; flex-basis: 8.5rem; }
+  .option-exit-fields .exit-reason-field { width: 8.5rem; flex: 0 1 8.5rem; }
+  .option-exit-fields .record-exit-button { flex: 0 0 auto; padding-inline: .8rem; }
+}
 .inline-runner-controls { display: flex; align-items: end; gap: .65rem; min-width: 17rem; padding-left: 1rem; border-left: 1px solid var(--line); }
 .inline-runner-controls .runner-stop-field { width: 7.5rem; }
 .inline-runner-controls .runner-stop-field input { width: 100%; }

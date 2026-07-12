@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 
-import { APIError, createReview } from "../api";
+import { useCreateReviewMutation } from "../hooks/queries";
 import { useTrades } from "../hooks/useTrades";
 import type {
   FollowedPlan,
@@ -22,6 +22,7 @@ import {
   horizonForApi,
 } from "./HorizonFilter";
 import { contextFromHash, positiveIntegerContext } from "../utils/navigation";
+import { frontendErrorMessage } from "../utils/apiError";
 import { useQueryClient } from "@tanstack/react-query";
 
 const mistakeOptions = [
@@ -55,9 +56,7 @@ const classificationLabels: Record<TradeClassification, string> = {
 };
 
 function errorMessage(error: unknown): string {
-  return error instanceof APIError
-    ? `${error.code}: ${error.message}`
-    : "The review could not be saved. Confirm that the backend is running.";
+  return frontendErrorMessage(error, "The review could not be saved. Confirm that the backend is running.");
 }
 
 function toggleValue(values: string[], value: string): string[] {
@@ -132,6 +131,7 @@ function ExecutionHistory({ trade }: { trade: Trade }) {
 }
 
 function ReviewForm({ trade, onReviewed }: ReviewFormProps) {
+  const reviewMutation = useCreateReviewMutation();
   const [followedPlan, setFollowedPlan] = useState<FollowedPlan>("yes");
   const [mistakeTags, setMistakeTags] = useState<string[]>([]);
   const [positiveActions, setPositiveActions] = useState<string[]>([]);
@@ -154,7 +154,7 @@ function ReviewForm({ trade, onReviewed }: ReviewFormProps) {
     setIsSaving(true);
     setError("");
     try {
-      onReviewed(await createReview(trade.id, payload));
+      onReviewed(await reviewMutation.mutateAsync({ tradeId: trade.id, review: payload }));
     } catch (requestError) {
       setError(errorMessage(requestError));
     } finally {

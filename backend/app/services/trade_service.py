@@ -16,6 +16,7 @@ from app.services.option_contract_service import (
     resolved_underlying_direction,
     underlying_direction,
 )
+from app.services.workflow_event_service import append_event
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +40,11 @@ def create_planned_trade(database: Session, trade_data: schemas.TradeCreate) -> 
 
     trade = models.Trade(**_apply_option_contract(trade_data.model_dump()), status="planned")
     database.add(trade)
+    database.flush()
+    append_event(
+        database, "plan_created", trade_id=trade.id,
+        event_data={"market": trade.market, "horizon": trade.trade_horizon, "setup": trade.setup},
+    )
     database.commit()
     database.refresh(trade)
     return trade
@@ -144,6 +150,10 @@ def update_trade(
 
     for field, value in updates.items():
         setattr(trade, field, value)
+    append_event(
+        database, "trade_updated", trade_id=trade.id,
+        event_data={"fields": sorted(updates)},
+    )
     database.commit()
     database.refresh(trade)
     if "current_price" in updates:
@@ -279,9 +289,17 @@ def record_partial_exit(
         trade.closed_at = models.utc_now()
         trade.runner_active = False
         logger.info("trade_auto_closed trade_id=%s quantity=%s", trade.id, requested)
+        append_event(
+            database, "trade_auto_closed", trade_id=trade.id,
+            event_data={"exit_reason": exit_data.exit_reason, "final_r": trade.final_r},
+        )
     else:
         trade.partial_exit_quantity = float(exited_quantity + requested)
         trade.partial_taken = True
+        append_event(
+            database, "partial_exit_recorded", trade_id=trade.id,
+            event_data={"quantity": float(requested), "price": exit_data.price, "exit_reason": exit_data.exit_reason},
+        )
     database.commit()
     database.refresh(trade)
     return trade
@@ -306,6 +324,10 @@ def open_trade(
     trade.current_stop = trade.stop_loss
     trade.status = "open"
     trade.opened_at = models.utc_now()
+    append_event(
+        database, "trade_opened", trade_id=trade.id,
+        event_data={"actual_entry": trade.actual_entry},
+    )
     database.commit()
     database.refresh(trade)
     return trade
@@ -338,6 +360,10 @@ def close_trade(
     trade.status = "closed"
     trade.closed_at = models.utc_now()
     trade.runner_active = False
+    append_event(
+        database, "trade_manually_closed", trade_id=trade.id,
+        event_data={"exit_reason": trade_data.exit_reason, "final_r": trade.final_r},
+    )
     database.commit()
     database.refresh(trade)
     return trade

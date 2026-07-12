@@ -261,3 +261,8 @@ New trade plans require a positive position size so total planned risk can be ca
 Rule Alerts is now the operational **Attention Center**. It contains only active work: blockers, warnings, meaningful reminders, stale critical prices, failed alert emails, pending reviews, and notification configuration problems. Attention is intentionally opened as a dedicated page; navigation and Dashboard do not repeat its count or item list.
 
 Attention links retain trade context in the URL, for example `#open-trades?trade_id=123` and `#post-trade-review?trade_id=123`. Open trades now include inline runner-stop editing, one context-aware runner-state action, collapsed price-alert history, execution preview, and a direct review handoff after a full exit.
+# Stage 25: consistent server state and workflow audit
+
+Frontend server reads now belong to TanStack Query and server writes to mutation hooks. Component state is reserved for edit drafts, UI state, and derived presentation. Query defaults provide short general freshness, long-lived Rules Library data, periodic Attention and notification health refreshes, and mutation-driven invalidation without clearing cached content.
+
+The backend now records a lightweight append-only `WorkflowEvent` audit trail for meaningful readiness, planning, lifecycle, review, and email-delivery actions. A read-only development endpoint is available at `GET /workflow-events`; there is no analytics navigation page and this is not event sourcing.

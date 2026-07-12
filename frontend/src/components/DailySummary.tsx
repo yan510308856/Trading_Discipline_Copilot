@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
-import { APIError, getDailySummary } from "../api";
-import type { DailySummaryData } from "../types";
+import { APIError } from "../api";
+import { useDailySummaryQuery } from "../hooks/queries";
 import {
   HorizonFilter,
   type HorizonFilterValue,
@@ -30,28 +30,10 @@ function requestErrorMessage(error: unknown): string {
 export function DailySummary() {
   const [selectedDate, setSelectedDate] = useState(todayKey);
   const [horizonFilter, setHorizonFilter] = useState<HorizonFilterValue>("all");
-  const [summary, setSummary] = useState<DailySummaryData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    let active = true;
-    setIsLoading(true);
-    setError("");
-    void getDailySummary(selectedDate, horizonForApi(horizonFilter))
-      .then((result) => {
-        if (active) setSummary(result);
-      })
-      .catch((requestError) => {
-        if (active) setError(requestErrorMessage(requestError));
-      })
-      .finally(() => {
-        if (active) setIsLoading(false);
-      });
-    return () => {
-      active = false;
-    };
-  }, [horizonFilter, selectedDate]);
+  const summaryQuery = useDailySummaryQuery(selectedDate, horizonForApi(horizonFilter));
+  const summary = summaryQuery.data ?? null;
+  const isLoading = summaryQuery.isLoading;
+  const error = summaryQuery.error ? requestErrorMessage(summaryQuery.error) : "";
 
   return (
     <section className="daily-summary-page">

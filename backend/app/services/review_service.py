@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from app import models, schemas
 from app.errors import APIError
 from app.services.trade_service import get_trade
+from app.services.workflow_event_service import append_event
 
 
 DEFAULT_SCORING_RULES_PATH = (
@@ -170,6 +171,15 @@ def create_review(
     trade.followed_plan = review_data.followed_plan
     trade.discipline_score = scoring["score"]
     database.add(review)
+    database.flush()
+    append_event(
+        database, "review_created", trade_id=trade.id,
+        event_data={
+            "discipline_score": scoring["score"],
+            "classification": classification,
+            "followed_plan": review_data.followed_plan,
+        },
+    )
     database.commit()
     database.refresh(review)
     return review

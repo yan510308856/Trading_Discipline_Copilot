@@ -41,11 +41,11 @@ interface IntradayReadinessPanelProps {
 export function IntradayReadinessPanel({
   onReadinessChange,
 }: IntradayReadinessPanelProps) {
-  const [readiness, setReadiness] = useState<DailyReadinessData | null>(null);
   const [items, setItems] = useState<DailyReadinessItem[]>([]);
   const [notes, setNotes] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const readinessQuery = useDailyReadinessQuery();
+  const readiness = readinessQuery.data ?? null;
   const updateReadinessMutation = useUpdateDailyReadinessMutation();
   const isLoading = readinessQuery.isLoading;
   const isSaving = updateReadinessMutation.isPending;
@@ -57,7 +57,6 @@ export function IntradayReadinessPanel({
 
   useEffect(() => {
     if (readinessQuery.data) {
-      setReadiness(readinessQuery.data);
       setItems(readinessQuery.data.items);
       setNotes(readinessQuery.data.notes ?? "");
       onReadinessChange?.(readinessQuery.data);
@@ -79,7 +78,6 @@ export function IntradayReadinessPanel({
           notes: notes.trim() || null,
         },
       });
-      setReadiness(result);
       setItems(result.items);
       setNotes(result.notes ?? "");
       setSuccessMessage("Intraday readiness saved.");

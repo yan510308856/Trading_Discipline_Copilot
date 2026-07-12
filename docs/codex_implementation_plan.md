@@ -1254,3 +1254,11 @@ and a three-step option-aware planner. See `stage22_live_alerts_and_execution_wo
 - Add reload-safe deep links for open-trade, price-alert, notification, and post-review destinations.
 - Standardize runner controls, show collapsed alert history and execution preview, and provide close-to-review handoff.
 - Preserve RuleAlertPanel, OptionContractSelector, underlying-only option R, and bottom Dashboard readiness.
+## Stage 25 implementation
+
+- Enforce query-owned reads and mutation-owned writes across operational pages.
+- Preserve only drafts, modal state, dismissed notices, and derived calculations locally.
+- Define query freshness, retry, reconnect, focus, and polling policies.
+- Add additive WorkflowEvent storage, filtered development API, and lifecycle integration.
+- Record planning attempts explicitly and idempotently; never audit debounced renders.
+- Keep current-state models authoritative; do not introduce event replay or analytics UI.
