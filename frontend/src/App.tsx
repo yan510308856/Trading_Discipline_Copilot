@@ -7,6 +7,7 @@ import { PostTradeReview } from "./components/PostTradeReview";
 import { AttentionCenter } from "./components/AttentionCenter";
 import { RulesLibrary } from "./components/RulesLibrary";
 import { TradeChecklist } from "./components/TradeChecklist";
+import { DisciplineAnalytics } from "./components/DisciplineAnalytics";
 import type { NavigationItem, PageId } from "./types";
 import { hashForPage, pageFromHash } from "./utils/navigation";
 
@@ -17,6 +18,7 @@ export const navigation: NavigationItem[] = [
   { id: "open-trades", label: "Open Trades", shortLabel: "Manage", icon: "▣" },
   { id: "post-trade-review", label: "Post-Trade Review", shortLabel: "Review", icon: "✓" },
   { id: "daily-summary", label: "Daily Summary", shortLabel: "Summary", icon: "▥" },
+  { id: "discipline-analytics", label: "Discipline Analytics", shortLabel: "Analytics", icon: "⌁" },
   { id: "rules-library", label: "Rules Library", shortLabel: "Rules", icon: "□" },
 ];
 
@@ -27,6 +29,7 @@ const pages: Record<PageId, React.ReactNode> = {
   "open-trades": <OpenTradePanel />,
   "post-trade-review": <PostTradeReview />,
   "daily-summary": <DailySummary />,
+  "discipline-analytics": <DisciplineAnalytics />,
   "rules-library": <RulesLibrary />,
 };
 

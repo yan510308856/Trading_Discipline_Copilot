@@ -5,6 +5,7 @@ export type PageId =
   | "open-trades"
   | "post-trade-review"
   | "daily-summary"
+  | "discipline-analytics"
   | "rules-library";
 
 export interface NavigationItem {
@@ -33,6 +34,80 @@ export interface DailySummaryData {
   revenge_trade_count: number;
   most_frequent_mistakes: MistakeFrequency[];
   lessons: string[];
+}
+
+export interface AnalyticsFilters {
+  date_from?: string;
+  date_to?: string;
+  trade_horizon?: TradeHorizon;
+  market?: Market;
+  setup?: string;
+}
+
+export interface AnalyticsFrequency { key: string; count: number; }
+export interface AnalyticsHorizonIssues { horizon: TradeHorizon; issue_count: number; }
+
+export interface DisciplineAnalyticsData {
+  timezone: "UTC";
+  date_from: string | null;
+  date_to: string | null;
+  trade_horizon: TradeHorizon | null;
+  market: Market | null;
+  setup: string | null;
+  preparation: {
+    readiness_days_recorded: number;
+    readiness_days_cleared: number;
+    readiness_completion_rate: number | null;
+    average_required_items_completed: number | null;
+  };
+  planning_quality: {
+    plans_created: number;
+    blocked_plan_attempts: number;
+    warning_finalization_attempts: number;
+    percent_plans_with_valid_stop: number | null;
+    percent_plans_with_position_size: number | null;
+    average_planned_risk_reward: number | null;
+    average_total_planned_risk: number | null;
+  };
+  execution_discipline: {
+    trades_opened: number;
+    trades_with_partial_exits: number;
+    partial_exit_rate: number | null;
+    trades_with_runner_activated: number;
+    runner_without_stop_occurrences: number;
+    green_to_red_warning_occurrences: number;
+    average_number_of_exit_executions: number | null;
+    auto_closed_trade_count: number;
+  };
+  review_completion: {
+    closed_trades: number;
+    reviewed_trades: number;
+    review_completion_rate: number | null;
+    median_close_to_review_minutes: number | null;
+    reviews_within_24_hours: number;
+    review_within_24_hours_rate: number | null;
+    pending_review_count: number;
+  };
+  notification_reliability: {
+    threshold_events: number;
+    emails_sent: number;
+    emails_failed: number;
+    email_success_rate: number | null;
+    retry_exhausted_events: number;
+    latest_failure_at: string | null;
+  };
+  recurring_issues: {
+    most_frequent_mistake_tags: AnalyticsFrequency[];
+    most_frequent_blocking_rules: AnalyticsFrequency[];
+    most_frequent_warning_rules: AnalyticsFrequency[];
+    issue_breakdown_by_horizon: AnalyticsHorizonIssues[];
+  };
+  outcome_context: {
+    total_underlying_r: number;
+    average_underlying_r: number | null;
+    median_underlying_r: number | null;
+    average_discipline_score: number | null;
+  };
 }
 
 export type DailyReadinessStatus =

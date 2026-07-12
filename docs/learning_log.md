@@ -647,3 +647,11 @@ No trading behavior changed. This stage improves frontend maintainability so rea
 - Audit trails are most trustworthy when lifecycle events share the domain transaction.
 - External side effects need outcome events after the attempt, while idempotency prevents retry noise.
 - An audit log can support future analytics without turning the application into an event-sourced system.
+
+## Stage 26 learning notes
+
+- A trustworthy rate starts with an explicit denominator; null is more honest than zero when it is absent.
+- Planning, opening, closing, threshold detection, and event occurrence use different timestamps.
+- Compatibility recovery logic should not validate plan quality: a stop is checked against the intended underlying direction.
+- Audit-derived metrics should disclose legacy undercount instead of inferring actions from final state.
+- Outcome context remains separate from process quality, and options outcomes are always Underlying R.

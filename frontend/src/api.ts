@@ -3,6 +3,8 @@ import type {
   DailyReadinessData,
   DailyReadinessUpdatePayload,
   DailySummaryData,
+  DisciplineAnalyticsData,
+  AnalyticsFilters,
   HealthResponse,
   OpenTradeAttention,
   QuoteResult,
@@ -82,6 +84,19 @@ export function getDailySummary(
   if (tradeHorizon) query.set("trade_horizon", tradeHorizon);
   const queryString = query.toString() ? `?${query.toString()}` : "";
   return apiRequest<DailySummaryData>(`/summary/daily${queryString}`);
+}
+
+export function analyticsQueryParams(filters: AnalyticsFilters): string {
+  const query = new URLSearchParams();
+  Object.entries(filters).forEach(([key, value]) => {
+    if (value) query.set(key, value);
+  });
+  return query.toString();
+}
+
+export function getDisciplineAnalytics(filters: AnalyticsFilters = {}): Promise<DisciplineAnalyticsData> {
+  const query = analyticsQueryParams(filters);
+  return apiRequest<DisciplineAnalyticsData>(`/analytics/discipline${query ? `?${query}` : ""}`);
 }
 
 export function getTodayDailyReadiness(): Promise<DailyReadinessData> {

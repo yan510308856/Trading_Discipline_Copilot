@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { getAttention, getDailySummary, getTrades } from "./api";
+import { getAttention, getDailySummary, getDisciplineAnalytics, getTrades } from "./api";
 
 function mockJsonResponse(data: unknown) {
   return Promise.resolve(
@@ -57,5 +57,15 @@ describe("api query parameters", () => {
     vi.stubGlobal("fetch", fetchMock);
     await getAttention("leap");
     expect(fetchMock).toHaveBeenCalledWith("/api/attention?trade_horizon=leap", expect.any(Object));
+  });
+
+  it("requests analytics with date, horizon, market, and setup filters", async () => {
+    const fetchMock = vi.fn(() => mockJsonResponse({}));
+    vi.stubGlobal("fetch", fetchMock);
+    await getDisciplineAnalytics({ date_from: "2026-07-01", date_to: "2026-07-11", trade_horizon: "leap", market: "options", setup: "breakout" });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/analytics/discipline?date_from=2026-07-01&date_to=2026-07-11&trade_horizon=leap&market=options&setup=breakout",
+      expect.any(Object),
+    );
   });
 });

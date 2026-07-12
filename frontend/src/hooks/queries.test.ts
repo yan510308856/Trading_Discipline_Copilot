@@ -20,7 +20,7 @@ describe("query keys", () => {
     ]);
   });
 
-  it("invalidates trades, summary, and Attention after domain writes", async () => {
+  it("invalidates trades, summary, Attention, and analytics after domain writes", async () => {
     const client = new QueryClient();
     const invalidated: unknown[] = [];
     client.invalidateQueries = ((filters: { queryKey?: unknown }) => {
@@ -30,6 +30,13 @@ describe("query keys", () => {
 
     invalidateTradesAndSummary(client);
 
-    expect(invalidated).toEqual([["trades"], ["daily-summary"], ["attention"]]);
+    expect(invalidated).toEqual([["trades"], ["daily-summary"], ["attention"], ["analytics"]]);
+  });
+
+  it("uses every analytics filter in a stable query key", () => {
+    expect(queryKeys.analytics({ date_from: "2026-07-01", date_to: "2026-07-11", trade_horizon: "leap", market: "options", setup: "breakout" })).toEqual([
+      "analytics",
+      { date_from: "2026-07-01", date_to: "2026-07-11", trade_horizon: "leap", market: "options", setup: "breakout" },
+    ]);
   });
 });

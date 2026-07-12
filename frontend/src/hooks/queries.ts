@@ -6,6 +6,7 @@ import {
   createTrade,
   getDailyReadiness,
   getDailySummary,
+  getDisciplineAnalytics,
   getOpenTradeAttention,
   getAttention,
   getNotificationStatus,
@@ -33,6 +34,7 @@ import type {
   TradePatchPayload,
   ExitReason,
   HealthResponse,
+  AnalyticsFilters,
 } from "../types";
 
 export const queryKeys = {
@@ -46,12 +48,29 @@ export const queryKeys = {
   attention: (tradeHorizon?: TradeHorizon) => ["attention", tradeHorizon ?? "all"] as const,
   notificationStatus: () => ["notification-status"] as const,
   priceAlertEvents: (tradeId: number) => ["price-alert-events", tradeId] as const,
+  analytics: (filters: AnalyticsFilters = {}) => ["analytics", {
+    date_from: filters.date_from ?? null,
+    date_to: filters.date_to ?? null,
+    trade_horizon: filters.trade_horizon ?? null,
+    market: filters.market ?? null,
+    setup: filters.setup ?? null,
+  }] as const,
 };
 
 export function invalidateTradesAndSummary(queryClient: ReturnType<typeof useQueryClient>) {
   void queryClient.invalidateQueries({ queryKey: ["trades"] });
   void queryClient.invalidateQueries({ queryKey: ["daily-summary"] });
   void queryClient.invalidateQueries({ queryKey: ["attention"] });
+  void queryClient.invalidateQueries({ queryKey: ["analytics"] });
+}
+
+export function useDisciplineAnalyticsQuery(filters: AnalyticsFilters) {
+  return useQuery({
+    queryKey: queryKeys.analytics(filters),
+    queryFn: () => getDisciplineAnalytics(filters),
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
 }
 
 export function useDailySummaryQuery(date?: string, tradeHorizon?: TradeHorizon) {
@@ -142,6 +161,7 @@ export function useUpdateDailyReadinessMutation() {
       void queryClient.invalidateQueries({ queryKey: ["daily-readiness"] });
       queryClient.setQueryData(queryKeys.dailyReadiness(readiness.readiness_date), readiness);
       queryClient.setQueryData(queryKeys.dailyReadiness(), readiness);
+      void queryClient.invalidateQueries({ queryKey: ["analytics"] });
     },
   });
 }
