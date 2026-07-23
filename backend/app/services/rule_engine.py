@@ -54,6 +54,16 @@ def _condition_matches(condition: Mapping[str, Any], trade: Mapping[str, Any]) -
         if not isinstance(expected_values, list):
             raise ValueError("Operator 'in' requires a list value")
         return actual in expected_values
+    if operator in {"contains", "contains_any", "contains_none"}:
+        if not isinstance(actual, list):
+            return False
+        expected = condition.get("value")
+        if operator == "contains":
+            return expected in actual
+        if not isinstance(expected, list):
+            raise ValueError(f"Operator '{operator}' requires a list value")
+        found = any(value in actual for value in expected)
+        return found if operator == "contains_any" else not found
     if _is_missing(actual):
         return False
 
@@ -136,5 +146,15 @@ class RuleEngine:
 
 def evaluate_trade(trade: object) -> dict[str, Any]:
     """Evaluate a trade with the default price-action rules."""
-
-    return RuleEngine().evaluate(trade)
+    values = dict(_trade_values(trade))
+    if not all(values.get(field) for field in ("market_state", "trade_thesis", "entry_trigger")):
+        from app.services.price_action_taxonomy import classification_from_legacy
+        mapped = classification_from_legacy(values.get("setup"), values.get("market_context"))
+        if not values.get("market_context"):
+            mapped.pop("market_state", None)
+        if not values.get("setup"):
+            mapped.pop("trade_thesis", None)
+            mapped.pop("entry_trigger", None)
+            mapped.pop("is_unconfirmed_reversal", None)
+        values |= mapped
+    return RuleEngine().evaluate(values)

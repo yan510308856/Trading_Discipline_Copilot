@@ -38,24 +38,41 @@ def _in_time(statement, column, start: datetime | None, end: datetime | None):
     return statement
 
 
-def _trade_filters(statement, horizon: str | None, market: str | None, setup: str | None):
+def _trade_filters(statement, horizon: str | None, market: str | None, setup: str | None,
+                   market_state: str | None = None, trade_thesis: str | None = None,
+                   entry_trigger: str | None = None, location_tag: str | None = None):
     if horizon:
         statement = statement.where(models.Trade.trade_horizon == horizon)
     if market:
         statement = statement.where(models.Trade.market == market)
     if setup:
         statement = statement.where(models.Trade.setup == setup)
+    if market_state:
+        statement = statement.where(models.Trade.market_state == market_state)
+    if trade_thesis:
+        statement = statement.where(models.Trade.trade_thesis == trade_thesis)
+    if entry_trigger:
+        statement = statement.where(models.Trade.entry_trigger == entry_trigger)
+    if location_tag:
+        statement = statement.where(models.Trade.location_tags.contains(location_tag))
     return statement
 
 
-def _event_matches(event: models.WorkflowEvent, horizon: str | None, market: str | None, setup: str | None) -> bool:
+def _event_matches(event: models.WorkflowEvent, horizon: str | None, market: str | None, setup: str | None,
+                   market_state: str | None, trade_thesis: str | None, entry_trigger: str | None,
+                   location_tag: str | None) -> bool:
     data = event.event_data or {}
     trade = event.trade
-    return all((expected is None or actual == expected) for expected, actual in (
+    scalar_match = all((expected is None or actual == expected) for expected, actual in (
         (horizon, data.get("horizon") if event.event_type.startswith("plan_") else getattr(trade, "trade_horizon", None)),
         (market, data.get("market") if event.event_type.startswith("plan_") else getattr(trade, "market", None)),
         (setup, data.get("setup") if event.event_type.startswith("plan_") else getattr(trade, "setup", None)),
+        (market_state, data.get("market_state") if event.event_type.startswith("plan_") else getattr(trade, "market_state", None)),
+        (trade_thesis, data.get("trade_thesis") if event.event_type.startswith("plan_") else getattr(trade, "trade_thesis", None)),
+        (entry_trigger, data.get("entry_trigger") if event.event_type.startswith("plan_") else getattr(trade, "entry_trigger", None)),
     ))
+    locations = data.get("location_tags", []) if event.event_type.startswith("plan_") else getattr(trade, "location_tags", []) if trade else []
+    return scalar_match and (location_tag is None or location_tag in locations)
 
 
 def discipline_analytics(
@@ -66,6 +83,10 @@ def discipline_analytics(
     trade_horizon: str | None = None,
     market: str | None = None,
     setup: str | None = None,
+    market_state: str | None = None,
+    trade_thesis: str | None = None,
+    entry_trigger: str | None = None,
+    location_tag: str | None = None,
 ) -> dict:
     start, end = _boundaries(date_from, date_to)
 
@@ -79,25 +100,25 @@ def discipline_analytics(
     plans_statement = _trade_filters(select(models.Trade).options(
         selectinload(models.Trade.review), selectinload(models.Trade.executions),
         selectinload(models.Trade.alerts), selectinload(models.Trade.price_alert_events),
-    ), trade_horizon, market, setup)
+    ), trade_horizon, market, setup, market_state, trade_thesis, entry_trigger, location_tag)
     plans_statement = _in_time(plans_statement, models.Trade.created_at, start, end)
     plans = list(database.scalars(plans_statement))
 
     opened_statement = _trade_filters(select(models.Trade).options(
         selectinload(models.Trade.executions), selectinload(models.Trade.alerts)
-    ).where(models.Trade.opened_at.is_not(None)), trade_horizon, market, setup)
+    ).where(models.Trade.opened_at.is_not(None)), trade_horizon, market, setup, market_state, trade_thesis, entry_trigger, location_tag)
     opened_statement = _in_time(opened_statement, models.Trade.opened_at, start, end)
     opened = list(database.scalars(opened_statement))
 
     closed_statement = _trade_filters(select(models.Trade).options(
         selectinload(models.Trade.review), selectinload(models.Trade.executions)
-    ).where(models.Trade.closed_at.is_not(None)), trade_horizon, market, setup)
+    ).where(models.Trade.closed_at.is_not(None)), trade_horizon, market, setup, market_state, trade_thesis, entry_trigger, location_tag)
     closed_statement = _in_time(closed_statement, models.Trade.closed_at, start, end)
     closed = list(database.scalars(closed_statement))
 
     event_statement = select(models.WorkflowEvent).options(selectinload(models.WorkflowEvent.trade))
     event_statement = _in_time(event_statement, models.WorkflowEvent.occurred_at, start, end)
-    events = [event for event in database.scalars(event_statement) if _event_matches(event, trade_horizon, market, setup)]
+    events = [event for event in database.scalars(event_statement) if _event_matches(event, trade_horizon, market, setup, market_state, trade_thesis, entry_trigger, location_tag)]
 
     event_types = Counter(event.event_type for event in events)
     planned_rrs: list[float] = []
@@ -122,7 +143,7 @@ def discipline_analytics(
     within_24 = sum(delay <= 1440 for delay in review_delays)
 
     alert_statement = select(models.TradePriceAlertEvent).join(models.Trade)
-    alert_statement = _trade_filters(alert_statement, trade_horizon, market, setup)
+    alert_statement = _trade_filters(alert_statement, trade_horizon, market, setup, market_state, trade_thesis, entry_trigger, location_tag)
     alert_statement = _in_time(alert_statement, models.TradePriceAlertEvent.triggered_at, start, end)
     threshold_events = list(database.scalars(alert_statement))
     attempted_events = [event for event in threshold_events if event.attempt_count > 0]
@@ -167,6 +188,8 @@ def discipline_analytics(
     return {
         "timezone": "UTC", "date_from": date_from, "date_to": date_to,
         "trade_horizon": trade_horizon, "market": market, "setup": setup,
+        "market_state": market_state, "trade_thesis": trade_thesis,
+        "entry_trigger": entry_trigger, "location_tag": location_tag,
         "preparation": {
             "readiness_days_recorded": len(readiness),
             "readiness_days_cleared": sum(item.is_cleared_for_intraday for item in readiness),

@@ -3,6 +3,7 @@ import { useState } from "react";
 import { APIError } from "../api";
 import { useDisciplineAnalyticsQuery } from "../hooks/queries";
 import type { AnalyticsFilters } from "../types";
+import { entryTriggerOptions, locationTagOptions, marketStateOptions, tradeThesisOptions } from "../utils/priceActionTaxonomy";
 
 type MetricProps = { label: string; value: string; definition: string };
 
@@ -39,7 +40,11 @@ export function DisciplineAnalytics() {
       <label>To<input type="date" value={filters.date_to ?? ""} onChange={(event) => set("date_to", event.target.value)} /></label>
       <label>Horizon<select value={filters.trade_horizon ?? ""} onChange={(event) => set("trade_horizon", event.target.value)}><option value="">All</option>{["intraday", "swing", "leap", "other"].map((item) => <option key={item} value={item}>{item === "leap" ? "LEAP" : item}</option>)}</select></label>
       <label>Market<select value={filters.market ?? ""} onChange={(event) => set("market", event.target.value)}><option value="">All</option>{["stocks", "options", "futures", "crypto", "forex", "other"].map((item) => <option key={item}>{item}</option>)}</select></label>
-      <label>Setup<input value={filters.setup ?? ""} placeholder="All setups" onChange={(event) => set("setup", event.target.value)} /></label>
+      <label>Market State<select value={filters.market_state ?? ""} onChange={(event) => set("market_state", event.target.value)}><option value="">All</option>{marketStateOptions.map((item) => <option key={item.value} value={item.value}>{item.english} / {item.chinese}</option>)}</select></label>
+      <label>Trade Thesis<select value={filters.trade_thesis ?? ""} onChange={(event) => set("trade_thesis", event.target.value)}><option value="">All</option>{tradeThesisOptions.map((item) => <option key={item.value} value={item.value}>{item.english} / {item.chinese}</option>)}</select></label>
+      <label>Entry Trigger<select value={filters.entry_trigger ?? ""} onChange={(event) => set("entry_trigger", event.target.value)}><option value="">All</option>{entryTriggerOptions.map((item) => <option key={item.value} value={item.value}>{item.english} / {item.chinese}</option>)}</select></label>
+      <label>Location<select value={filters.location_tag ?? ""} onChange={(event) => set("location_tag", event.target.value)}><option value="">All</option>{locationTagOptions.map((item) => <option key={item.value} value={item.value}>{item.english} / {item.chinese}</option>)}</select></label>
+      <label>Legacy setup <small>Deprecated</small><input value={filters.setup ?? ""} placeholder="All legacy setups" onChange={(event) => set("setup", event.target.value)} /></label>
     </div>
     {analyticsQuery.isLoading && <p className="empty-state">Loading discipline analytics…</p>}
     {error && <p className="form-message error-message">{error}</p>}

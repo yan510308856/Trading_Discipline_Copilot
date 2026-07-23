@@ -252,6 +252,11 @@ docker-compose.yml      Local two-container application
 - [Engineering workflow](docs/engineering_workflow.md)
 - [Learning log](docs/learning_log.md)
 - [Discipline analytics definitions](docs/discipline_analytics_definitions.md)
+- [Price action taxonomy](docs/price_action_taxonomy.md)
+
+## Stage 27: structured bilingual price action
+
+New plans classify Market State / 市场结构, Trade Thesis / 交易逻辑, Entry Trigger / 入场触发, and Key Locations / 关键位置 separately. English and Chinese terminology comes from one frontend taxonomy, and Open Trades shows both languages together. `setup` and `market_context` remain deprecated compatibility mirrors. Narrow Channel is always translated as 窄通道.
 
 ## Stage 26: discipline effectiveness analytics
 

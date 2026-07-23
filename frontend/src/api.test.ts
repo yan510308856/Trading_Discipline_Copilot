@@ -28,6 +28,13 @@ describe("api query parameters", () => {
     );
   });
 
+  it("requests trades with structured classification filters", async () => {
+    const fetchMock = vi.fn(() => mockJsonResponse([]));
+    vi.stubGlobal("fetch", fetchMock);
+    await getTrades("planned", "swing", { market_state: "narrow_channel", trade_thesis: "pullback_continuation", entry_trigger: "wedge", location_tag: "support" });
+    expect(fetchMock).toHaveBeenCalledWith("/api/trades?limit=500&status=planned&trade_horizon=swing&market_state=narrow_channel&trade_thesis=pullback_continuation&entry_trigger=wedge&location_tag=support", expect.any(Object));
+  });
+
   it("requests daily summary with date and horizon filters", async () => {
     const fetchMock = vi.fn(() =>
       mockJsonResponse({

@@ -2,15 +2,15 @@ import type { SetStateAction } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { APIError } from "../api";
-import type { Trade, TradeHorizon } from "../types";
+import type { Trade, TradeFilters, TradeHorizon } from "../types";
 import { queryKeys, useTradesQuery } from "./queries";
 
-export function useTrades(status?: Trade["status"], tradeHorizon?: TradeHorizon) {
+export function useTrades(status?: Trade["status"], tradeHorizon?: TradeHorizon, filters: TradeFilters = {}) {
   const queryClient = useQueryClient();
-  const tradesQuery = useTradesQuery(status, tradeHorizon);
+  const tradesQuery = useTradesQuery(status, tradeHorizon, filters);
   const trades = tradesQuery.data ?? [];
   const setTrades = (update: SetStateAction<Trade[]>) => {
-    queryClient.setQueryData<Trade[]>(queryKeys.trades(status, tradeHorizon), (current = []) =>
+    queryClient.setQueryData<Trade[]>(queryKeys.trades(status, tradeHorizon, filters), (current = []) =>
       typeof update === "function" ? update(current) : update,
     );
   };

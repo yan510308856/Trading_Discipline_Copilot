@@ -977,6 +977,12 @@ Daily Readiness remains the final Dashboard section. Option risk and Final R con
 Discipline Analytics is a reflection page after Daily Summary, not a Dashboard replacement. It separates process evidence into preparation, planning, execution, review, notification reliability, recurring issues, and outcome context. Every rate has an explicit numerator and denominator; missing evidence remains null, and readiness never assumes unrecorded market days.
 
 Outcome cards deliberately say Underlying R. Options continue to use underlying entry, stop, target, and exit values only. Attention remains the operational action inbox while Analytics is a slower historical view.
+
+## Stage 27 — Price-action taxonomy
+
+Every new plan separately records market structure, trade thesis, entry trigger, key locations, and unconfirmed-reversal risk. These fields replace the logical use of the overloaded Setup & Context UI and appear bilingually in planning, management, and review. Legacy setup/context columns remain deprecated mirrors during the compatibility period.
+
+The taxonomy improves classification and rules; it does not predict structure automatically. Narrow Channel / 窄通道 is the approved term. Options remain underlying-R based, and Daily Readiness remains at the bottom of Dashboard.
 ## Stage 25 — Server-state consistency and workflow audit
 
 Frontend ownership follows one rule: reads are query-owned, writes use mutation hooks, edit drafts and UI state remain local, and derived values are memoized. Cached server data remains visible during background refetch. New-plan creation treats checklist persistence as a second required step and reports partial success without encouraging duplicate trade creation.

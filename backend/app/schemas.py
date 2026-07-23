@@ -11,6 +11,10 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 Market = Literal["futures", "stocks", "crypto", "forex", "options", "other"]
 Direction = Literal["long", "short"]
 TradeHorizon = Literal["swing", "intraday", "leap", "other"]
+MarketState = Literal["strong_trend", "narrow_channel", "broad_channel", "trading_range", "breakout_mode", "unclear"]
+TradeThesis = Literal["pullback_continuation", "breakout", "breakout_pullback", "failed_breakout", "range_reversal", "major_reversal", "other"]
+EntryTrigger = Literal["h1_h2_l1_l2", "second_entry", "wedge", "double_top_bottom", "inside_bar_triangle", "strong_signal_bar", "breakout_retest", "other"]
+LocationTag = Literal["opening_range", "gap_open", "range_high", "range_low", "prior_day_high", "prior_day_low", "support", "resistance", "pullback_zone", "breakout_point"]
 TradeStatus = Literal["planned", "open", "closed", "cancelled"]
 FollowedPlan = Literal["yes", "partial", "no"]
 TradeClassification = Literal[
@@ -70,6 +74,11 @@ class TradeCreate(BaseModel):
     direction: Direction
     setup: str = Field(min_length=1, max_length=64)
     market_context: str = Field(min_length=1, max_length=64)
+    market_state: MarketState
+    trade_thesis: TradeThesis
+    entry_trigger: EntryTrigger
+    location_tags: list[LocationTag] = Field(default_factory=list)
+    is_unconfirmed_reversal: bool = False
     planned_entry: float
     actual_entry: Optional[float] = None
     stop_loss: float
@@ -80,6 +89,26 @@ class TradeCreate(BaseModel):
     position_size: float = Field(gt=0)
     risk_per_trade: Optional[float] = Field(default=None, ge=0)
     notes: Optional[str] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_classification(cls, value: Any) -> Any:
+        if not isinstance(value, dict):
+            return value
+        from app.services.price_action_taxonomy import add_legacy_mirrors, classification_from_legacy
+        data = dict(value)
+        if not all(data.get(field) for field in ("market_state", "trade_thesis", "entry_trigger")):
+            legacy = classification_from_legacy(data.get("setup"), data.get("market_context"))
+            for field, mapped in legacy.items():
+                data.setdefault(field, mapped)
+        add_legacy_mirrors(data)
+        return data
+
+    @field_validator("location_tags")
+    @classmethod
+    def normalize_create_location_tags(cls, value: list[LocationTag]) -> list[LocationTag]:
+        from app.services.price_action_taxonomy import ordered_location_tags
+        return ordered_location_tags(value)  # type: ignore[arg-type]
 
     @field_validator(
         "planned_entry",
@@ -122,6 +151,9 @@ class TradeRead(TradeCreate):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
+    market_state: Optional[MarketState] = None
+    trade_thesis: Optional[TradeThesis] = None
+    entry_trigger: Optional[EntryTrigger] = None
     created_at: datetime
     updated_at: datetime
     opened_at: Optional[datetime]
@@ -160,6 +192,11 @@ class TradePatch(BaseModel):
     direction: Optional[Direction] = None
     setup: Optional[str] = Field(default=None, min_length=1, max_length=64)
     market_context: Optional[str] = Field(default=None, min_length=1, max_length=64)
+    market_state: Optional[MarketState] = None
+    trade_thesis: Optional[TradeThesis] = None
+    entry_trigger: Optional[EntryTrigger] = None
+    location_tags: Optional[list[LocationTag]] = None
+    is_unconfirmed_reversal: Optional[bool] = None
     planned_entry: Optional[float] = None
     actual_entry: Optional[float] = None
     stop_loss: Optional[float] = None
@@ -174,6 +211,14 @@ class TradePatch(BaseModel):
     position_size: Optional[float] = Field(default=None, gt=0)
     risk_per_trade: Optional[float] = Field(default=None, ge=0)
     notes: Optional[str] = None
+
+    @field_validator("location_tags")
+    @classmethod
+    def normalize_location_tags(cls, value: Optional[list[LocationTag]]) -> Optional[list[LocationTag]]:
+        if value is None:
+            return None
+        from app.services.price_action_taxonomy import ordered_location_tags
+        return ordered_location_tags(value)  # type: ignore[arg-type]
 
     @field_validator(
         "planned_entry",
@@ -504,6 +549,10 @@ class DisciplineAnalytics(BaseModel):
     trade_horizon: Optional[TradeHorizon]
     market: Optional[Market]
     setup: Optional[str]
+    market_state: Optional[MarketState]
+    trade_thesis: Optional[TradeThesis]
+    entry_trigger: Optional[EntryTrigger]
+    location_tag: Optional[LocationTag]
     preparation: AnalyticsPreparation
     planning_quality: AnalyticsPlanningQuality
     execution_discipline: AnalyticsExecutionDiscipline

@@ -14,6 +14,9 @@ SUPPORTED_OPERATORS = {
     "missing",
     "equals",
     "in",
+    "contains",
+    "contains_any",
+    "contains_none",
     "greater_than",
     "greater_than_or_equal",
     "less_than",
@@ -40,8 +43,10 @@ class RuleConditionModel(BaseModel):
 
     @model_validator(mode="after")
     def validate_operator_shape(self) -> "RuleConditionModel":
-        if self.operator == "in" and not isinstance(self.value, list):
+        if self.operator in {"in", "contains_any", "contains_none"} and not isinstance(self.value, list):
             raise ValueError("Operator 'in' requires a list value")
+        if self.operator == "contains" and isinstance(self.value, (list, dict)):
+            raise ValueError("Operator 'contains' requires a scalar value")
         if self.operator in {"greater_than_field", "less_than_field"} and not self.compare_field:
             raise ValueError(f"Operator '{self.operator}' requires compare_field")
         return self

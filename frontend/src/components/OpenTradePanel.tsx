@@ -21,6 +21,7 @@ import {
 import { PriceLadder } from "./PriceLadder";
 import { PriceFreshness } from "./PriceFreshness";
 import { RuleAlertPanel } from "./RuleAlertPanel";
+import { PriceActionClassification } from "./PriceActionClassification";
 import { DeleteTradeButton } from "./DeleteTradeButton";
 import {
   HorizonFilter,
@@ -350,6 +351,7 @@ function TradeCard({ trade, onUpdated, defaultExpanded, onDeleted, onAutoClosed 
           <span className="trade-status planned">Planned</span>
         </summary>
         <article className="open-trade-card">
+        <PriceActionClassification trade={trade} compact englishOnly />
         <div className="trade-facts compact-facts cockpit-metrics">
           <div><span>Horizon</span><strong>{trade.trade_horizon}</strong></div>
           <div><span>Planned entry</span><strong>{trade.planned_entry}</strong></div>
@@ -435,6 +437,8 @@ function TradeCard({ trade, onUpdated, defaultExpanded, onDeleted, onAutoClosed 
         <strong>{requiredActionText(primaryRequiredAction)}</strong>
         {primaryRequiredAction && <p>{primaryRequiredAction.message}</p>}
       </section>
+
+      <PriceActionClassification trade={trade} englishOnly />
 
       <div className="trade-facts cockpit-metrics">
         <div><span>Horizon</span><strong>{trade.trade_horizon}</strong></div>

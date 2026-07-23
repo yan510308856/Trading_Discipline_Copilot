@@ -63,6 +63,10 @@ def evaluate_rules(
                 "horizon": trade_values.get("trade_horizon"),
                 "market": trade_values.get("market"),
                 "setup": trade_values.get("setup"),
+                "market_state": trade_values.get("market_state"),
+                "trade_thesis": trade_values.get("trade_thesis"),
+                "entry_trigger": trade_values.get("entry_trigger"),
+                "location_tags": trade_values.get("location_tags", []),
             },
         )
         database.commit()

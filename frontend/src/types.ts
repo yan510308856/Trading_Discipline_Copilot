@@ -42,6 +42,10 @@ export interface AnalyticsFilters {
   trade_horizon?: TradeHorizon;
   market?: Market;
   setup?: string;
+  market_state?: MarketState;
+  trade_thesis?: TradeThesis;
+  entry_trigger?: EntryTrigger;
+  location_tag?: LocationTag;
 }
 
 export interface AnalyticsFrequency { key: string; count: number; }
@@ -54,6 +58,10 @@ export interface DisciplineAnalyticsData {
   trade_horizon: TradeHorizon | null;
   market: Market | null;
   setup: string | null;
+  market_state: MarketState | null;
+  trade_thesis: TradeThesis | null;
+  entry_trigger: EntryTrigger | null;
+  location_tag: LocationTag | null;
   preparation: {
     readiness_days_recorded: number;
     readiness_days_cleared: number;
@@ -159,6 +167,10 @@ export type Market =
 
 export type Direction = "long" | "short";
 export type TradeHorizon = "swing" | "intraday" | "leap" | "other";
+export type MarketState = "strong_trend" | "narrow_channel" | "broad_channel" | "trading_range" | "breakout_mode" | "unclear";
+export type TradeThesis = "pullback_continuation" | "breakout" | "breakout_pullback" | "failed_breakout" | "range_reversal" | "major_reversal" | "other";
+export type EntryTrigger = "h1_h2_l1_l2" | "second_entry" | "wedge" | "double_top_bottom" | "inside_bar_triangle" | "strong_signal_bar" | "breakout_retest" | "other";
+export type LocationTag = "opening_range" | "gap_open" | "range_high" | "range_low" | "prior_day_high" | "prior_day_low" | "support" | "resistance" | "pullback_zone" | "breakout_point";
 export type FollowedPlan = "yes" | "partial" | "no";
 export type RuleStatus = "allowed" | "warning" | "blocked";
 export type RuleSeverity = "blocker" | "warning" | "reminder";
@@ -194,6 +206,11 @@ export interface TradeFormState {
   direction: Direction;
   setup: string;
   market_context: string;
+  market_state: MarketState | "";
+  trade_thesis: TradeThesis | "";
+  entry_trigger: EntryTrigger | "";
+  location_tags: LocationTag[];
+  is_unconfirmed_reversal: boolean;
   planned_entry: string;
   stop_loss: string;
   target_1: string;
@@ -220,6 +237,11 @@ export interface TradeCreatePayload {
   direction: Direction;
   setup: string;
   market_context: string;
+  market_state: MarketState;
+  trade_thesis: TradeThesis;
+  entry_trigger: EntryTrigger;
+  location_tags: LocationTag[];
+  is_unconfirmed_reversal: boolean;
   planned_entry: number;
   stop_loss: number;
   target_1: number;
@@ -295,6 +317,18 @@ export interface TradePatchPayload {
   runner_stop?: number | null;
   position_size?: number | null;
   notes?: string | null;
+  market_state?: MarketState;
+  trade_thesis?: TradeThesis;
+  entry_trigger?: EntryTrigger;
+  location_tags?: LocationTag[];
+  is_unconfirmed_reversal?: boolean;
+}
+
+export interface TradeFilters {
+  market_state?: MarketState;
+  trade_thesis?: TradeThesis;
+  entry_trigger?: EntryTrigger;
+  location_tag?: LocationTag;
 }
 
 export interface TradeClosePayload {

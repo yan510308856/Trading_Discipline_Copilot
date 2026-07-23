@@ -1,0 +1,10 @@
+import type { BilingualTaxonomyItem } from "../../utils/priceActionTaxonomy";
+
+export function BilingualChoiceGroup<T extends string>({ label, chineseLabel, items, value, onChange, emphasis = "medium", legendHidden = false, confirming = false }: { label: string; chineseLabel: string; items: BilingualTaxonomyItem<T>[]; value: T | null; onChange: (value: T) => void; emphasis?: "medium" | "strong" | "compact"; legendHidden?: boolean; confirming?: boolean }) {
+  const selected = items.find((item) => item.value === value);
+  return <fieldset className={`bilingual-choice-group ${emphasis}${confirming ? " confirming" : ""}`}><legend className={legendHidden ? "visually-hidden" : undefined}><span>{label}</span><small>{chineseLabel}</small></legend><div className="bilingual-choice-grid">{items.map((item) => <button type="button" key={item.value} aria-pressed={value === item.value} onClick={() => onChange(item.value)}><span className="choice-check" aria-hidden="true">✓</span><strong>{item.english}</strong><small lang="zh">{item.chinese}</small></button>)}</div>{emphasis === "strong" && selected?.englishDescription && <div className="taxonomy-description"><p>{selected.englishDescription}</p><p lang="zh">{selected.chineseDescription}</p></div>}</fieldset>;
+}
+
+export function BilingualMultiSelectChips<T extends string>({ label, chineseLabel, items, values, onChange, legendHidden = false }: { label: string; chineseLabel: string; items: BilingualTaxonomyItem<T>[]; values: T[]; onChange: (values: T[]) => void; legendHidden?: boolean }) {
+  return <fieldset className="bilingual-multiselect"><legend className={legendHidden ? "visually-hidden" : undefined}><span>{label}</span><small>{chineseLabel}</small></legend><div>{items.map((item) => { const selected = values.includes(item.value); return <button type="button" key={item.value} aria-pressed={selected} onClick={() => onChange(selected ? values.filter((value) => value !== item.value) : [...values, item.value])}><span aria-hidden="true">✓</span><strong>{item.english}</strong><small lang="zh">{item.chinese}</small></button>; })}</div></fieldset>;
+}

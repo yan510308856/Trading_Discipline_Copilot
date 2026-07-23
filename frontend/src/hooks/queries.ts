@@ -35,14 +35,15 @@ import type {
   ExitReason,
   HealthResponse,
   AnalyticsFilters,
+  TradeFilters,
 } from "../types";
 
 export const queryKeys = {
   dailySummary: (date?: string, tradeHorizon?: TradeHorizon) =>
     ["daily-summary", date ?? "today", tradeHorizon ?? "all"] as const,
   dailyReadiness: (date?: string) => ["daily-readiness", date ?? "today"] as const,
-  trades: (status?: Trade["status"], tradeHorizon?: TradeHorizon) =>
-    ["trades", status ?? "all", tradeHorizon ?? "all"] as const,
+  trades: (status?: Trade["status"], tradeHorizon?: TradeHorizon, filters: TradeFilters = {}) =>
+    ["trades", status ?? "all", tradeHorizon ?? "all", filters] as const,
   rules: () => ["rules"] as const,
   openTradeAttention: () => ["open-trade-attention"] as const,
   attention: (tradeHorizon?: TradeHorizon) => ["attention", tradeHorizon ?? "all"] as const,
@@ -54,6 +55,10 @@ export const queryKeys = {
     trade_horizon: filters.trade_horizon ?? null,
     market: filters.market ?? null,
     setup: filters.setup ?? null,
+    market_state: filters.market_state ?? null,
+    trade_thesis: filters.trade_thesis ?? null,
+    entry_trigger: filters.entry_trigger ?? null,
+    location_tag: filters.location_tag ?? null,
   }] as const,
 };
 
@@ -87,10 +92,10 @@ export function useDailyReadinessQuery(date?: string) {
   });
 }
 
-export function useTradesQuery(status?: Trade["status"], tradeHorizon?: TradeHorizon) {
+export function useTradesQuery(status?: Trade["status"], tradeHorizon?: TradeHorizon, filters: TradeFilters = {}) {
   return useQuery({
-    queryKey: queryKeys.trades(status, tradeHorizon),
-    queryFn: () => getTrades(status, tradeHorizon),
+    queryKey: queryKeys.trades(status, tradeHorizon, filters),
+    queryFn: () => getTrades(status, tradeHorizon, filters),
   });
 }
 

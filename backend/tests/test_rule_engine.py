@@ -50,7 +50,11 @@ def test_yaml_contains_all_mvp_rules() -> None:
         "breakout_gap_no_retest_strength",
         "signal_context_over_shape",
         "no_options_for_left_side_bottom_picking",
-        "left_side_stock_only_small_size",
+            "left_side_stock_only_small_size",
+            "strong_trend_unconfirmed_major_reversal",
+            "breakout_mode_direction_unconfirmed",
+            "range_reversal_needs_range_edge",
+            "unclear_structure_pullback_continuation",
         "options_trade_missing_contract_details",
         "take_profit_and_let_runner_run",
         "green_trade_should_not_go_red",
@@ -59,7 +63,7 @@ def test_yaml_contains_all_mvp_rules() -> None:
 
 
 def test_current_price_action_rules_validate() -> None:
-    assert len(load_rules()) == 15
+    assert len(load_rules()) == 19
 
 
 def test_missing_top_level_rules_fails(tmp_path) -> None:
@@ -72,10 +76,10 @@ def test_missing_top_level_rules_fails(tmp_path) -> None:
 def test_unsupported_operator_fails(tmp_path) -> None:
     path = write_rule_document(
         tmp_path,
-        valid_rule_document({"field": "status", "operator": "contains", "value": "planned"}),
+        valid_rule_document({"field": "status", "operator": "matches", "value": "planned"}),
     )
 
-    with pytest.raises(ValueError, match="Unsupported rule operator: contains"):
+    with pytest.raises(ValueError, match="Unsupported rule operator: matches"):
         load_rules(path)
 
 

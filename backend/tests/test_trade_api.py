@@ -648,7 +648,7 @@ def test_get_rules(api_client: TestClient) -> None:
     rule_ids = {rule["id"] for rule in rules}
 
     assert response.status_code == 200
-    assert len(rules) == 15
+    assert len(rules) == 19
     assert {
         "no_options_for_left_side_bottom_picking",
         "left_side_stock_only_small_size",
