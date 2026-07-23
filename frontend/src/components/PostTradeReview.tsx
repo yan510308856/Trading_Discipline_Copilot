@@ -24,6 +24,7 @@ import {
 import { contextFromHash, positiveIntegerContext } from "../utils/navigation";
 import { frontendErrorMessage } from "../utils/apiError";
 import { useQueryClient } from "@tanstack/react-query";
+import { PriceActionClassification } from "./PriceActionClassification";
 
 const mistakeOptions = [
   ["no_stop_loss", "No stop loss (veto)"],
@@ -164,6 +165,7 @@ function ReviewForm({ trade, onReviewed }: ReviewFormProps) {
 
   return (
     <form className="review-card" onSubmit={handleSubmit}>
+      <PriceActionClassification trade={trade} compact englishOnly />
       <div className="review-exit-summary">
         <div><span>Open time</span><strong className="summary-date-time">{formatDateTime(trade.opened_at)}</strong></div>
         <div><span>{trade.market === "options" ? "Underlying entry" : "Open price"}</span><strong>{formatDecimal(trade.actual_entry ?? trade.planned_entry)}</strong></div>

@@ -626,3 +626,7 @@ Domain services append WorkflowEvent rows before their existing commit so state 
 Define each metric's source, ownership timestamp, numerator, denominator, filters, and null behavior before implementation. Date tests must cover the instant before and at the exclusive UTC end boundary. Include LEAP filtering and an options Underlying R case.
 
 Analytics query keys include all filters. Relevant writes invalidate the `analytics` prefix; the page uses a five-minute stale time with no focus refetch. Future metric changes must update `discipline_analytics_definitions.md`.
+
+## Stage 27 taxonomy checks
+
+Treat taxonomy values as API contracts: define them once per layer, validate at boundaries, and test frontend/backend parity. Migration mappings must be conservative and self-contained. JSON multi-select values are ordered and deduplicated after validation; unsupported values fail cleanly. Test legacy payloads and rows separately from new UI requirements.

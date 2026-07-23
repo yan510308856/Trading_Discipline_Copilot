@@ -21,6 +21,10 @@ def list_trades(
     database: Database,
     trade_status: Optional[schemas.TradeStatus] = Query(default=None, alias="status"),
     trade_horizon: Optional[schemas.TradeHorizon] = Query(default=None),
+    market_state: Optional[schemas.MarketState] = Query(default=None),
+    trade_thesis: Optional[schemas.TradeThesis] = Query(default=None),
+    entry_trigger: Optional[schemas.EntryTrigger] = Query(default=None),
+    location_tag: Optional[schemas.LocationTag] = Query(default=None),
     limit: int = Query(default=100, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
 ) -> list[models.Trade]:
@@ -30,6 +34,10 @@ def list_trades(
         trade_horizon,
         limit,
         offset,
+        market_state,
+        trade_thesis,
+        entry_trigger,
+        location_tag,
     )
 
 

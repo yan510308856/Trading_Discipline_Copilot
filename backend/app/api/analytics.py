@@ -20,5 +20,11 @@ def get_discipline_analytics(
     trade_horizon: Optional[schemas.TradeHorizon] = None,
     market: Optional[schemas.Market] = None,
     setup: Optional[str] = Query(default=None, max_length=64),
+    market_state: Optional[schemas.MarketState] = None,
+    trade_thesis: Optional[schemas.TradeThesis] = None,
+    entry_trigger: Optional[schemas.EntryTrigger] = None,
+    location_tag: Optional[schemas.LocationTag] = None,
 ) -> dict:
-    return discipline_analytics(database, date_from=date_from, date_to=date_to, trade_horizon=trade_horizon, market=market, setup=setup)
+    return discipline_analytics(database, date_from=date_from, date_to=date_to, trade_horizon=trade_horizon, market=market, setup=setup,
+                                market_state=market_state, trade_thesis=trade_thesis,
+                                entry_trigger=entry_trigger, location_tag=location_tag)

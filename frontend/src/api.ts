@@ -22,6 +22,7 @@ import type {
   PriceAlertEvent,
   TradeHorizon,
   TradePatchPayload,
+  TradeFilters,
 } from "./types";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "/api";
@@ -178,10 +179,12 @@ export function saveChecklistAnswers(
 export function getTrades(
   status?: Trade["status"],
   tradeHorizon?: TradeHorizon,
+  filters: TradeFilters = {},
 ): Promise<Trade[]> {
   const query = new URLSearchParams({ limit: "500" });
   if (status) query.set("status", status);
   if (tradeHorizon) query.set("trade_horizon", tradeHorizon);
+  Object.entries(filters).forEach(([key, value]) => value && query.set(key, value));
   return apiRequest<Trade[]>(`/trades?${query.toString()}`);
 }
 

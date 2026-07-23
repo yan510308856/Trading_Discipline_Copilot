@@ -9,6 +9,7 @@ describe("query keys", () => {
       "trades",
       "open",
       "swing",
+      {},
     ]);
   });
 
@@ -36,7 +37,7 @@ describe("query keys", () => {
   it("uses every analytics filter in a stable query key", () => {
     expect(queryKeys.analytics({ date_from: "2026-07-01", date_to: "2026-07-11", trade_horizon: "leap", market: "options", setup: "breakout" })).toEqual([
       "analytics",
-      { date_from: "2026-07-01", date_to: "2026-07-11", trade_horizon: "leap", market: "options", setup: "breakout" },
+      { date_from: "2026-07-01", date_to: "2026-07-11", trade_horizon: "leap", market: "options", setup: "breakout", market_state: null, trade_thesis: null, entry_trigger: null, location_tag: null },
     ]);
   });
 });

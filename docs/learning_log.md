@@ -655,3 +655,11 @@ No trading behavior changed. This stage improves frontend maintainability so rea
 - Compatibility recovery logic should not validate plan quality: a stop is checked against the intended underlying direction.
 - Audit-derived metrics should disclose legacy undercount instead of inferring actions from final state.
 - Outcome context remains separate from process quality, and options outcomes are always Underlying R.
+
+## Stage 27 learning notes
+
+- Domain taxonomy separates market state, thesis, trigger, location, and risk behavior so each fact has one meaning.
+- Backward-compatible migrations can add a new source of truth while retaining old columns as documented mirrors.
+- JSON lists need validation, deterministic ordering, deduplication, and generic rule operators.
+- Bilingual UI terminology belongs in structured data, not scattered component strings.
+- Conservative migration preserves uncertainty: a wedge proves a trigger, not a continuation or reversal thesis.

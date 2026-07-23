@@ -6,7 +6,7 @@ import logging
 from decimal import Decimal, ROUND_HALF_UP
 from datetime import datetime, timezone
 
-from sqlalchemy import select
+from sqlalchemy import exists, func, select
 from sqlalchemy.orm import Session, selectinload
 
 from app import models, schemas
@@ -17,6 +17,7 @@ from app.services.option_contract_service import (
     underlying_direction,
 )
 from app.services.workflow_event_service import append_event
+from app.services.price_action_taxonomy import add_legacy_mirrors
 
 logger = logging.getLogger(__name__)
 
@@ -38,12 +39,15 @@ def _apply_option_contract(data: dict) -> dict:
 def create_planned_trade(database: Session, trade_data: schemas.TradeCreate) -> models.Trade:
     """Persist a new trade plan in the initial planned state."""
 
-    trade = models.Trade(**_apply_option_contract(trade_data.model_dump()), status="planned")
+    values = add_legacy_mirrors(trade_data.model_dump())
+    trade = models.Trade(**_apply_option_contract(values), status="planned")
     database.add(trade)
     database.flush()
     append_event(
         database, "plan_created", trade_id=trade.id,
-        event_data={"market": trade.market, "horizon": trade.trade_horizon, "setup": trade.setup},
+        event_data={"market": trade.market, "horizon": trade.trade_horizon, "setup": trade.setup,
+                    "market_state": trade.market_state, "trade_thesis": trade.trade_thesis,
+                    "entry_trigger": trade.entry_trigger, "location_tags": trade.location_tags},
     )
     database.commit()
     database.refresh(trade)
@@ -56,6 +60,10 @@ def list_trades(
     trade_horizon: str | None = None,
     limit: int = 100,
     offset: int = 0,
+    market_state: str | None = None,
+    trade_thesis: str | None = None,
+    entry_trigger: str | None = None,
+    location_tag: str | None = None,
 ) -> list[models.Trade]:
     statement = select(models.Trade).options(
         selectinload(models.Trade.review),
@@ -65,6 +73,15 @@ def list_trades(
         statement = statement.where(models.Trade.status == trade_status)
     if trade_horizon is not None:
         statement = statement.where(models.Trade.trade_horizon == trade_horizon)
+    if market_state is not None:
+        statement = statement.where(models.Trade.market_state == market_state)
+    if trade_thesis is not None:
+        statement = statement.where(models.Trade.trade_thesis == trade_thesis)
+    if entry_trigger is not None:
+        statement = statement.where(models.Trade.entry_trigger == entry_trigger)
+    if location_tag is not None:
+        locations = func.json_each(models.Trade.location_tags).table_valued("key", "value")
+        statement = statement.where(exists(select(1).select_from(locations).where(locations.c.value == location_tag)))
     statement = statement.order_by(models.Trade.id.desc()).limit(limit).offset(offset)
     return list(database.scalars(statement))
 
@@ -92,6 +109,12 @@ def update_trade(
         )}
         prospective.update(updates)
         updates.update(_apply_option_contract(prospective))
+        if set(updates) & {"market_state", "trade_thesis"}:
+            merged_classification = {
+                "market_state": updates.get("market_state", trade.market_state),
+                "trade_thesis": updates.get("trade_thesis", trade.trade_thesis),
+            }
+            updates.update(add_legacy_mirrors(merged_classification))
     management_fields = {
         "current_stop",
         "current_price",

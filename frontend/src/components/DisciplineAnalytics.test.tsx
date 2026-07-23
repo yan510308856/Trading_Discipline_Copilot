@@ -7,7 +7,7 @@ import type { DisciplineAnalyticsData } from "../types";
 import { DisciplineAnalytics } from "./DisciplineAnalytics";
 
 const data: DisciplineAnalyticsData = {
-  timezone: "UTC", date_from: null, date_to: null, trade_horizon: null, market: null, setup: null,
+  timezone: "UTC", date_from: null, date_to: null, trade_horizon: null, market: null, setup: null, market_state: null, trade_thesis: null, entry_trigger: null, location_tag: null,
   preparation: { readiness_days_recorded: 0, readiness_days_cleared: 0, readiness_completion_rate: null, average_required_items_completed: null },
   planning_quality: { plans_created: 0, blocked_plan_attempts: 0, warning_finalization_attempts: 0, percent_plans_with_valid_stop: null, percent_plans_with_position_size: null, average_planned_risk_reward: null, average_total_planned_risk: null },
   execution_discipline: { trades_opened: 0, trades_with_partial_exits: 0, partial_exit_rate: null, trades_with_runner_activated: 0, runner_without_stop_occurrences: 0, green_to_red_warning_occurrences: 0, average_number_of_exit_executions: null, auto_closed_trade_count: 0 },

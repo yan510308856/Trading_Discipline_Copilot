@@ -1271,3 +1271,12 @@ and a three-step option-aware planner. See `stage22_live_alerts_and_execution_wo
 - Add a low-frequency, query-backed Analytics page after Daily Summary.
 - Invalidate analytics after lifecycle, review, and readiness writes.
 - Preserve Attention, Dashboard readiness placement, OptionContractSelector, and underlying-only options R.
+
+## Stage 27 implementation
+
+- Add nullable structured taxonomy columns with conservative migration backfill.
+- Preserve setup/context as deprecated mirrors for old rows and consumers.
+- Add validated JSON location tags and generic rule list operators.
+- Replace flat New Trade classification with accessible bilingual controls.
+- Show compact bilingual facts in planned, open, and review workflows.
+- Extend trade and analytics filters without removing historical filters.

@@ -4,7 +4,7 @@ Stage 26 measures whether the discipline workflow is being followed. It does not
 
 ## API, filters, and time
 
-`GET /analytics/discipline` accepts optional `date_from`, `date_to`, `trade_horizon`, `market`, and `setup`. Dates are UTC calendar dates: `date_from` starts at 00:00 UTC and inclusive `date_to` ends immediately before 00:00 UTC the following day.
+`GET /analytics/discipline` accepts optional `date_from`, `date_to`, `trade_horizon`, `market`, `market_state`, `trade_thesis`, `entry_trigger`, `location_tag`, and deprecated `setup`. Dates are UTC calendar dates: `date_from` starts at 00:00 UTC and inclusive `date_to` ends immediately before 00:00 UTC the following day. Multiple filters use AND semantics.
 
 Planning uses trade creation time, execution uses open time, review uses close time, notification uses threshold-trigger time, and WorkflowEvent metrics use occurrence time. Readiness uses its date-only `readiness_date`. Trade filters apply to trade-backed metrics; horizon, market, and setup do not alter readiness because readiness is not attached to a trade.
 

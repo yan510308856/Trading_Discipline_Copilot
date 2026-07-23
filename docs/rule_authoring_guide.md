@@ -60,6 +60,9 @@ Use `conditions: []` when the trigger alone is enough.
 missing
 equals
 in
+contains
+contains_any
+contains_none
 greater_than
 greater_than_or_equal
 less_than
@@ -91,6 +94,22 @@ Examples:
 
 `in` requires `value` to be a list. Field comparison operators require
 `compare_field`.
+
+`contains` checks one scalar member in a list-valued trade field. `contains_any`
+and `contains_none` require list values and are intended for JSON fields such as
+`location_tags`:
+
+```yaml
+- field: location_tags
+  operator: contains_none
+  value:
+    - range_high
+    - range_low
+```
+
+Stage 27 rules should use `market_state`, `trade_thesis`, `entry_trigger`,
+`location_tags`, and `is_unconfirmed_reversal`. `setup` and `market_context`
+remain compatibility mirrors and are deprecated for new rules.
 
 ## Next Actions And UI Hints
 

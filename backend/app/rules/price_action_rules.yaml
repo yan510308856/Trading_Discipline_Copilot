@@ -58,7 +58,7 @@ rules:
     stage: pre_trade
     severity: warning
     trigger:
-      setup: breakout
+      trade_thesis: breakout
     conditions:
       - field: follow_through_confirmed
         operator: equals
@@ -83,7 +83,7 @@ rules:
     stage: pre_trade
     severity: warning
     trigger:
-      market_context: trading_range
+      market_state: trading_range
     conditions:
       - field: second_leg_entry
         operator: equals
@@ -108,7 +108,7 @@ rules:
     stage: pre_trade
     severity: warning
     trigger:
-      market_context: trading_range
+      market_state: trading_range
     conditions:
       - field: big_bar_entry
         operator: equals
@@ -133,7 +133,7 @@ rules:
     stage: pre_trade
     severity: reminder
     trigger:
-      setup: inside_bar_triangle
+      entry_trigger: inside_bar_triangle
     conditions: []
     message: Define the breakout direction, invalidation point, and follow-through before entry.
     checklist:
@@ -154,7 +154,7 @@ rules:
     stage: pre_trade
     severity: warning
     trigger:
-      setup: failed_breakout
+      trade_thesis: failed_breakout
     conditions: []
     message: A failed-breakout setup at a key level needs explicit confirmation before another attempt.
     checklist:
@@ -175,9 +175,11 @@ rules:
     category: price_action
     stage: pre_trade
     severity: reminder
-    trigger:
-      setup: gap_open
-    conditions: []
+    trigger: {}
+    conditions:
+      - field: location_tags
+        operator: contains
+        value: gap_open
     message: A breakout gap that does not retest may be strong; plan the entry without chasing it.
     checklist:
       - Is the gap holding beyond the breakout point?
@@ -197,7 +199,7 @@ rules:
     stage: pre_trade
     severity: warning
     trigger:
-      market_context: uncertain
+      market_state: unclear
     conditions: []
     message: The market context is uncertain; a familiar candle shape alone is not enough.
     checklist:
@@ -214,7 +216,7 @@ rules:
     enabled: true
 
   - id: no_options_for_left_side_bottom_picking
-    name: Do not use options for left-side bottom picking
+    name: Do not use options for unconfirmed reversals
     category: risk_control
     stage: pre_trade
     severity: blocker
@@ -222,13 +224,13 @@ rules:
       status: planned
       market: options
     conditions:
-      - field: setup
-        operator: in
-        value:
-          - left_side_bottom_pick
-          - early_reversal
-          - bottom_pick
-    message: Options are blocked for left-side bottom-picking or early reversal plans.
+      - field: trade_thesis
+        operator: equals
+        value: major_reversal
+      - field: is_unconfirmed_reversal
+        operator: equals
+        value: true
+    message: You are attempting an unconfirmed reversal against the current structure with options.
     checklist:
       - Is this attempt happening before clear confirmation?
       - Would option decay or spread risk punish being early?
@@ -242,8 +244,106 @@ rules:
     discipline_sentence: Do not use options to be early on a bottom.
     enabled: true
 
+  - id: strong_trend_unconfirmed_major_reversal
+    name: Unconfirmed major reversal against a strong trend
+    category: price_action
+    stage: pre_trade
+    severity: warning
+    trigger:
+      market_state: strong_trend
+      trade_thesis: major_reversal
+    conditions:
+      - field: is_unconfirmed_reversal
+        operator: equals
+        value: true
+    message: You are attempting an unconfirmed reversal against a strong trend.
+    checklist:
+      - Is there sufficient reversal confirmation?
+      - Is the invalidation structural and the size intentionally reduced?
+    next_actions:
+      - Wait for reversal confirmation.
+      - Reduce size if the market permits the trade.
+      - Define structural invalidation and do not average down.
+    ui_hints:
+      emphasis: acknowledgement_required
+    requires_acknowledgement: true
+    avoid: Treating an early countertrend attempt like a confirmed reversal.
+    discipline_sentence: Strong trends deserve confirmation before reversal attempts.
+    enabled: true
+
+  - id: breakout_mode_direction_unconfirmed
+    name: Breakout-mode direction needs confirmation
+    category: price_action
+    stage: pre_trade
+    severity: warning
+    trigger:
+      market_state: breakout_mode
+      trade_thesis: breakout
+    conditions:
+      - field: follow_through_confirmed
+        operator: equals
+        value: false
+    message: Direction is not confirmed before the breakout and follow-through.
+    checklist:
+      - Has price broken clearly from compression?
+      - Is there convincing follow-through?
+    next_actions:
+      - Wait for the breakout and follow-through before committing directionally.
+    ui_hints:
+      emphasis: acknowledgement_required
+    requires_acknowledgement: true
+    avoid: Predicting direction while breakout mode remains unresolved.
+    discipline_sentence: Breakout mode is uncertainty until price confirms direction.
+    enabled: true
+
+  - id: range_reversal_needs_range_edge
+    name: Range reversals belong near a range boundary
+    category: trading_range
+    stage: pre_trade
+    severity: warning
+    trigger:
+      trade_thesis: range_reversal
+    conditions:
+      - field: location_tags
+        operator: contains_none
+        value:
+          - range_high
+          - range_low
+    message: A range-reversal thesis should normally occur near a range boundary.
+    checklist:
+      - Is price actually near the range high or range low?
+    next_actions:
+      - Reclassify the location or wait for price to reach a range boundary.
+    ui_hints:
+      emphasis: acknowledgement_required
+    requires_acknowledgement: true
+    avoid: Calling a middle-of-range entry a range reversal.
+    discipline_sentence: A range reversal needs a range edge.
+    enabled: true
+
+  - id: unclear_structure_pullback_continuation
+    name: Continuation requires clear directional structure
+    category: price_action
+    stage: pre_trade
+    severity: warning
+    trigger:
+      market_state: unclear
+      trade_thesis: pullback_continuation
+    conditions: []
+    message: A continuation trade requires a sufficiently clear directional structure.
+    checklist:
+      - What directional structure is expected to continue?
+    next_actions:
+      - Wait until the structure is clear or choose a thesis supported by current price action.
+    ui_hints:
+      emphasis: acknowledgement_required
+    requires_acknowledgement: true
+    avoid: Calling a trade continuation when direction is unclear.
+    discipline_sentence: Continuation requires something clear enough to continue.
+    enabled: true
+
   - id: left_side_stock_only_small_size
-    name: Left-side stock bottom picks require small-size confirmation
+    name: Unconfirmed stock reversals require small-size confirmation
     category: risk_control
     stage: pre_trade
     severity: warning
@@ -251,13 +351,13 @@ rules:
       status: planned
       market: stocks
     conditions:
-      - field: setup
-        operator: in
-        value:
-          - left_side_bottom_pick
-          - early_reversal
-          - bottom_pick
-    message: A left-side stock bottom-picking plan is allowed only with small-size confirmation.
+      - field: trade_thesis
+        operator: equals
+        value: major_reversal
+      - field: is_unconfirmed_reversal
+        operator: equals
+        value: true
+    message: An unconfirmed stock reversal is allowed only with intentionally small size and a structural stop.
     checklist:
       - Is the position intentionally small?
       - Is the stop structural and close enough to honor immediately?
