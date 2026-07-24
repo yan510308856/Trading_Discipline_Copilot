@@ -16,6 +16,12 @@ from app.services.option_contract_service import (
     resolved_underlying_direction,
     underlying_direction,
 )
+from app.services.position_accounting_service import (
+    aggregate_underlying_r,
+    decimal_value,
+    normalized_quantity,
+    position_summary,
+)
 from app.services.workflow_event_service import append_event
 from app.services.price_action_taxonomy import add_legacy_mirrors
 
@@ -70,6 +76,7 @@ def list_trades(
     statement = select(models.Trade).options(
         selectinload(models.Trade.review),
         selectinload(models.Trade.executions),
+        selectinload(models.Trade.entry_executions),
     )
     if trade_status is not None:
         statement = statement.where(models.Trade.status == trade_status)
@@ -105,6 +112,13 @@ def update_trade(
 ) -> models.Trade:
     trade = get_trade(database, trade_id)
     updates = trade_data.model_dump(exclude_unset=True)
+    if "trade_horizon" in updates:
+        raise APIError(
+            422,
+            "DEDICATED_HORIZON_ENDPOINT_REQUIRED",
+            "Use the dedicated horizon-change endpoint to update trade horizon.",
+            {"trade_id": trade.id},
+        )
     if trade.status == "planned":
         legacy_updates = set(updates) & {"setup", "market_context"}
         if legacy_updates and all(
@@ -169,6 +183,17 @@ def update_trade(
             "IMMUTABLE_TRADE_FACTS",
             "Core trade plan fields cannot be changed after the trade is opened.",
             {"trade_id": trade.id, "fields": sorted(set(updates) - management_fields)},
+        )
+    if (
+        trade.status == "open"
+        and "position_size" in updates
+        and trade.entry_executions
+    ):
+        raise APIError(
+            409,
+            "INITIAL_QUANTITY_IMMUTABLE",
+            "Initial quantity cannot be changed after entry is recorded; use Add Position.",
+            {"trade_id": trade.id},
         )
     if trade.status in {"closed", "cancelled"}:
         raise APIError(
@@ -235,6 +260,8 @@ def _require_status(trade: models.Trade, expected: str, action: str) -> None:
 def calculate_final_r(trade: models.Trade, exit_price: float) -> float:
     """Calculate R from entry, initial stop, direction, and exit price."""
 
+    if trade.entry_executions:
+        return aggregate_underlying_r(trade, exit_price)
     entry_price = (
         trade.actual_entry
         if trade.actual_entry is not None
@@ -282,6 +309,8 @@ def _validate_price_structure(
 
 
 def _weighted_execution_r(trade: models.Trade, executions: list[models.TradeExecution]) -> float:
+    if trade.entry_executions:
+        return aggregate_underlying_r(trade)
     if trade.position_size is None:
         raise APIError(422, "POSITION_SIZE_REQUIRED", "Position size is required to calculate weighted R.", {"trade_id": trade.id})
     total = sum((_quantity(item.quantity or 0) for item in executions), Decimal("0.00"))
@@ -305,17 +334,18 @@ def record_partial_exit(
 ) -> models.Trade:
     trade = get_trade(database, trade_id)
     _require_status(trade, "open", "partially exited")
-    if trade.position_size is None:
+    summary = position_summary(trade)
+    if summary.total_entry_quantity <= 0:
         raise APIError(
             422,
             "POSITION_SIZE_REQUIRED",
             "Position size is required before recording a partial exit.",
             {"trade_id": trade.id},
         )
-    exited_quantity = sum((_quantity(item.quantity or 0) for item in trade.executions), Decimal("0.00"))
-    position_size = _quantity(trade.position_size)
+    exited_quantity = summary.total_exit_quantity
+    position_size = summary.total_entry_quantity
     requested = _quantity(exit_data.quantity)
-    remaining = position_size - exited_quantity
+    remaining = summary.remaining_quantity
     if remaining <= 0:
         raise APIError(409, "INVALID_EXECUTION_QUANTITY", "No position quantity remains to exit.", {"trade_id": trade.id})
     if requested > remaining:
@@ -384,6 +414,37 @@ def open_trade(
     trade.current_stop = trade.stop_loss
     trade.status = "open"
     trade.opened_at = models.utc_now()
+    if any(item.entry_kind == "initial" for item in trade.entry_executions):
+        raise APIError(
+            409,
+            "DUPLICATE_INITIAL_ENTRY",
+            "This trade already has an initial entry execution.",
+            {"trade_id": trade.id},
+        )
+    if trade.position_size is None:
+        raise APIError(
+            422,
+            "POSITION_SIZE_REQUIRED",
+            "Position size is required before marking entry filled.",
+            {"trade_id": trade.id},
+        )
+    database.add(
+        models.TradeEntryExecution(
+            trade=trade,
+            executed_at=trade.opened_at,
+            entry_kind="initial",
+            underlying_price=decimal_value(trade.actual_entry),
+            quantity=normalized_quantity(trade.position_size),
+            stop_at_entry=decimal_value(trade.stop_loss),
+            option_price=(
+                decimal_value(trade.option_entry_price)
+                if trade.market == "options" and trade.option_entry_price is not None
+                else None
+            ),
+            reason="initial_plan",
+        )
+    )
+    database.flush()
     append_event(
         database, "trade_opened", trade_id=trade.id,
         event_data={"actual_entry": trade.actual_entry},
@@ -400,12 +461,19 @@ def close_trade(
     _require_status(trade, "open", "closed")
     trade.exit_price = trade_data.exit_price
     trade.exit_reason = trade_data.exit_reason
-    if trade.position_size is None:
+    summary = position_summary(trade)
+    if summary.total_entry_quantity <= 0:
         trade.final_r = calculate_final_r(trade, trade_data.exit_price)
         remaining_quantity = None
     else:
-        exited = sum((_quantity(item.quantity or 0) for item in trade.executions), Decimal("0.00"))
-        remaining_quantity = float(_quantity(trade.position_size) - exited)
+        if summary.remaining_quantity <= 0:
+            raise APIError(
+                409,
+                "INVALID_EXECUTION_QUANTITY",
+                "No position quantity remains to close.",
+                {"trade_id": trade.id},
+            )
+        remaining_quantity = float(summary.remaining_quantity)
     final_execution = models.TradeExecution(
             trade=trade,
             execution_type="final",
@@ -423,6 +491,198 @@ def close_trade(
     append_event(
         database, "trade_manually_closed", trade_id=trade.id,
         event_data={"exit_reason": trade_data.exit_reason, "final_r": trade.final_r},
+    )
+    database.commit()
+    database.refresh(trade)
+    return trade
+
+
+def change_trade_horizon(
+    database: Session,
+    trade_id: int,
+    horizon_data: schemas.TradeHorizonChange,
+) -> models.Trade:
+    """Change the classification horizon without reopening plan-readiness gates."""
+
+    trade = get_trade(database, trade_id)
+    if trade.status not in {"planned", "open"}:
+        raise APIError(
+            409,
+            "INVALID_TRADE_STATE",
+            "Only planned or open trades can change horizon.",
+            {"trade_id": trade.id, "current_status": trade.status},
+        )
+    old_horizon = trade.trade_horizon
+    new_horizon = horizon_data.trade_horizon
+    if old_horizon == new_horizon:
+        return trade
+    changed_at = models.utc_now()
+    trade.trade_horizon = new_horizon
+    append_event(
+        database,
+        "trade_horizon_changed",
+        trade_id=trade.id,
+        event_data={
+            "old_horizon": old_horizon,
+            "new_horizon": new_horizon,
+            "trade_status": trade.status,
+            "changed_at": changed_at.isoformat(),
+        },
+    )
+    database.commit()
+    database.refresh(trade)
+    return trade
+
+
+def add_position_entry(
+    database: Session,
+    trade_id: int,
+    entry_data: schemas.TradeEntryExecutionCreate,
+) -> models.Trade:
+    """Persist one local add execution after applying action-specific gates."""
+
+    trade = get_trade(database, trade_id)
+    _require_status(trade, "open", "added to")
+    if trade.current_stop is None:
+        raise APIError(
+            409,
+            "CURRENT_STOP_REQUIRED",
+            "A current stop is required before adding to the position.",
+            {"trade_id": trade.id},
+        )
+    if (
+        trade.reversal_confirmation == "unconfirmed"
+        or trade.is_unconfirmed_reversal
+    ):
+        append_event(
+            database,
+            "position_add_blocked",
+            trade_id=trade.id,
+            event_data={"reason": "unconfirmed_reversal"},
+        )
+        database.commit()
+        raise APIError(
+            409,
+            "UNCONFIRMED_REVERSAL_ADD_BLOCKED",
+            "Do not add to an unconfirmed reversal attempt.",
+            {
+                "trade_id": trade.id,
+                "required_action": (
+                    "Wait for confirmation or manage the existing position "
+                    "without increasing exposure."
+                ),
+            },
+        )
+
+    direction = underlying_direction(
+        trade.market, trade.direction, trade.option_type
+    )
+    valid_risk = (
+        entry_data.stop_at_entry < entry_data.underlying_price
+        if direction == "long"
+        else entry_data.stop_at_entry > entry_data.underlying_price
+    )
+    if not valid_risk:
+        raise APIError(
+            422,
+            "INVALID_ADD_RISK",
+            "Stop at add must define positive risk in the underlying direction.",
+            {
+                "trade_id": trade.id,
+                "direction": direction,
+                "underlying_price": entry_data.underlying_price,
+                "stop_at_entry": entry_data.stop_at_entry,
+            },
+        )
+
+    old_summary = position_summary(trade)
+    if not old_summary.accounting_consistent:
+        raise APIError(
+            409,
+            "POSITION_ACCOUNTING_INCONSISTENT",
+            "Repair entry and exit quantity history before adding exposure.",
+            {"trade_id": trade.id},
+        )
+    current_r = (
+        calculate_final_r(trade, trade.current_price)
+        if trade.current_price is not None
+        else None
+    )
+    warning_code = "adding_while_losing"
+    if current_r is not None and current_r < 0 and warning_code not in set(
+        entry_data.warnings_acknowledged
+    ):
+        raise APIError(
+            409,
+            "WARNING_ACKNOWLEDGEMENT_REQUIRED",
+            "You are adding while the position is below its aggregate entry basis.",
+            {
+                "trade_id": trade.id,
+                "warning_code": warning_code,
+                "required_actions": [
+                    "Confirm this is a planned add rather than emotional averaging.",
+                    "Verify the structural stop.",
+                    "Review new total risk.",
+                ],
+            },
+        )
+
+    old_current_stop = trade.current_stop
+    execution = models.TradeEntryExecution(
+        trade=trade,
+        entry_kind="add",
+        underlying_price=decimal_value(entry_data.underlying_price),
+        quantity=normalized_quantity(entry_data.quantity),
+        stop_at_entry=decimal_value(entry_data.stop_at_entry),
+        option_price=(
+            decimal_value(entry_data.option_price)
+            if trade.market == "options" and entry_data.option_price is not None
+            else None
+        ),
+        reason=entry_data.reason,
+        notes=entry_data.notes,
+    )
+    database.add(execution)
+    trade.current_stop = decimal_value(entry_data.stop_at_entry)
+    database.flush()
+    new_summary = position_summary(trade)
+    incremental_risk = (
+        abs(
+            decimal_value(entry_data.underlying_price)
+            - decimal_value(entry_data.stop_at_entry)
+        )
+        * normalized_quantity(entry_data.quantity)
+    )
+    append_event(
+        database,
+        "position_added",
+        trade_id=trade.id,
+        event_data={
+            "entry_execution_id": execution.id,
+            "quantity": float(normalized_quantity(entry_data.quantity)),
+            "underlying_price": entry_data.underlying_price,
+            "stop_at_entry": entry_data.stop_at_entry,
+            "old_current_stop": (
+                float(old_current_stop) if old_current_stop is not None else None
+            ),
+            "new_current_stop": entry_data.stop_at_entry,
+            "reason": entry_data.reason,
+            "old_total_entry_quantity": float(old_summary.total_entry_quantity),
+            "new_total_entry_quantity": float(new_summary.total_entry_quantity),
+            "old_average_entry": (
+                float(old_summary.weighted_average_entry)
+                if old_summary.weighted_average_entry is not None
+                else None
+            ),
+            "new_average_entry": (
+                float(new_summary.weighted_average_entry)
+                if new_summary.weighted_average_entry is not None
+                else None
+            ),
+            "incremental_risk": float(incremental_risk),
+            "new_total_risk": float(new_summary.total_underlying_risk),
+            "added_while_negative": bool(current_r is not None and current_r < 0),
+        },
     )
     database.commit()
     database.refresh(trade)

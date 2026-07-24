@@ -676,3 +676,16 @@ No trading behavior changed. This stage improves frontend maintainability so rea
   blocker.
 - A machine-readable bilingual contract can drive labels and order while static
   Pydantic Literals and TypeScript unions preserve validation.
+
+## Stage 29 - Execution facts before derived position state
+
+- Append-only entry facts prevent a scalar quantity from erasing how exposure
+  was built.
+- A weighted average entry is useful for display, but risk must retain each
+  entry leg's own stop snapshot.
+- Remaining quantity is a derived invariant shared by exit validation,
+  automatic close, review, and UI previews.
+- Action-specific acknowledgements cannot be replaced by dismissing a general
+  Attention warning.
+- Reclassification can update current analytics while WorkflowEvents preserve
+  the historical transition.

@@ -106,19 +106,45 @@ function ExecutionHistory({ trade }: { trade: Trade }) {
   });
   const polyline = chartPoints.map((point) => `${point.x},${point.y}`).join(" ");
   const finalProfit = points.at(-1)?.cumulativeProfit ?? null;
+  const history = [
+    ...trade.entry_executions.map((entry) => ({
+      id: `entry-${entry.id}`,
+      timestamp: entry.executed_at,
+      action: entry.entry_kind === "initial" ? "Initial entry" : "Add position",
+      price: entry.underlying_price,
+      optionPrice: entry.option_price,
+      quantity: entry.quantity,
+      reason: entry.reason,
+      stop: entry.stop_at_entry,
+      exitId: null as number | null,
+      kind: entry.entry_kind,
+    })),
+    ...trade.executions.map((execution) => ({
+      id: `exit-${execution.id}`,
+      timestamp: execution.executed_at,
+      action: execution.execution_type === "final" ? "Final exit" : "Partial exit",
+      price: execution.price,
+      optionPrice: execution.option_price,
+      quantity: execution.quantity,
+      reason: execution.exit_reason,
+      stop: null,
+      exitId: execution.id,
+      kind: execution.execution_type,
+    })),
+  ].sort((left, right) => left.timestamp.localeCompare(right.timestamp));
 
   return <section className="execution-review-section">
-    <div className="execution-review-heading"><div><p className="eyebrow">Exit executions</p><h3>Takeoff history</h3></div>{finalProfit !== null && <div className={finalProfit < 0 ? "execution-total negative" : "execution-total positive"}><span>Gross P&amp;L</span><strong>{formatSignedAmount(finalProfit)}</strong></div>}</div>
-    {trade.executions.length === 0 ? <p className="execution-empty">No execution records are available for this trade.</p> : <div className="execution-history-list">
-      {trade.executions.map((execution, index) => {
-        const profitPoint = points.find((point) => point.execution.id === execution.id);
-        return <div className={`execution-history-row ${isOption ? "option-execution-row" : ""}`} key={execution.id}>
-          <span className={`execution-sequence ${execution.execution_type}`}>{index + 1}</span>
-          <div><strong>{execution.execution_type === "final" ? "Final exit" : `Partial takeoff ${index + 1}`}</strong><small>{formatDateTime(execution.executed_at)}</small></div>
-          <div><span>{isOption ? "Underlying" : "Price"}</span><strong>{formatDecimal(execution.price)}</strong></div>
-          {isOption && <div><span>Option price</span><strong>{execution.option_price === null ? "—" : formatDecimal(execution.option_price)}</strong></div>}
-          <div><span>Quantity</span><strong>{execution.quantity === null ? "—" : formatDecimal(execution.quantity)}</strong></div>
-          <div><span>Reason</span><strong>{execution.exit_reason?.replaceAll("_", " ") ?? "—"}</strong></div>
+    <div className="execution-review-heading"><div><p className="eyebrow">Entry and exit executions</p><h3>Position history</h3></div>{finalProfit !== null && <div className={finalProfit < 0 ? "execution-total negative" : "execution-total positive"}><span>Gross P&amp;L</span><strong>{formatSignedAmount(finalProfit)}</strong></div>}</div>
+    {history.length === 0 ? <p className="execution-empty">No execution records are available for this trade.</p> : <div className="execution-history-list">
+      {history.map((event, index) => {
+        const profitPoint = points.find((point) => point.execution.id === event.exitId);
+        return <div className={`execution-history-row ${isOption ? "option-execution-row" : ""}`} key={event.id}>
+          <span className={`execution-sequence ${event.kind}`}>{index + 1}</span>
+          <div><strong>{event.action}</strong><small>{formatDateTime(event.timestamp)}</small></div>
+          <div><span>{isOption ? "Underlying" : "Price"}</span><strong>{formatDecimal(event.price)}</strong></div>
+          {isOption && <div><span>Option price</span><strong>{event.optionPrice === null ? "—" : formatDecimal(event.optionPrice)}</strong></div>}
+          <div><span>Quantity</span><strong>{event.quantity === null ? "—" : formatDecimal(event.quantity)}</strong></div>
+          <div><span>Reason</span><strong>{event.reason?.replaceAll("_", " ") ?? "—"}</strong>{event.stop !== null && <small>Stop {formatDecimal(event.stop)}</small>}</div>
           <div className={profitPoint && profitPoint.profit < 0 ? "negative" : "positive"}><span>P&amp;L</span><strong>{profitPoint ? formatSignedAmount(profitPoint.profit) : "—"}</strong></div>
         </div>;
       })}

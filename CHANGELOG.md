@@ -1,5 +1,13 @@
 # Changelog
 
+## Stage 29
+
+Added audited trade-horizon changes, immutable initial/add entry executions,
+Decimal-based position accounting, aggregate Underlying R, add-position
+discipline gates, remaining-quantity exit validation, scaling analytics,
+unified execution history, modular stylesheet imports, Ruff/ESLint checks, and
+CI migration/runtime smoke verification.
+
 ## Stage 28
 
 Added explicit key-location and reversal decisions, persistent occurrence-based

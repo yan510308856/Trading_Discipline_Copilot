@@ -640,3 +640,14 @@ When classification, warning, or rule semantics change:
 4. Verify stale metadata still renders but produces no Attention item.
 5. Verify dismissal, Undo, mutation failure recovery, blocker scope, and
    pre-trade acknowledgement separately.
+
+## Stage 29 accounting checks
+
+Treat entry and exit executions as immutable facts. Never increase exposure by
+rewriting `position_size`. Calculate quantities and risk with Decimal values,
+normalize quantity comparisons to two decimals, and round only when producing
+API/UI output. Opening, adding, and their WorkflowEvents share one transaction.
+
+Run `alembic upgrade head`, `ruff check app tests`, and `pytest -q` in
+`backend/`. Run `npm run lint`, `npm run typecheck`, `npm test`, and
+`npm run build` in `frontend/`.

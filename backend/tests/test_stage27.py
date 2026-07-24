@@ -3,9 +3,6 @@ from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
-from sqlalchemy.orm import Session
-
-from app import models
 from app.services.price_action_taxonomy import classification_from_legacy
 from app.services.rule_engine import RuleEngine, evaluate_trade
 from app.services.rule_schema import RuleConditionModel

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { getAttention, getDailySummary, getDisciplineAnalytics, getTrades } from "./api";
+import { addPosition, changeTradeHorizon, getAttention, getDailySummary, getDisciplineAnalytics, getTrades } from "./api";
 
 function mockJsonResponse(data: unknown) {
   return Promise.resolve(
@@ -73,6 +73,31 @@ describe("api query parameters", () => {
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/analytics/discipline?date_from=2026-07-01&date_to=2026-07-11&trade_horizon=leap&market=options&setup=breakout",
       expect.any(Object),
+    );
+  });
+
+  it("uses dedicated audited horizon and add-position endpoints", async () => {
+    const fetchMock = vi.fn(() => mockJsonResponse({}));
+    vi.stubGlobal("fetch", fetchMock);
+    await changeTradeHorizon(7, "leap");
+    await addPosition(7, {
+      underlying_price: 105,
+      quantity: 1,
+      stop_at_entry: 100,
+      reason: "breakout_confirmation",
+    });
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      "/api/trades/7/horizon",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ trade_horizon: "leap" }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      "/api/trades/7/entries",
+      expect.objectContaining({ method: "POST" }),
     );
   });
 });

@@ -35,6 +35,19 @@ Live workflow:
 Plan → Execute → Manage → Review
 ```
 
+Stage 29 makes position scaling an explicit Manage action. Opening creates one
+initial entry execution; every later exposure increase appends an add execution.
+The legacy `position_size` remains the initial planned/opened quantity and is
+not redefined as current exposure. The application records these facts locally
+and never places a broker order.
+
+Planned and open trades may change horizon through a confirmed, audited action.
+Reclassifying an open trade as intraday does not rerun Daily Readiness because
+readiness governs plan creation, not management of existing exposure.
+
+All options risk and R calculations continue to use underlying entry, stop,
+current, and exit prices. Option premiums are optional reference facts only.
+
 - `Daily Readiness`: 开始新的 intraday 交易前，先完成当天准备检查。
 - `Plan`: 填写真实交易计划，系统检查 blocker / warning / reminder。
 - `Execute`: 用户自己在券商或交易平台执行；本应用不下单。

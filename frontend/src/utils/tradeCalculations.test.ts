@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  calculateAddPositionPreview,
+  calculateAggregateUnderlyingR,
   calculateCurrentR,
   calculateExecutionProfitCurve,
   calculatePositionBreakdown,
@@ -8,6 +10,33 @@ import {
   optionUnderlyingDirection,
   resolvedUnderlyingDirection,
 } from "./tradeCalculations";
+
+describe("position scaling calculations", () => {
+  const entries = [
+    { id: 1, trade_id: 1, executed_at: "2026-07-24T10:00:00Z", entry_kind: "initial" as const, underlying_price: 100, quantity: 2, stop_at_entry: 95, option_price: null, reason: "initial_plan", notes: null, created_at: "2026-07-24T10:00:00Z" },
+    { id: 2, trade_id: 1, executed_at: "2026-07-24T11:00:00Z", entry_kind: "add" as const, underlying_price: 110, quantity: 1, stop_at_entry: 100, option_price: 2, reason: "breakout_confirmation", notes: null, created_at: "2026-07-24T11:00:00Z" },
+  ];
+
+  it("previews weighted average and underlying risk", () => {
+    expect(calculateAddPositionPreview(2, 2, 100, 10, 110, 1, 100)).toEqual({
+      newTotalQuantity: 3,
+      newRemainingQuantity: 3,
+      newWeightedAverageEntry: 103.33,
+      incrementalRisk: 10,
+      newTotalRisk: 20,
+    });
+  });
+
+  it("calculates aggregate long R without option premium values", () => {
+    expect(calculateAggregateUnderlyingR("long", entries, [], 112)).toBe(1.3);
+    expect(calculateAggregateUnderlyingR(
+      "long",
+      entries.map((entry) => ({ ...entry, option_price: 999 })),
+      [],
+      112,
+    )).toBe(1.3);
+  });
+});
 
 describe("calculateRiskReward", () => {
   it("calculates risk and target R for a long trade", () => {

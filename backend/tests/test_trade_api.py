@@ -242,7 +242,9 @@ def test_patch_persists_open_trade_management_fields(api_client: TestClient) -> 
     assert response.json()["runner_active"] is True
 
 
-def test_patch_open_trade_initial_quantity(api_client: TestClient) -> None:
+def test_patch_open_trade_initial_quantity_is_rejected_after_entry(
+    api_client: TestClient,
+) -> None:
     created = create_trade(api_client)
     api_client.post(f"/trades/{created['id']}/open", json={})
 
@@ -251,8 +253,8 @@ def test_patch_open_trade_initial_quantity(api_client: TestClient) -> None:
         json={"position_size": 3.456},
     )
 
-    assert response.status_code == 200
-    assert response.json()["position_size"] == 3.46
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "INITIAL_QUANTITY_IMMUTABLE"
 
 
 def test_patch_open_trade_management_targets(api_client: TestClient) -> None:

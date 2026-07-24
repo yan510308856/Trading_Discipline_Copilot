@@ -12,10 +12,12 @@ from sqlalchemy import inspect, select
 from sqlalchemy.orm import Session
 
 from app import models
+from app.errors import APIError
 from app.services.email_sender import EmailSettings
 from app.services.price_alert_monitor import runtime_state
 from app.services.rule_engine import evaluate_trade, rule_occurrence_token, rule_warning_identity
 from app.services.trade_service import calculate_final_r, list_trades
+from app.services.position_accounting_service import position_summary
 
 SEVERITY_PRIORITY = {"blocker": 0, "warning": 1, "reminder": 2}
 
@@ -73,7 +75,15 @@ def build_attention_items(
     items: list[dict[str, Any]] = []
     open_trades = list_trades(database, "open", horizon, 500, 0)
     for trade in open_trades:
-        current_r = calculate_final_r(trade, trade.current_price) if trade.current_price is not None else None
+        summary = position_summary(trade)
+        try:
+            current_r = calculate_final_r(trade, trade.current_price) if trade.current_price is not None else None
+        except APIError:
+            current_r = None
+        if not summary.accounting_consistent:
+            items.append(_item(item_id=f"trade:{trade.id}:accounting", source_type="accounting_inconsistency", severity="blocker", title=f"{trade.symbol}: position accounting inconsistent", message="Entry and exit quantities do not reconcile.", required_action="Repair execution history before recording another position change.", detected_at=trade.updated_at, destination_page="open-trades", trade=trade, current_r=current_r, destination_context={"trade_id": str(trade.id)}, time_sensitive=True))
+        elif summary.uses_legacy_fallback and trade.position_size is not None:
+            items.append(_item(item_id=f"trade:{trade.id}:legacy-accounting", source_type="incomplete_position_accounting", severity="warning", title=f"{trade.symbol}: entry history requires repair", message="This legacy open trade has no initial entry execution.", required_action="Backfill or repair the initial entry before adding exposure.", detected_at=trade.updated_at, destination_page="open-trades", trade=trade, current_r=current_r, destination_context={"trade_id": str(trade.id)}, dismissible=True, dismissal_key=f"warning:legacy-accounting:{trade.id}", occurrence_key=f"occurrence:legacy-accounting:{trade.id}", source_id=str(trade.id)))
         if trade.position_size is None:
             items.append(_item(item_id=f"trade:{trade.id}:position-size", source_type="missing_position_size", severity="blocker", title=f"{trade.symbol}: position size missing", message="Total position risk cannot be managed without position size.", required_action="Set position size.", detected_at=trade.updated_at, destination_page="open-trades", trade=trade, current_r=current_r, destination_context={"trade_id": str(trade.id)}, time_sensitive=True))
         if trade.current_stop is None:

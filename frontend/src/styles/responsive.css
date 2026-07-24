@@ -1,0 +1,6 @@
+@media (max-width: 720px) {
+  .add-position-fields,
+  .add-risk-preview {
+    grid-template-columns: 1fr;
+  }
+}

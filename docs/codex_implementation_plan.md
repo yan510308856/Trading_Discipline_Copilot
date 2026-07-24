@@ -1290,3 +1290,16 @@ and a three-step option-aware planner. See `stage22_live_alerts_and_execution_wo
 - Make the shared JSON taxonomy contract authoritative without weakening types.
 - Reject contradictory legacy classification patches.
 - Verify with migration, backend, jsdom interaction, build, and Docker config.
+
+## Stage 29 — Horizon and position scaling
+
+- Add a distinct entry-execution table while retaining the exit table.
+- Create the initial entry transactionally when a plan opens.
+- Derive quantities, weighted entry, risk, and aggregate Underlying R with
+  Decimal arithmetic.
+- Route horizon changes and additions through dedicated audited endpoints.
+- Validate exits against remaining entered quantity and close only at zero.
+- Add action-specific reversal, stop, directional-risk, and losing-add gates.
+- Extend Open Trades, Price Ladder, review history, Attention, and Analytics.
+- Add migration backfill, Ruff, ESLint/typecheck, modular CSS imports, and CI
+  migration/Docker smoke checks.

@@ -86,6 +86,12 @@ export interface DisciplineAnalyticsData {
     green_to_red_warning_occurrences: number;
     average_number_of_exit_executions: number | null;
     auto_closed_trade_count: number;
+    trades_with_additions: number;
+    position_addition_rate: number | null;
+    total_add_executions: number;
+    average_adds_per_trade_with_additions: number | null;
+    adds_while_negative_count: number;
+    unconfirmed_reversal_adds_blocked: number;
   };
   review_completion: {
     closed_trades: number;
@@ -285,7 +291,53 @@ export interface Trade extends Omit<TradeCreatePayload, "position_size" | "locat
   discipline_score: number | null;
   has_review: boolean;
   review: Review | null;
+  entry_executions: TradeEntryExecution[];
   executions: TradeExecution[];
+  position_summary: PositionSummary;
+}
+
+export interface PositionSummary {
+  initial_quantity: number;
+  added_quantity: number;
+  total_entry_quantity: number;
+  total_exit_quantity: number;
+  remaining_quantity: number;
+  weighted_average_entry: number | null;
+  total_underlying_risk: number;
+  add_count: number;
+  uses_legacy_fallback: boolean;
+  accounting_consistent: boolean;
+}
+
+export interface TradeEntryExecution {
+  id: number;
+  trade_id: number;
+  executed_at: string;
+  entry_kind: "initial" | "add";
+  underlying_price: number;
+  quantity: number;
+  stop_at_entry: number;
+  option_price: number | null;
+  reason: string;
+  notes: string | null;
+  created_at: string;
+}
+
+export type AddReason =
+  | "breakout_confirmation"
+  | "pullback_continuation"
+  | "risk_reentry"
+  | "trend_continuation"
+  | "other";
+
+export interface AddPositionPayload {
+  underlying_price: number;
+  quantity: number;
+  stop_at_entry: number;
+  reason: AddReason;
+  option_price?: number | null;
+  notes?: string | null;
+  warnings_acknowledged?: string[];
 }
 
 export interface QuoteResult {

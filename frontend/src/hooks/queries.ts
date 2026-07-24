@@ -21,10 +21,13 @@ import {
   saveChecklistAnswers,
   deleteTrade,
   getHealth,
+  getEntryExecutions,
   sendTestEmail,
   updateDailyReadiness,
   dismissWarning,
   undoWarningDismissal,
+  addPosition,
+  changeTradeHorizon,
 } from "../api";
 import type {
   DailyReadinessUpdatePayload,
@@ -38,6 +41,7 @@ import type {
   HealthResponse,
   AnalyticsFilters,
   TradeFilters,
+  AddPositionPayload,
 } from "../types";
 
 export const queryKeys = {
@@ -51,6 +55,7 @@ export const queryKeys = {
   attention: (tradeHorizon?: TradeHorizon) => ["attention", tradeHorizon ?? "all"] as const,
   notificationStatus: () => ["notification-status"] as const,
   priceAlertEvents: (tradeId: number) => ["price-alert-events", tradeId] as const,
+  entryExecutions: (tradeId: number) => ["entry-executions", tradeId] as const,
   analytics: (filters: AnalyticsFilters = {}) => ["analytics", {
     date_from: filters.date_from ?? null,
     date_to: filters.date_to ?? null,
@@ -160,6 +165,13 @@ export function usePriceAlertEventsQuery(tradeId: number) {
   return useQuery({ queryKey: queryKeys.priceAlertEvents(tradeId), queryFn: () => getPriceAlertEvents(tradeId) });
 }
 
+export function useEntryExecutionsQuery(tradeId: number) {
+  return useQuery({
+    queryKey: queryKeys.entryExecutions(tradeId),
+    queryFn: () => getEntryExecutions(tradeId),
+  });
+}
+
 export function useRecordExitMutation() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -249,6 +261,50 @@ export function usePatchTradeMutation() {
     onSuccess: () => {
       invalidateTradesAndSummary(queryClient);
       void queryClient.invalidateQueries({ queryKey: queryKeys.openTradeAttention() });
+    },
+  });
+}
+
+export function useChangeTradeHorizonMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      tradeId,
+      tradeHorizon,
+    }: {
+      tradeId: number;
+      tradeHorizon: TradeHorizon;
+    }) => changeTradeHorizon(tradeId, tradeHorizon),
+    onSuccess: () => {
+      invalidateTradesAndSummary(queryClient);
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.openTradeAttention(),
+      });
+    },
+  });
+}
+
+export function useAddPositionMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      tradeId,
+      payload,
+    }: {
+      tradeId: number;
+      payload: AddPositionPayload;
+    }) => addPosition(tradeId, payload),
+    onSuccess: (_, variables) => {
+      invalidateTradesAndSummary(queryClient);
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.openTradeAttention(),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.priceAlertEvents(variables.tradeId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.entryExecutions(variables.tradeId),
+      });
     },
   });
 }

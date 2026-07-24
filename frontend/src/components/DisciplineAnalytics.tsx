@@ -72,6 +72,12 @@ export function DisciplineAnalytics() {
         <Metric label="Green-to-red warnings" value={String(data.execution_discipline.green_to_red_warning_occurrences)} definition="Recorded green-to-red rule occurrences." />
         <Metric label="Average exit executions" value={number(data.execution_discipline.average_number_of_exit_executions)} definition="Exit execution records / opened trades." />
         <Metric label="Auto-closed trades" value={String(data.execution_discipline.auto_closed_trade_count)} definition="trade_auto_closed workflow events." />
+        <Metric label="Trades with additions" value={String(data.execution_discipline.trades_with_additions)} definition="Opened trades with at least one persisted add execution." />
+        <Metric label="Position addition rate" value={rate(data.execution_discipline.position_addition_rate)} definition="Trades with additions / opened trades." />
+        <Metric label="Total add executions" value={String(data.execution_discipline.total_add_executions)} definition="Persisted add entry executions." />
+        <Metric label="Average adds per scaled trade" value={number(data.execution_discipline.average_adds_per_trade_with_additions)} definition="Add executions / trades with additions." />
+        <Metric label="Adds while negative" value={String(data.execution_discipline.adds_while_negative_count)} definition="Confirmed adds whose aggregate Underlying R was negative." />
+        <Metric label="Unconfirmed reversal adds blocked" value={String(data.execution_discipline.unconfirmed_reversal_adds_blocked)} definition="Audited add attempts blocked by unconfirmed reversal status." />
       </div></section>
       <section><h3>Review Completion</h3><div className="analytics-grid">
         <Metric label="Closed trades" value={String(data.review_completion.closed_trades)} definition="Trades closed in the selected period." />
