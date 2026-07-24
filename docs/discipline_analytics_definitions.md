@@ -32,6 +32,12 @@ Rates return `null` when their denominator is zero. The UI says `No recorded dat
 | Execution | Green-to-red warnings | `green_trade_should_not_go_red` alerts | none |
 | Execution | Average exit executions | Exit execution records | Selected opened trades |
 | Execution | Auto-closed trades | `trade_auto_closed` WorkflowEvents | none |
+| Execution | Trades with additions | Opened trades with one or more `add` entry executions | none |
+| Execution | Position addition rate | Trades with additions | Opened trades |
+| Execution | Total add executions | Persisted `TradeEntryExecution(entry_kind=add)` rows | none |
+| Execution | Average adds per scaled trade | Add executions | Trades with additions |
+| Execution | Adds while negative | Confirmed negative-R `position_added` events | none |
+| Execution | Unconfirmed reversal adds blocked | Matching `position_add_blocked` events | none |
 | Review | Closed trades | Trades closed in period | none |
 | Review | Reviewed trades | Selected closed trades with Review | none |
 | Review | Review completion rate | Reviewed closed trades | All closed trades |
@@ -50,6 +56,11 @@ Recurring mistake tags come from reviews; blocking and warning rule frequencies 
 ## Underlying R
 
 Total Underlying R, Average Underlying R, and Median Underlying R use stored final R for selected closed trades. For options, entry, stop, exit, and R use only the underlying symbol. Option premium return, option P&L, and option-based R are intentionally absent. Discipline score remains separate from outcome.
+
+Stage 29 Final Underlying R uses every entry and exit execution divided by the
+sum of each entry leg's underlying stop-at-entry risk. Scaling metrics come only
+from persisted add executions; changes to legacy `position_size` are never
+inferred as historical additions.
 
 ## Missing and legacy data
 

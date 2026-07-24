@@ -12,6 +12,20 @@ It is **not** an auto-trading bot. It does not connect to a broker, place orders
 or predict market direction.
 It is not a practice-mode simulator; blockers are part of the real workflow.
 
+## Stage 29 position management
+
+An active plan or open trade can change between Intraday, Swing, LEAP, and
+Other. The change requires confirmation and is recorded as a WorkflowEvent.
+Changing an already-open trade to Intraday does not retroactively invoke Daily
+Readiness; readiness gates new intraday plan creation only.
+
+`Add to Position` records an execution fact in the local database. It does not
+place or simulate a broker order. Each add preserves its underlying price,
+quantity, stop snapshot, reason, time, and optional option-premium reference.
+Quantities, weighted average entry, remaining quantity, and risk derive from
+entry and exit histories. Options Current R, Final R, and risk remain based
+only on the underlying.
+
 ## Features
 
 - Pre-trade form with blocker, warning, and reminder rules loaded from YAML.
@@ -19,6 +33,9 @@ It is not a practice-mode simulator; blockers are part of the real workflow.
 - Intraday trade plans are blocked until today's Daily Readiness checklist is cleared.
 - Planned and open trade lifecycle stored in SQLite.
 - Open-trade R tracking, stop management, partial-profit recording, and runners.
+- Confirmed horizon changes for planned/open trades with an audit trail.
+- Persistent initial/add entry executions, aggregate position accounting, and
+  locally recorded position additions with no broker order placement.
 - Durable price-threshold email alerts and execution-based automatic local closing.
 - Three-step click-first planning with structured option contract suggestions in Instrument & Horizon.
 - Explicit key-location and major-reversal decisions.
@@ -246,7 +263,8 @@ docker-compose.yml      Local two-container application
 - No authentication or multi-user support; this is a local single-user tool.
 - No CSV import because Stage 10 was skipped.
 - Non-stock prices and all partial exits are entered manually.
-- Weighted Final R requires position size when a trade has partial exits.
+- Legacy null-size trades require repair before entry/exit accounting can be
+  completed.
 - SQLite timestamps are stored for the local MVP; timezone/reporting policy
   should be made explicit before multi-region deployment.
 

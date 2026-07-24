@@ -1,4 +1,8 @@
-import type { Direction, TradeExecution } from "../types";
+import type {
+  Direction,
+  TradeEntryExecution,
+  TradeExecution,
+} from "../types";
 
 export function optionUnderlyingDirection(
   action: Direction,
@@ -62,6 +66,84 @@ export function calculateCurrentR(
   return direction === "long"
     ? (currentPrice - entry) / risk
     : (entry - currentPrice) / risk;
+}
+
+export interface AddPositionPreview {
+  newTotalQuantity: number;
+  newRemainingQuantity: number;
+  newWeightedAverageEntry: number;
+  incrementalRisk: number;
+  newTotalRisk: number;
+}
+
+export function calculateAddPositionPreview(
+  currentTotalQuantity: number,
+  currentRemainingQuantity: number,
+  currentAverageEntry: number,
+  currentTotalRisk: number,
+  addPrice: number,
+  addQuantity: number,
+  stopAtAdd: number,
+): AddPositionPreview {
+  const newTotalQuantity = currentTotalQuantity + addQuantity;
+  return {
+    newTotalQuantity: roundToTwoDecimals(newTotalQuantity),
+    newRemainingQuantity: roundToTwoDecimals(
+      currentRemainingQuantity + addQuantity,
+    ),
+    newWeightedAverageEntry: roundToTwoDecimals(
+      (
+        currentAverageEntry * currentTotalQuantity
+        + addPrice * addQuantity
+      ) / newTotalQuantity,
+    ),
+    incrementalRisk: roundToTwoDecimals(
+      Math.abs(addPrice - stopAtAdd) * addQuantity,
+    ),
+    newTotalRisk: roundToTwoDecimals(
+      currentTotalRisk + Math.abs(addPrice - stopAtAdd) * addQuantity,
+    ),
+  };
+}
+
+export function calculateAggregateUnderlyingR(
+  direction: Direction,
+  entries: TradeEntryExecution[],
+  exits: TradeExecution[],
+  currentPrice: number | null,
+): number | null {
+  if (entries.length === 0) return null;
+  const entered = entries.reduce(
+    (sum, entry) => sum + entry.underlying_price * entry.quantity,
+    0,
+  );
+  const exited = exits.reduce(
+    (sum, execution) =>
+      sum + execution.price * (execution.quantity ?? 0),
+    0,
+  );
+  const totalQuantity = entries.reduce(
+    (sum, entry) => sum + entry.quantity,
+    0,
+  );
+  const exitedQuantity = exits.reduce(
+    (sum, execution) => sum + (execution.quantity ?? 0),
+    0,
+  );
+  const remaining = Math.max(0, totalQuantity - exitedQuantity);
+  if (remaining > 0 && currentPrice === null) return null;
+  const risk = entries.reduce(
+    (sum, entry) =>
+      sum
+      + Math.abs(entry.underlying_price - entry.stop_at_entry) * entry.quantity,
+    0,
+  );
+  if (risk <= 0) return null;
+  const marked = (currentPrice ?? 0) * remaining;
+  const pnl = direction === "long"
+    ? exited + marked - entered
+    : entered - exited - marked;
+  return pnl / risk;
 }
 
 export function calculatePositionBreakdown(

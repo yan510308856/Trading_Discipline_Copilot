@@ -1,7 +1,9 @@
+import type { TradeEntryExecution } from "../types";
+
 interface PriceLevel {
   label: string;
   value: number | null;
-  kind: "target" | "current" | "entry" | "stop" | "partial";
+  kind: "target" | "current" | "entry" | "stop" | "partial" | "average" | "add";
 }
 
 interface PartialExitLevel {
@@ -16,6 +18,8 @@ interface PriceLadderProps {
   target1: number;
   target2: number | null;
   partialExits?: PartialExitLevel[];
+  entryExecutions?: TradeEntryExecution[];
+  weightedAverageEntry?: number | null;
 }
 
 const TRACK_HEIGHT_PX = 260;
@@ -60,7 +64,28 @@ export function PriceLadder({
   target1,
   target2,
   partialExits = [],
+  entryExecutions = [],
+  weightedAverageEntry = null,
 }: PriceLadderProps) {
+  const recordedInitial = entryExecutions.find(
+    (execution) => execution.entry_kind === "initial",
+  );
+  const addEntries = entryExecutions.filter(
+    (execution) => execution.entry_kind === "add",
+  );
+  const entryReference: PriceLevel = (
+    addEntries.length > 0 && weightedAverageEntry !== null
+  )
+    ? {
+        label: "Weighted average",
+        value: weightedAverageEntry,
+        kind: "average",
+      }
+    : {
+        label: "Initial entry",
+        value: recordedInitial?.underlying_price ?? entry,
+        kind: "entry",
+      };
   const candidateLevels: PriceLevel[] = [
     { label: "Target 2", value: target2, kind: "target" },
     { label: "Target 1", value: target1, kind: "target" },
@@ -71,8 +96,13 @@ export function PriceLadder({
       value: exit.price,
       kind: "partial" as const,
     })),
+    ...addEntries.map((addition, index) => ({
+      label: `Add ${index + 1} (${addition.quantity})`,
+      value: addition.underlying_price,
+      kind: "add" as const,
+    })),
     { label: "Current", value: currentPrice, kind: "current" },
-    { label: "Entry", value: entry, kind: "entry" },
+    entryReference,
     { label: "Stop", value: currentStop, kind: "stop" },
   ];
   const levels = candidateLevels.filter((level) => level.value !== null);

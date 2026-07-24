@@ -62,6 +62,18 @@ def update_trade(
     return trade_service.update_trade(database, trade_id, trade_data)
 
 
+@router.post(
+    "/trades/{trade_id}/horizon",
+    response_model=schemas.TradeRead,
+)
+def change_trade_horizon(
+    trade_id: int,
+    horizon_data: schemas.TradeHorizonChange,
+    database: Database,
+) -> models.Trade:
+    return trade_service.change_trade_horizon(database, trade_id, horizon_data)
+
+
 @router.post("/trades/{trade_id}/open", response_model=schemas.TradeRead)
 def open_trade(
     trade_id: int, trade_data: schemas.TradeOpen, database: Database
@@ -85,6 +97,30 @@ def record_partial_exit(
     trade_id: int, exit_data: schemas.PartialExitCreate, database: Database
 ) -> models.Trade:
     return trade_service.record_partial_exit(database, trade_id, exit_data)
+
+
+@router.get(
+    "/trades/{trade_id}/entries",
+    response_model=list[schemas.TradeEntryExecutionRead],
+)
+def list_entry_executions(
+    trade_id: int, database: Database
+) -> list[models.TradeEntryExecution]:
+    trade = trade_service.get_trade(database, trade_id)
+    return list(trade.entry_executions)
+
+
+@router.post(
+    "/trades/{trade_id}/entries",
+    response_model=schemas.TradeRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def add_position_entry(
+    trade_id: int,
+    entry_data: schemas.TradeEntryExecutionCreate,
+    database: Database,
+) -> models.Trade:
+    return trade_service.add_position_entry(database, trade_id, entry_data)
 
 
 @router.post("/trades/{trade_id}/cancel", response_model=schemas.TradeRead)

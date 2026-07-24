@@ -99,19 +99,24 @@ def discipline_analytics(
 
     plans_statement = _trade_filters(select(models.Trade).options(
         selectinload(models.Trade.review), selectinload(models.Trade.executions),
+        selectinload(models.Trade.entry_executions),
         selectinload(models.Trade.alerts), selectinload(models.Trade.price_alert_events),
     ), trade_horizon, market, setup, market_state, trade_thesis, entry_trigger, location_tag)
     plans_statement = _in_time(plans_statement, models.Trade.created_at, start, end)
     plans = list(database.scalars(plans_statement))
 
     opened_statement = _trade_filters(select(models.Trade).options(
-        selectinload(models.Trade.executions), selectinload(models.Trade.alerts)
+        selectinload(models.Trade.executions),
+        selectinload(models.Trade.entry_executions),
+        selectinload(models.Trade.alerts),
     ).where(models.Trade.opened_at.is_not(None)), trade_horizon, market, setup, market_state, trade_thesis, entry_trigger, location_tag)
     opened_statement = _in_time(opened_statement, models.Trade.opened_at, start, end)
     opened = list(database.scalars(opened_statement))
 
     closed_statement = _trade_filters(select(models.Trade).options(
-        selectinload(models.Trade.review), selectinload(models.Trade.executions)
+        selectinload(models.Trade.review),
+        selectinload(models.Trade.executions),
+        selectinload(models.Trade.entry_executions),
     ).where(models.Trade.closed_at.is_not(None)), trade_horizon, market, setup, market_state, trade_thesis, entry_trigger, location_tag)
     closed_statement = _in_time(closed_statement, models.Trade.closed_at, start, end)
     closed = list(database.scalars(closed_statement))
@@ -179,6 +184,12 @@ def discipline_analytics(
     }
     partial_trade_count = sum(any(execution.execution_type == "partial" for execution in trade.executions) for trade in opened)
     execution_count = sum(len(trade.executions) for trade in opened)
+    add_counts = [
+        sum(entry.entry_kind == "add" for entry in trade.entry_executions)
+        for trade in opened
+    ]
+    trades_with_additions = sum(count > 0 for count in add_counts)
+    total_add_executions = sum(add_counts)
     final_rs = [float(trade.final_r) for trade in closed if trade.final_r is not None]
     scores = [float(trade.discipline_score) for trade in reviewed if trade.discipline_score is not None]
 
@@ -211,6 +222,22 @@ def discipline_analytics(
             "green_to_red_warning_occurrences": green_alerts,
             "average_number_of_exit_executions": _rate(execution_count, len(opened)),
             "auto_closed_trade_count": event_types["trade_auto_closed"],
+            "trades_with_additions": trades_with_additions,
+            "position_addition_rate": _rate(trades_with_additions, len(opened)),
+            "total_add_executions": total_add_executions,
+            "average_adds_per_trade_with_additions": _rate(
+                total_add_executions, trades_with_additions
+            ),
+            "adds_while_negative_count": sum(
+                event.event_type == "position_added"
+                and event.event_data.get("added_while_negative") is True
+                for event in events
+            ),
+            "unconfirmed_reversal_adds_blocked": sum(
+                event.event_type == "position_add_blocked"
+                and event.event_data.get("reason") == "unconfirmed_reversal"
+                for event in events
+            ),
         },
         "review_completion": {
             "closed_trades": len(closed), "reviewed_trades": len(reviewed),

@@ -23,6 +23,8 @@ import type {
   TradeHorizon,
   TradePatchPayload,
   TradeFilters,
+  AddPositionPayload,
+  TradeEntryExecution,
 } from "./types";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "/api";
@@ -212,6 +214,32 @@ export function patchTrade(
   return apiRequest<Trade>(`/trades/${tradeId}`, {
     method: "PATCH",
     body: JSON.stringify(updates),
+  });
+}
+
+export function changeTradeHorizon(
+  tradeId: number,
+  tradeHorizon: TradeHorizon,
+): Promise<Trade> {
+  return apiRequest<Trade>(`/trades/${tradeId}/horizon`, {
+    method: "POST",
+    body: JSON.stringify({ trade_horizon: tradeHorizon }),
+  });
+}
+
+export function getEntryExecutions(
+  tradeId: number,
+): Promise<TradeEntryExecution[]> {
+  return apiRequest<TradeEntryExecution[]>(`/trades/${tradeId}/entries`);
+}
+
+export function addPosition(
+  tradeId: number,
+  payload: AddPositionPayload,
+): Promise<Trade> {
+  return apiRequest<Trade>(`/trades/${tradeId}/entries`, {
+    method: "POST",
+    body: JSON.stringify(payload),
   });
 }
 

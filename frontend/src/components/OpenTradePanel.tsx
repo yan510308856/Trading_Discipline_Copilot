@@ -5,17 +5,21 @@ import {
 } from "../api";
 import { useTrades } from "../hooks/useTrades";
 import type {
+  AddReason,
   RuleAlert,
   RuleEvaluationResult,
   Trade,
   TradePatchPayload,
   ExitReason,
+  TradeHorizon,
 } from "../types";
 import { formatDecimal, parseDecimalInput } from "../utils/decimal";
 import { groupTradesByMarket } from "../utils/tradeGrouping";
 import {
+  calculateAddPositionPreview,
+  calculateAggregateUnderlyingR,
   calculateCurrentR,
-  calculatePositionBreakdown,
+  optionUnderlyingDirection,
   resolvedUnderlyingDirection,
 } from "../utils/tradeCalculations";
 import { PriceLadder } from "./PriceLadder";
@@ -28,7 +32,7 @@ import {
   type HorizonFilterValue,
   horizonForApi,
 } from "./HorizonFilter";
-import { useDismissWarningMutation, useOpenTradeMutation, usePatchTradeMutation, usePriceAlertEventsQuery, useRecordExitMutation, useUndoWarningDismissalMutation } from "../hooks/queries";
+import { useAddPositionMutation, useChangeTradeHorizonMutation, useDismissWarningMutation, useOpenTradeMutation, usePatchTradeMutation, usePriceAlertEventsQuery, useRecordExitMutation, useUndoWarningDismissalMutation } from "../hooks/queries";
 import { useQueryClient } from "@tanstack/react-query";
 import { contextFromHash, hashWithContext, positiveIntegerContext } from "../utils/navigation";
 import { frontendErrorMessage } from "../utils/apiError";
@@ -136,6 +140,63 @@ export function robinhoodUrl(symbol: string): string {
   )}`;
 }
 
+export type TradeSort = "opened" | "symbol" | "current_r";
+
+export function currentUnderlyingRForTrade(trade: Trade): number | null {
+  if (trade.current_price === null) return null;
+  const entry = trade.actual_entry ?? trade.planned_entry;
+  const direction = trade.market === "options"
+    ? resolvedUnderlyingDirection(
+        trade.direction,
+        trade.option_type,
+        entry,
+        trade.stop_loss,
+      )
+    : trade.direction;
+  const aggregate = calculateAggregateUnderlyingR(
+    direction,
+    trade.entry_executions,
+    trade.executions,
+    trade.current_price,
+  );
+  const value = aggregate ?? calculateCurrentR(
+    direction,
+    entry,
+    trade.stop_loss,
+    trade.current_price,
+  );
+  return Number.isFinite(value) ? value : null;
+}
+
+export function sortActiveTrades(
+  trades: Trade[],
+  sortBy: TradeSort,
+): Trade[] {
+  return [...trades].sort((left, right) => {
+    const statusDifference =
+      Number(right.status === "open") - Number(left.status === "open");
+    if (statusDifference !== 0) return statusDifference;
+
+    if (sortBy === "symbol") {
+      return left.symbol.localeCompare(right.symbol) || right.id - left.id;
+    }
+    if (sortBy === "current_r") {
+      const leftR = currentUnderlyingRForTrade(left);
+      const rightR = currentUnderlyingRForTrade(right);
+      if (leftR === null && rightR !== null) return 1;
+      if (leftR !== null && rightR === null) return -1;
+      if (leftR !== null && rightR !== null && leftR !== rightR) {
+        return rightR - leftR;
+      }
+      return left.symbol.localeCompare(right.symbol) || right.id - left.id;
+    }
+
+    const leftOpened = left.opened_at ?? left.created_at;
+    const rightOpened = right.opened_at ?? right.created_at;
+    return rightOpened.localeCompare(leftOpened) || right.id - left.id;
+  });
+}
+
 function errorMessage(error: unknown): string {
   return frontendErrorMessage(error, "The trade update failed. Confirm that the backend is running.");
 }
@@ -175,6 +236,8 @@ function TradeCard({ trade, onUpdated, defaultExpanded, onDeleted, onAutoClosed 
   const patchMutation = usePatchTradeMutation();
   const openMutation = useOpenTradeMutation();
   const exitMutation = useRecordExitMutation();
+  const addMutation = useAddPositionMutation();
+  const horizonMutation = useChangeTradeHorizonMutation();
   const dismissWarningMutation = useDismissWarningMutation();
   const undoDismissalMutation = useUndoWarningDismissalMutation();
   const [actualEntry, setActualEntry] = useState(
@@ -205,6 +268,21 @@ function TradeCard({ trade, onUpdated, defaultExpanded, onDeleted, onAutoClosed 
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState("");
   const [undoDismissalKey, setUndoDismissalKey] = useState<string | null>(null);
+  const [pendingHorizon, setPendingHorizon] = useState<TradeHorizon | null>(null);
+  const [isEditingHorizon, setIsEditingHorizon] = useState(false);
+  const [addPrice, setAddPrice] = useState(
+    trade.current_price === null ? "" : formatDecimal(trade.current_price),
+  );
+  const [addQuantity, setAddQuantity] = useState("");
+  const [addStop, setAddStop] = useState(
+    trade.current_stop === null ? "" : formatDecimal(trade.current_stop),
+  );
+  const [addOptionPrice, setAddOptionPrice] = useState("");
+  const [addReason, setAddReason] = useState<AddReason>("breakout_confirmation");
+  const [addNotes, setAddNotes] = useState("");
+  const [confirmingAdd, setConfirmingAdd] = useState(false);
+  const [losingAddAcknowledged, setLosingAddAcknowledged] = useState(false);
+  const [addNotice, setAddNotice] = useState("");
 
   async function dismissOpenWarning(alert: RuleAlert) {
     if (!alert.dismissal_key || !alert.occurrence_key) return;
@@ -255,18 +333,30 @@ function TradeCard({ trade, onUpdated, defaultExpanded, onDeleted, onAutoClosed 
   const parsedPrice = numberOrNull(currentPrice);
   const currentR = useMemo(() => {
     if (parsedEntry === null || parsedPrice === null) return null;
-    const value = calculateCurrentR(
-      trade.market === "options" ? resolvedUnderlyingDirection(trade.direction, trade.option_type, parsedEntry, trade.stop_loss) : trade.direction,
-      parsedEntry,
-      trade.stop_loss,
+    const underlyingDirection = trade.market === "options"
+      ? resolvedUnderlyingDirection(
+          trade.direction,
+          trade.option_type,
+          parsedEntry,
+          trade.stop_loss,
+        )
+      : trade.direction;
+    const aggregate = calculateAggregateUnderlyingR(
+      underlyingDirection,
+      trade.entry_executions,
+      trade.executions,
       parsedPrice,
     );
+    const value = aggregate ?? calculateCurrentR(
+      underlyingDirection, parsedEntry, trade.stop_loss, parsedPrice,
+    );
     return Number.isFinite(value) ? value : null;
-  }, [parsedEntry, parsedPrice, trade.direction, trade.market, trade.option_type, trade.stop_loss]);
-  const quantity = calculatePositionBreakdown(
-    trade.position_size,
-    trade.partial_exit_quantity,
-  );
+  }, [parsedEntry, parsedPrice, trade.direction, trade.entry_executions, trade.executions, trade.market, trade.option_type, trade.stop_loss]);
+  const quantity = {
+    initial: trade.position_summary.initial_quantity,
+    taken: trade.position_summary.total_exit_quantity,
+    runner: trade.position_summary.remaining_quantity,
+  };
   const partialExitLevels = trade.executions
     .filter((item) => item.execution_type === "partial")
     .map((item) => ({ price: item.price, quantity: item.quantity }));
@@ -280,8 +370,6 @@ function TradeCard({ trade, onUpdated, defaultExpanded, onDeleted, onAutoClosed 
   const partialQuantityIsValid =
     parsedPartialQuantity !== null &&
     parsedPartialQuantity > 0 &&
-    trade.position_size !== null &&
-    quantity.runner !== null &&
     parsedPartialQuantity <= quantity.runner;
   const primaryRequiredAction = trade.position_size === null
     ? ({ rule_id: "position_size_required", severity: "blocker", message: "Position size is required before recording exits.", checklist: [], discipline_sentence: "", next_actions: ["Set position size before recording exits."] } as RuleAlert)
@@ -338,13 +426,211 @@ function TradeCard({ trade, onUpdated, defaultExpanded, onDeleted, onAutoClosed 
 
   function updateExitQuantity(value: string) {
     const requested = numberOrNull(value);
-    if (requested === null || trade.position_size === null) {
+    if (requested === null) {
       setPartialQuantity(value);
       return;
     }
     const remaining = quantity.runner ?? 0;
     setPartialQuantity(requested > remaining ? formatDecimal(remaining) : value);
   }
+
+  async function changeHorizon() {
+    if (pendingHorizon === null) return;
+    await runAction(() => horizonMutation.mutateAsync({
+      tradeId: trade.id,
+      tradeHorizon: pendingHorizon,
+    }));
+    setPendingHorizon(null);
+    setIsEditingHorizon(false);
+  }
+
+  const parsedAddPrice = numberOrNull(addPrice);
+  const parsedAddQuantity = numberOrNull(addQuantity);
+  const parsedAddStop = numberOrNull(addStop);
+  const parsedAddOptionPrice = numberOrNull(addOptionPrice);
+  const addDirection = optionUnderlyingDirection(
+    trade.direction, trade.market === "options" ? trade.option_type : null,
+  );
+  const addRiskIsValid = parsedAddPrice !== null && parsedAddStop !== null && (
+    addDirection === "long"
+      ? parsedAddStop < parsedAddPrice
+      : parsedAddStop > parsedAddPrice
+  );
+  const addPreview = (
+    parsedAddPrice !== null
+    && parsedAddQuantity !== null
+    && parsedAddQuantity > 0
+    && parsedAddStop !== null
+    && trade.position_summary.weighted_average_entry !== null
+  ) ? calculateAddPositionPreview(
+      trade.position_summary.total_entry_quantity,
+      trade.position_summary.remaining_quantity,
+      trade.position_summary.weighted_average_entry,
+      trade.position_summary.total_underlying_risk,
+      parsedAddPrice,
+      parsedAddQuantity,
+      parsedAddStop,
+    ) : null;
+  const addBlocked = trade.current_stop === null
+    || trade.reversal_confirmation === "unconfirmed"
+    || trade.is_unconfirmed_reversal
+    || !trade.position_summary.accounting_consistent
+    || !addRiskIsValid;
+  const losingAddWarning = currentR !== null && currentR < 0;
+
+  async function saveAddPosition() {
+    if (
+      parsedAddPrice === null
+      || parsedAddQuantity === null
+      || parsedAddStop === null
+      || addPreview === null
+    ) return;
+    setIsSaving(true);
+    setError("");
+    try {
+      const updated = await addMutation.mutateAsync({
+        tradeId: trade.id,
+        payload: {
+          underlying_price: parsedAddPrice,
+          quantity: parsedAddQuantity,
+          stop_at_entry: parsedAddStop,
+          reason: addReason,
+          option_price: trade.market === "options" ? parsedAddOptionPrice : null,
+          notes: addNotes.trim() || null,
+          warnings_acknowledged: losingAddAcknowledged
+            ? ["adding_while_losing"]
+            : [],
+        },
+      });
+      onUpdated(updated);
+      setCurrentStop(updated.current_stop === null ? "" : formatDecimal(updated.current_stop));
+      setAddStop(updated.current_stop === null ? "" : formatDecimal(updated.current_stop));
+      setAddQuantity("");
+      setAddOptionPrice("");
+      setAddNotes("");
+      setConfirmingAdd(false);
+      setLosingAddAcknowledged(false);
+      setAddNotice("Position addition recorded locally. No broker order was placed.");
+    } catch (requestError) {
+      setError(errorMessage(requestError));
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  const horizonControl = (
+    <div className="horizon-edit-control">
+      <span>Horizon</span>
+      {isEditingHorizon ? (
+        <select
+          aria-label={`Change horizon for ${trade.symbol}`}
+          defaultValue={trade.trade_horizon}
+          autoFocus
+          onBlur={() => setIsEditingHorizon(false)}
+          onChange={(event) => {
+            const next = event.target.value as TradeHorizon;
+            setIsEditingHorizon(false);
+            if (next !== trade.trade_horizon) setPendingHorizon(next);
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") setIsEditingHorizon(false);
+          }}
+        >
+          <option value="intraday">Intraday</option>
+          <option value="swing">Swing</option>
+          <option value="leap">LEAP</option>
+          <option value="other">Other</option>
+        </select>
+      ) : (
+        <button
+          type="button"
+          className="metric-edit-button"
+          aria-label={`Edit horizon for ${trade.symbol}`}
+          onClick={() => setIsEditingHorizon(true)}
+        >
+          {trade.trade_horizon}
+        </button>
+      )}
+    </div>
+  );
+  const horizonConfirmation = pendingHorizon !== null && (
+    <div className="confirmation-backdrop" role="presentation">
+      <section
+        className="exit-confirmation"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={`horizon-confirmation-${trade.id}`}
+      >
+        <div>
+          <p className="eyebrow">Classification change</p>
+          <h3 id={`horizon-confirmation-${trade.id}`}>
+            Change trade horizon?
+          </h3>
+        </div>
+        <p className="horizon-change-value">
+          {trade.trade_horizon} → {pendingHorizon}
+        </p>
+        <p>
+          This updates filtering, Attention, and Analytics. It does not alter
+          entry, stop, targets, or execution history.
+        </p>
+        {trade.status === "open" && pendingHorizon === "intraday" && (
+          <p className="readiness-information">
+            Daily Readiness applies when creating a new intraday plan. This open
+            trade remains manageable after reclassification.
+          </p>
+        )}
+        <div className="confirmation-actions">
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={() => setPendingHorizon(null)}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="primary-button"
+            disabled={isSaving}
+            onClick={() => void changeHorizon()}
+          >
+            {isSaving ? "Saving…" : "Confirm change"}
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+
+  let runningQuantity = 0;
+  const unifiedExecutionHistory = [
+    ...trade.entry_executions.map((entry) => ({
+      id: `entry-${entry.id}`,
+      timestamp: entry.executed_at,
+      action: entry.entry_kind === "initial" ? "Initial entry" : "Add position",
+      price: entry.underlying_price,
+      quantity: entry.quantity,
+      optionPrice: entry.option_price,
+      reason: entry.reason,
+      stop: entry.stop_at_entry,
+      delta: entry.quantity,
+    })),
+    ...trade.executions.map((execution) => ({
+      id: `exit-${execution.id}`,
+      timestamp: execution.executed_at,
+      action: execution.execution_type === "final" ? "Final exit" : "Partial exit",
+      price: execution.price,
+      quantity: execution.quantity ?? 0,
+      optionPrice: execution.option_price,
+      reason: execution.exit_reason ?? "other",
+      stop: null,
+      delta: -(execution.quantity ?? 0),
+    })),
+  ]
+    .sort((left, right) => left.timestamp.localeCompare(right.timestamp))
+    .map((event) => {
+      runningQuantity = Math.max(0, runningQuantity + event.delta);
+      return { ...event, remaining: runningQuantity };
+    });
 
   async function savePartialExit() {
     if (parsedPartialQuantity === null || parsedPartialPrice === null) return;
@@ -400,7 +686,7 @@ function TradeCard({ trade, onUpdated, defaultExpanded, onDeleted, onAutoClosed 
         <article className="open-trade-card">
         <PriceActionClassification trade={trade} compact englishOnly />
         <div className="trade-facts compact-facts cockpit-metrics">
-          <div><span>Horizon</span><strong>{trade.trade_horizon}</strong></div>
+          {horizonControl}
           <div><span>Planned entry</span><strong>{trade.planned_entry}</strong></div>
           <div><span>Initial stop</span><strong>{trade.stop_loss}</strong></div>
           <div><span>Target 1</span><strong>{trade.target_1}</strong></div>
@@ -431,6 +717,7 @@ function TradeCard({ trade, onUpdated, defaultExpanded, onDeleted, onAutoClosed 
           {trade.position_size === null && <small className="form-message error-message">Set position size before marking the entry filled.</small>}
         </div>
         {error && <p className="form-message error-message">{error}</p>}
+        {horizonConfirmation}
         <DeleteTradeButton trade={trade} onDeleted={onDeleted} />
         </article>
       </details>
@@ -488,13 +775,13 @@ function TradeCard({ trade, onUpdated, defaultExpanded, onDeleted, onAutoClosed 
       <PriceActionClassification trade={trade} englishOnly />
 
       <div className="trade-facts cockpit-metrics">
-        <div><span>Horizon</span><strong>{trade.trade_horizon}</strong></div>
-        <div><span>Current R</span><strong>{currentR === null ? "—" : `${currentR.toFixed(2)}R`}</strong></div>
-        <div><span>Actual entry</span><strong>{displayPrice(trade.actual_entry)}</strong></div>
+        {horizonControl}
+        <div><span>Current Underlying R</span><strong>{currentR === null ? "—" : `${currentR.toFixed(2)}R`}</strong></div>
+        <div><span>Initial entry</span><strong>{displayPrice(trade.actual_entry)}</strong></div>
+        <div><span>Weighted average entry</span><strong>{displayPrice(trade.position_summary.weighted_average_entry)}</strong></div>
         {trade.option_contract && (
           <div><span>Option contract</span><strong>{trade.option_contract}</strong></div>
         )}
-        <div><span>Initial stop</span><strong>{formatDecimal(trade.stop_loss)}</strong></div>
         <EditableMetric label="Current stop" value={trade.current_stop} required onSave={async (value) => {
           setCurrentStop(value === null ? "" : formatDecimal(value));
           await update({ current_stop: value });
@@ -518,13 +805,12 @@ function TradeCard({ trade, onUpdated, defaultExpanded, onDeleted, onAutoClosed 
             onSave={(value) => update({ target_2: value })}
           />
         </div>
-        <EditableMetric
-          label="Position size"
-          value={trade.position_size}
-          onSave={(value) => update({ position_size: value })}
-        />
-        <div><span>Partial quantity</span><strong>{formatDecimal(quantity.taken)}</strong></div>
-        <div><span>Runner remaining</span><strong>{quantity.runner === null ? "—" : formatDecimal(quantity.runner)}</strong></div>
+        <div><span>Initial quantity</span><strong>{formatDecimal(trade.position_summary.initial_quantity)}</strong></div>
+        <div><span>Added quantity</span><strong>{formatDecimal(trade.position_summary.added_quantity)}</strong></div>
+        <div><span>Total entered</span><strong>{formatDecimal(trade.position_summary.total_entry_quantity)}</strong></div>
+        <div><span>Exited quantity</span><strong>{formatDecimal(quantity.taken)}</strong></div>
+        <div><span>Remaining quantity</span><strong>{formatDecimal(quantity.runner)}</strong></div>
+        <div><span>Total underlying risk</span><strong>{formatDecimal(trade.position_summary.total_underlying_risk)}</strong></div>
         <div><span>Runner state</span><strong>{trade.runner_active ? "Active" : "Inactive"}</strong></div>
       </div>
 
@@ -535,10 +821,12 @@ function TradeCard({ trade, onUpdated, defaultExpanded, onDeleted, onAutoClosed 
         target1={trade.target_1}
         target2={trade.target_2}
         partialExits={partialExitLevels}
+        entryExecutions={trade.entry_executions}
+        weightedAverageEntry={trade.position_summary.weighted_average_entry}
       />
 
-      <section className="management-section">
-        <h3>Record Exit Execution</h3>
+      <details className="management-section trade-management-accordion exit-execution-section">
+        <summary>Record Exit Execution</summary>
         <div className="action-row exit-runner-row">
           <div className={`exit-execution-fields ${trade.market === "options" ? "option-exit-fields" : ""}`}>
           <label className="partial-quantity-field">
@@ -594,9 +882,73 @@ function TradeCard({ trade, onUpdated, defaultExpanded, onDeleted, onAutoClosed 
             >{trade.runner_active ? "Mark Runner Inactive" : "Activate Runner"}</button>
           </div>
         </div>
-      </section>
+      </details>
 
-      {confirmingExit && parsedPartialQuantity !== null && parsedPartialPrice !== null && trade.position_size !== null && (() => {
+      <details className="management-section trade-management-accordion add-position-section">
+        <summary>Add to Position</summary>
+        <p className="section-helper">
+          Record a local execution fact. This does not place a broker order.
+        </p>
+        <div className="add-position-fields">
+          <label>
+            {trade.market === "options" ? "Underlying add price" : "Add underlying price"}
+            <input type="number" min="0.01" step="0.01" value={addPrice} onChange={(event) => setAddPrice(event.target.value)} />
+          </label>
+          {trade.market === "options" && <label>Option add price <small>Optional reference only</small><input type="number" min="0.01" step="0.01" value={addOptionPrice} onChange={(event) => setAddOptionPrice(event.target.value)} /></label>}
+          <label>Add quantity<input type="number" min="0.01" step="0.01" value={addQuantity} onChange={(event) => setAddQuantity(event.target.value)} /></label>
+          <label>Stop at add<input type="number" min="0.01" step="0.01" value={addStop} onChange={(event) => setAddStop(event.target.value)} /></label>
+          <label>Add reason<select value={addReason} onChange={(event) => setAddReason(event.target.value as AddReason)}>
+            <option value="breakout_confirmation">Breakout confirmation</option>
+            <option value="pullback_continuation">Pullback continuation</option>
+            <option value="risk_reentry">Risk re-entry</option>
+            <option value="trend_continuation">Trend continuation</option>
+            <option value="other">Other</option>
+          </select></label>
+          <label className="notes-field">Optional note<textarea rows={2} value={addNotes} onChange={(event) => setAddNotes(event.target.value)} /></label>
+        </div>
+        {addPreview && <dl className="add-risk-preview">
+          <div><dt>Current total quantity</dt><dd>{formatDecimal(trade.position_summary.total_entry_quantity)}</dd></div>
+          <div><dt>Add quantity</dt><dd>{formatDecimal(parsedAddQuantity)}</dd></div>
+          <div><dt>New total quantity</dt><dd>{formatDecimal(addPreview.newTotalQuantity)}</dd></div>
+          <div><dt>Current average entry</dt><dd>{displayPrice(trade.position_summary.weighted_average_entry)}</dd></div>
+          <div><dt>New average entry</dt><dd>{formatDecimal(addPreview.newWeightedAverageEntry)}</dd></div>
+          <div><dt>Incremental underlying risk</dt><dd>{formatDecimal(addPreview.incrementalRisk)}</dd></div>
+          <div><dt>Current total underlying risk</dt><dd>{formatDecimal(trade.position_summary.total_underlying_risk)}</dd></div>
+          <div><dt>New total underlying risk</dt><dd>{formatDecimal(addPreview.newTotalRisk)}</dd></div>
+          <div><dt>Current remaining</dt><dd>{formatDecimal(trade.position_summary.remaining_quantity)}</dd></div>
+          <div><dt>New remaining</dt><dd>{formatDecimal(addPreview.newRemainingQuantity)}</dd></div>
+          <div><dt>Current Underlying R</dt><dd>{currentR === null ? "—" : `${currentR.toFixed(2)}R`}</dd></div>
+        </dl>}
+        {(trade.reversal_confirmation === "unconfirmed" || trade.is_unconfirmed_reversal) && <p className="form-message error-message">Do not add to an unconfirmed reversal attempt. Wait for confirmation or manage the existing position without increasing exposure.</p>}
+        {trade.current_stop === null && <p className="form-message error-message">Record a current stop before adding exposure.</p>}
+        {!addRiskIsValid && parsedAddPrice !== null && parsedAddStop !== null && <p className="form-message error-message">Stop at add must define positive directional risk.</p>}
+        {losingAddWarning && <label className="warning-acknowledgement"><input type="checkbox" checked={losingAddAcknowledged} onChange={(event) => setLosingAddAcknowledged(event.target.checked)} />I confirm this is a planned add, I verified the structural stop, and I reviewed the new total risk.</label>}
+        <button type="button" className="secondary-button" disabled={isSaving || addPreview === null || addBlocked || (losingAddWarning && !losingAddAcknowledged)} onClick={() => setConfirmingAdd(true)}>Review Add</button>
+      </details>
+
+      {confirmingAdd && addPreview && parsedAddQuantity !== null && parsedAddStop !== null && <div className="confirmation-backdrop" role="presentation"><section className="exit-confirmation add-confirmation" role="dialog" aria-modal="true" aria-labelledby={`add-confirmation-${trade.id}`}>
+        <div><p className="eyebrow">Local execution record</p><h3 id={`add-confirmation-${trade.id}`}>Add to {trade.symbol}?</h3></div>
+        <dl className="exit-confirmation-details">
+          <div><dt>Horizon</dt><dd>{trade.trade_horizon}</dd></div>
+          <div><dt>Direction</dt><dd>{addDirection}</dd></div>
+          <div><dt>Current quantity</dt><dd>{formatDecimal(trade.position_summary.total_entry_quantity)}</dd></div>
+          <div><dt>Add quantity</dt><dd>{formatDecimal(parsedAddQuantity)}</dd></div>
+          <div><dt>New total quantity</dt><dd>{formatDecimal(addPreview.newTotalQuantity)}</dd></div>
+          <div><dt>Current average entry</dt><dd>{displayPrice(trade.position_summary.weighted_average_entry)}</dd></div>
+          <div><dt>New average entry</dt><dd>{formatDecimal(addPreview.newWeightedAverageEntry)}</dd></div>
+          <div><dt>Stop at add</dt><dd>{formatDecimal(parsedAddStop)}</dd></div>
+          <div><dt>Incremental risk</dt><dd>{formatDecimal(addPreview.incrementalRisk)}</dd></div>
+          <div><dt>New total risk</dt><dd>{formatDecimal(addPreview.newTotalRisk)}</dd></div>
+          <div><dt>Add reason</dt><dd>{addReason.replaceAll("_", " ")}</dd></div>
+        </dl>
+        {losingAddWarning && <p className="full-exit-warning">Warning acknowledged: this position is below its aggregate entry basis.</p>}
+        <div className="confirmation-actions"><button type="button" className="secondary-button" onClick={() => setConfirmingAdd(false)}>Cancel</button><button type="button" className="primary-button" disabled={isSaving} onClick={() => void saveAddPosition()}>{isSaving ? "Recording…" : "Confirm Add"}</button></div>
+      </section></div>}
+
+      {addNotice && <p className="page-notice" role="status">{addNotice}</p>}
+      {horizonConfirmation}
+
+      {confirmingExit && parsedPartialQuantity !== null && parsedPartialPrice !== null && (() => {
         const remainingBefore = quantity.runner ?? 0;
         const remainingAfter = Math.max(0, Number((remainingBefore - parsedPartialQuantity).toFixed(2)));
         const isFullExit = Math.abs(parsedPartialQuantity - remainingBefore) < 0.005;
@@ -617,9 +969,9 @@ function TradeCard({ trade, onUpdated, defaultExpanded, onDeleted, onAutoClosed 
         </section></div>;
       })()}
 
-      {trade.executions.length > 0 && <details className="trade-history-section"><summary>Execution Preview</summary><div className="execution-preview-list">{trade.executions.map((execution, index) => { const exited = trade.executions.slice(0, index + 1).reduce((sum, item) => sum + (item.quantity ?? 0), 0); const remaining = trade.position_size === null ? null : Math.max(0, trade.position_size - exited); return <div key={execution.id}><span>#{index + 1}</span><strong>{formatDecimal(execution.price)}</strong><span>Qty {execution.quantity === null ? "—" : formatDecimal(execution.quantity)}</span><span>{execution.exit_reason?.replaceAll("_", " ") ?? "—"}</span><span>Remaining {remaining === null ? "—" : formatDecimal(remaining)}</span></div>; })}</div></details>}
+      {unifiedExecutionHistory.length > 0 && <details className="trade-history-section trade-management-accordion"><summary>Execution History</summary><div className="execution-preview-list">{unifiedExecutionHistory.map((event, index) => <div key={event.id}><span>#{index + 1}</span><strong>{event.action}</strong><span>{new Date(event.timestamp).toLocaleString()}</span><span>Underlying {formatDecimal(event.price)}</span>{trade.market === "options" && <span>Option {event.optionPrice === null ? "—" : formatDecimal(event.optionPrice)}</span>}<span>Qty {formatDecimal(event.quantity)}</span><span>{event.reason.replaceAll("_", " ")}</span>{event.stop !== null && <span>Stop {formatDecimal(event.stop)}</span>}<span>Remaining {formatDecimal(event.remaining)}</span></div>)}</div></details>}
 
-      <details className="trade-history-section" id={`trade-${trade.id}-price-alerts`} open={defaultExpanded && contextFromHash(window.location.hash).get("section") === "price-alerts"}><summary>Price Alert History</summary>{priceAlerts.isLoading ? <p>Loading alert history…</p> : (priceAlerts.data?.length ?? 0) === 0 ? <p>No threshold alerts recorded</p> : <div className="price-alert-history">{priceAlerts.data?.map((event) => <div key={event.id} className={`email-status-${event.notification_status}`}><strong>{event.alert_kind.replaceAll("_", " ")}</strong><span>Threshold {formatDecimal(event.threshold_price)}</span><span>Observed {formatDecimal(event.observed_price)}</span><span>{new Date(event.triggered_at).toLocaleString()}</span><span>{event.notification_status}</span><span>{event.attempt_count} attempt{event.attempt_count === 1 ? "" : "s"}</span>{event.last_error && <small>{event.last_error}</small>}</div>)}</div>}</details>
+      <details className="trade-history-section trade-management-accordion" id={`trade-${trade.id}-price-alerts`} open={defaultExpanded && contextFromHash(window.location.hash).get("section") === "price-alerts"}><summary>Price Alert History</summary>{priceAlerts.isLoading ? <p>Loading alert history…</p> : (priceAlerts.data?.length ?? 0) === 0 ? <p>No threshold alerts recorded</p> : <div className="price-alert-history">{priceAlerts.data?.map((event) => <div key={event.id} className={`email-status-${event.notification_status}`}><strong>{event.alert_kind.replaceAll("_", " ")}</strong><span>Threshold {formatDecimal(event.threshold_price)}</span><span>Observed {formatDecimal(event.observed_price)}</span><span>{new Date(event.triggered_at).toLocaleString()}</span><span>{event.notification_status}</span><span>{event.attempt_count} attempt{event.attempt_count === 1 ? "" : "s"}</span>{event.last_error && <small>{event.last_error}</small>}</div>)}</div>}</details>
 
       <RuleAlertPanel
         status={evaluation.status}
@@ -648,19 +1000,19 @@ function TradeCard({ trade, onUpdated, defaultExpanded, onDeleted, onAutoClosed 
 export function OpenTradePanel() {
   const queryClient = useQueryClient();
   const [horizonFilter, setHorizonFilter] = useState<HorizonFilterValue>("all");
+  const [sortBy, setSortBy] = useState<TradeSort>("opened");
   const [closeNotice, setCloseNotice] = useState<Trade | null>(null);
   const loaded = useTrades(undefined, horizonForApi(horizonFilter));
   const { setTrades, isLoading, error } = loaded;
   const trades = useMemo(
     () =>
-      loaded.trades
-        .filter((trade) => trade.status === "planned" || trade.status === "open")
-        .sort((left, right) => {
-          const statusDifference =
-            Number(right.status === "open") - Number(left.status === "open");
-          return statusDifference || right.id - left.id;
-        }),
-    [loaded.trades],
+      sortActiveTrades(
+        loaded.trades.filter(
+          (trade) => trade.status === "planned" || trade.status === "open",
+        ),
+        sortBy,
+      ),
+    [loaded.trades, sortBy],
   );
   const tradeGroups = useMemo(() => groupTradesByMarket(trades), [trades]);
   const selectedTradeId = positiveIntegerContext(contextFromHash(window.location.hash), "trade_id");
@@ -691,6 +1043,17 @@ export function OpenTradePanel() {
         </div>
         <div className="heading-controls">
           <HorizonFilter value={horizonFilter} onChange={setHorizonFilter} />
+          <label className="horizon-filter trade-sort-control">
+            Rank trades
+            <select
+              value={sortBy}
+              onChange={(event) => setSortBy(event.target.value as TradeSort)}
+            >
+              <option value="opened">Open time (newest)</option>
+              <option value="symbol">Name (A–Z)</option>
+              <option value="current_r">Current R (high–low)</option>
+            </select>
+          </label>
           <span>{trades.length} active plan{trades.length === 1 ? "" : "s"}</span>
         </div>
       </div>
@@ -698,8 +1061,10 @@ export function OpenTradePanel() {
       {closeNotice && <div className="page-success-notice" role="status">
         <strong>{closeNotice.symbol} trade #{closeNotice.id} closed automatically.</strong>
         <span>Final underlying R: {closeNotice.final_r === null ? "—" : `${closeNotice.final_r.toFixed(2)}R`} · Exit reason: {closeNotice.exit_reason?.replaceAll("_", " ") ?? "—"}</span>
-        <button type="button" onClick={() => { window.location.hash = hashWithContext("post-trade-review", { trade_id: closeNotice.id }); }}>Review This Trade</button>
-        <button type="button" onClick={() => setCloseNotice(null)}>Dismiss</button>
+        <div className="page-success-actions">
+          <button type="button" onClick={() => { window.location.hash = hashWithContext("post-trade-review", { trade_id: closeNotice.id }); }}>Review This Trade</button>
+          <button type="button" onClick={() => setCloseNotice(null)}>Dismiss</button>
+        </div>
       </div>}
 
       {isLoading && <p className="empty-state">Loading active trades…</p>}

@@ -3,9 +3,24 @@
 from __future__ import annotations
 
 from datetime import date, datetime, timezone
+from decimal import Decimal
 from typing import Optional
 
-from sqlalchemy import Boolean, Date, DateTime, Float, ForeignKey, Integer, JSON, String, Text
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    Date,
+    DateTime,
+    Float,
+    ForeignKey,
+    Index,
+    Integer,
+    JSON,
+    Numeric,
+    String,
+    Text,
+    text,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -88,7 +103,12 @@ class Trade(Base):
     executions: Mapped[list["TradeExecution"]] = relationship(
         back_populates="trade",
         cascade="all, delete-orphan",
-        order_by="TradeExecution.executed_at",
+        order_by="(TradeExecution.executed_at, TradeExecution.id)",
+    )
+    entry_executions: Mapped[list["TradeEntryExecution"]] = relationship(
+        back_populates="trade",
+        cascade="all, delete-orphan",
+        order_by="(TradeEntryExecution.executed_at, TradeEntryExecution.id)",
     )
     price_alert_events: Mapped[list["TradePriceAlertEvent"]] = relationship(
         back_populates="trade", cascade="all, delete-orphan"
@@ -103,6 +123,12 @@ class Trade(Base):
     @property
     def has_review(self) -> bool:
         return self.review is not None
+
+    @property
+    def position_summary(self) -> dict[str, float | int | bool | None]:
+        from app.services.position_accounting_service import position_summary
+
+        return position_summary(self).as_api_dict()
 
 
 class Alert(Base):
@@ -169,6 +195,42 @@ class TradeExecution(Base):
     option_price: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
 
     trade: Mapped[Trade] = relationship(back_populates="executions")
+
+
+class TradeEntryExecution(Base):
+    __tablename__ = "trade_entry_executions"
+    __table_args__ = (
+        CheckConstraint("entry_kind IN ('initial', 'add')", name="ck_trade_entry_kind"),
+        CheckConstraint("quantity > 0", name="ck_trade_entry_quantity_positive"),
+        Index(
+            "uq_trade_entry_initial",
+            "trade_id",
+            unique=True,
+            sqlite_where=text("entry_kind = 'initial'"),
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    trade_id: Mapped[int] = mapped_column(
+        ForeignKey("trades.id", ondelete="CASCADE"), index=True
+    )
+    executed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, index=True
+    )
+    entry_kind: Mapped[str] = mapped_column(String(16))
+    underlying_price: Mapped[Decimal] = mapped_column(Numeric(18, 4))
+    quantity: Mapped[Decimal] = mapped_column(Numeric(18, 2))
+    stop_at_entry: Mapped[Decimal] = mapped_column(Numeric(18, 4))
+    option_price: Mapped[Optional[Decimal]] = mapped_column(
+        Numeric(18, 4), nullable=True
+    )
+    reason: Mapped[str] = mapped_column(String(32))
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now
+    )
+
+    trade: Mapped[Trade] = relationship(back_populates="entry_executions")
 
 
 class TradePriceAlertEvent(Base):

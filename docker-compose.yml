@@ -1,7 +1,8 @@
 services:
   backend:
     build:
-      context: ./backend
+      context: .
+      dockerfile: backend/Dockerfile
     environment:
       DATABASE_URL: sqlite:////data/trading_discipline.db
       FINNHUB_API_KEY: ${FINNHUB_API_KEY:-}

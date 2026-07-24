@@ -88,3 +88,11 @@ conditions:
 ```
 
 The structured facts support actionable combinations without guessing market direction. The application still does not identify price action automatically or place broker orders.
+
+## Position-add management
+
+Price-action classification remains unchanged when exposure is added. A Major
+Trend Reversal with `reversal_confirmation=unconfirmed` blocks the add action.
+Other adds retain the existing structured taxonomy and append an execution
+reason; they do not rewrite classification history. Open Trades remains
+English-only and New Trade remains bilingual with deliberate confirmation.

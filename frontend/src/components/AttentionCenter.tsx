@@ -59,7 +59,7 @@ export function AttentionCenter() {
       <div><span>Reminders</span><strong>{visibleCounts.reminder}</strong></div>
     </div>
     <div className="attention-filters">
-      <label>Severity<select value={severity} onChange={(event) => setSeverity(event.target.value as AttentionSeverity | "all")}><option value="all">All</option><option value="blocker">Blocker</option><option value="warning">Warning</option><option value="reminder">Reminder</option></select></label>
+      <label className="horizon-filter">Severity<select value={severity} onChange={(event) => setSeverity(event.target.value as AttentionSeverity | "all")}><option value="all">All</option><option value="blocker">Blocker</option><option value="warning">Warning</option><option value="reminder">Reminder</option></select></label>
       <HorizonFilter value={horizon} onChange={setHorizon} />
     </div>
     {query.isLoading && <p className="empty-state">Checking active attention items…</p>}

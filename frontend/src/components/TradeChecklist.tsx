@@ -8,7 +8,7 @@ import { optionContractSummary } from "../utils/optionContracts";
 import { buildLocalTradeAlerts, statusFromAlerts } from "../utils/tradePlanGate";
 import { hashForPage } from "../utils/navigation";
 import { ChoiceGroup } from "./ui/ChoiceGroup";
-import { entryTriggerOptions, legacyMirrors, locationTagOptions, marketStateOptions, tradeThesisOptions } from "../utils/priceActionTaxonomy";
+import { entryTriggerOptions, legacyMirrors, marketStateOptions, tradeThesisOptions } from "../utils/priceActionTaxonomy";
 import { OptionContractSelector } from "./OptionContractSelector";
 import { PriceActionClassificationFlow } from "./PriceActionClassificationFlow";
 import { RuleAlertPanel } from "./RuleAlertPanel";

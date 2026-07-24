@@ -31,6 +31,14 @@ ExitReason = Literal[
     "partial_profit", "target_hit", "stop_hit", "runner_stop", "risk_reduction",
     "invalidated_setup", "time_exit", "manual_exit", "other",
 ]
+EntryKind = Literal["initial", "add"]
+AddReason = Literal[
+    "breakout_confirmation",
+    "pullback_continuation",
+    "risk_reentry",
+    "trend_continuation",
+    "other",
+]
 
 
 class ReviewSummary(BaseModel):
@@ -62,6 +70,35 @@ class TradeExecutionRead(BaseModel):
     quantity: Optional[float]
     exit_reason: Optional[ExitReason]
     option_price: Optional[float]
+
+
+class TradeEntryExecutionRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    trade_id: int
+    executed_at: datetime
+    entry_kind: EntryKind
+    underlying_price: float
+    quantity: float
+    stop_at_entry: float
+    option_price: Optional[float]
+    reason: str
+    notes: Optional[str]
+    created_at: datetime
+
+
+class PositionSummaryRead(BaseModel):
+    initial_quantity: float
+    added_quantity: float
+    total_entry_quantity: float
+    total_exit_quantity: float
+    remaining_quantity: float
+    weighted_average_entry: Optional[float]
+    total_underlying_risk: float
+    add_count: int
+    uses_legacy_fallback: bool
+    accounting_consistent: bool
 
 
 class TradeCreate(BaseModel):
@@ -204,7 +241,9 @@ class TradeRead(TradeCreate):
     discipline_score: Optional[int]
     has_review: bool
     review: Optional[ReviewSummary]
+    entry_executions: list[TradeEntryExecutionRead]
     executions: list[TradeExecutionRead]
+    position_summary: PositionSummaryRead
 
 
 class TradePatch(BaseModel):
@@ -309,6 +348,29 @@ class TradePatch(BaseModel):
 class TradeOpen(BaseModel):
     actual_entry: Optional[float] = None
     option_entry_price: Optional[float] = Field(default=None, gt=0)
+
+
+class TradeHorizonChange(BaseModel):
+    trade_horizon: TradeHorizon
+
+
+class TradeEntryExecutionCreate(BaseModel):
+    underlying_price: float = Field(gt=0, le=1_000_000_000)
+    quantity: float = Field(gt=0, le=1_000_000_000)
+    stop_at_entry: float = Field(gt=0, le=1_000_000_000)
+    reason: AddReason
+    option_price: Optional[float] = Field(
+        default=None, gt=0, le=1_000_000_000
+    )
+    notes: Optional[str] = Field(default=None, max_length=2_000)
+    warnings_acknowledged: list[str] = Field(default_factory=list)
+
+    @field_validator(
+        "underlying_price", "quantity", "stop_at_entry", "option_price"
+    )
+    @classmethod
+    def round_entry_numbers(cls, value: Optional[float]) -> Optional[float]:
+        return None if value is None else round(value, 2)
 
 
 class TradeClose(BaseModel):
@@ -468,6 +530,7 @@ class AttentionItem(BaseModel):
         "runner_unprotected", "profit_milestone", "green_to_red",
         "failed_email", "pending_review",
         "notification_configuration",
+        "accounting_inconsistency", "incomplete_position_accounting",
     ]
     severity: Literal["blocker", "warning", "reminder"]
     title: str
@@ -554,6 +617,12 @@ class AnalyticsExecutionDiscipline(BaseModel):
     green_to_red_warning_occurrences: int
     average_number_of_exit_executions: Optional[float] = Field(description="Exit executions / opened trades; null when none opened.")
     auto_closed_trade_count: int
+    trades_with_additions: int
+    position_addition_rate: Optional[float]
+    total_add_executions: int
+    average_adds_per_trade_with_additions: Optional[float]
+    adds_while_negative_count: int
+    unconfirmed_reversal_adds_blocked: int
 
 
 class AnalyticsReviewCompletion(BaseModel):

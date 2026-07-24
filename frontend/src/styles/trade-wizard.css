@@ -1,0 +1,57 @@
+.exit-confirmation {
+  max-height: calc(100dvh - 40px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.confirmation-actions {
+  align-items: stretch;
+}
+
+.confirmation-actions > button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: auto;
+  min-height: 46px;
+  margin: 0;
+  padding: 11px 16px;
+  line-height: 1.2;
+}
+
+.confirmation-actions > .primary-button,
+.confirmation-actions > .danger-button {
+  flex: 1 1 12rem;
+}
+
+.confirmation-actions > .secondary-button {
+  flex: 0 0 auto;
+}
+
+.create-confirmation .confirmation-actions {
+  position: sticky;
+  bottom: -26px;
+  z-index: 1;
+  margin: 22px -26px -26px;
+  padding: 14px 26px 26px;
+  background: linear-gradient(rgba(255, 255, 255, 0.92), #fff 35%);
+  border-top: 1px solid var(--line);
+}
+
+@media (max-width: 640px) {
+  .confirmation-backdrop {
+    padding: 10px;
+  }
+
+  .exit-confirmation {
+    max-height: calc(100dvh - 20px);
+  }
+
+  .confirmation-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .confirmation-actions > button {
+    width: 100%;
+  }
+}
