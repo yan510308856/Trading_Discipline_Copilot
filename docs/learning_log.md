@@ -637,7 +637,7 @@ No trading behavior changed. This stage improves frontend maintainability so rea
 ## Stage 24 learning notes
 
 - A useful attention feed is a projection of unresolved work, not a list of entities or historical events.
-- Backend normalization keeps stale prices, failed delivery, and pending-review decisions consistent within the dedicated Attention workflow.
+- Backend normalization keeps failed delivery and pending-review decisions consistent within the dedicated Attention workflow; Stage 28 later made stale price informational only.
 - Hash query context provides lightweight reload-safe deep links without introducing a routing dependency.
 - State mutation and cache invalidation are one workflow concern: resolving a runner warning or review must update every Attention consumer.
 ## Stage 25 learning notes
@@ -663,3 +663,16 @@ No trading behavior changed. This stage improves frontend maintainability so rea
 - JSON lists need validation, deterministic ordering, deduplication, and generic rule operators.
 - Bilingual UI terminology belongs in structured data, not scattered component strings.
 - Conservative migration preserves uncertainty: a wedge proves a trigger, not a continuation or reversal thesis.
+## Stage 28 - Explicit intent and stable warning identity
+
+- Empty collections and default booleans cannot prove that a user made a
+  decision; nullable enums preserve the difference between “none” and
+  “unanswered.”
+- Dismissal belongs to a warning occurrence, not to a mutable trade row.
+  Hashing only rule-relevant facts prevents notes from resurrecting warnings.
+- An inactive-to-active cycle needs an episode discriminator; relevant
+  `WorkflowEvent` changes provide it without using unrelated `trade.updated_at`.
+- Presentation dismissal cannot replace pre-trade acknowledgement or resolve a
+  blocker.
+- A machine-readable bilingual contract can drive labels and order while static
+  Pydantic Literals and TypeScript unions preserve validation.

@@ -12,11 +12,13 @@ import { entryTriggerOptions, legacyMirrors, locationTagOptions, marketStateOpti
 import { OptionContractSelector } from "./OptionContractSelector";
 import { PriceActionClassificationFlow } from "./PriceActionClassificationFlow";
 import { RuleAlertPanel } from "./RuleAlertPanel";
+import { BilingualChoiceGroup } from "./ui/BilingualChoiceGroup";
 
 export const initialForm: TradeFormState = {
   symbol: "", option_contract: "", option_type: null, option_expiration: "", option_strike: "", option_entry_price: "",
   trade_horizon: "intraday", market: "stocks", direction: "long", setup: "", market_context: "",
-  market_state: "", trade_thesis: "", entry_trigger: "", location_tags: [], is_unconfirmed_reversal: false,
+  market_state: "", trade_thesis: "", entry_trigger: "", location_tags: [], location_decision: null,
+  reversal_confirmation: null, is_unconfirmed_reversal: false,
   planned_entry: "", stop_loss: "", target_1: "", target_2: "", runner_enabled: false,
   position_size: "", notes: "", follow_through_confirmed: false, recent_stop_loss: false,
   is_immediate_reverse: false, second_leg_entry: false, big_bar_entry: false,
@@ -67,16 +69,18 @@ export function TradeChecklist() {
 
   useEffect(() => {
     const controller = new AbortController();
-    const timer = window.setTimeout(() => void evaluateRules({ status: "planned", trade_horizon: form.trade_horizon, market: form.market, direction: underlyingDirection, market_state: form.market_state || null, trade_thesis: form.trade_thesis || null, entry_trigger: form.entry_trigger || null, location_tags: form.location_tags, is_unconfirmed_reversal: form.is_unconfirmed_reversal, planned_entry: entry, stop_loss: stop, target_1: target, option_contract: canonicalOptionContract, option_type: form.option_type, option_expiration: form.option_expiration || null, option_strike: parseDecimalInput(form.option_strike), follow_through_confirmed: form.follow_through_confirmed, recent_stop_loss: form.recent_stop_loss, is_immediate_reverse: form.is_immediate_reverse, second_leg_entry: form.second_leg_entry, big_bar_entry: form.big_bar_entry }, controller.signal).then(setEvaluation).catch((caught) => { if (!(caught instanceof DOMException && caught.name === "AbortError")) setError("Could not evaluate rules."); }), 250);
+    const timer = window.setTimeout(() => void evaluateRules({ status: "planned", trade_horizon: form.trade_horizon, market: form.market, direction: underlyingDirection, market_state: form.market_state || null, trade_thesis: form.trade_thesis || null, entry_trigger: form.entry_trigger || null, location_tags: form.location_tags, location_decision: form.location_decision, reversal_confirmation: form.reversal_confirmation, is_unconfirmed_reversal: form.is_unconfirmed_reversal, planned_entry: entry, stop_loss: stop, target_1: target, option_contract: canonicalOptionContract, option_type: form.option_type, option_expiration: form.option_expiration || null, option_strike: parseDecimalInput(form.option_strike), follow_through_confirmed: form.follow_through_confirmed, recent_stop_loss: form.recent_stop_loss, is_immediate_reverse: form.is_immediate_reverse, second_leg_entry: form.second_leg_entry, big_bar_entry: form.big_bar_entry }, controller.signal).then(setEvaluation).catch((caught) => { if (!(caught instanceof DOMException && caught.name === "AbortError")) setError("Could not evaluate rules."); }), 250);
     return () => { window.clearTimeout(timer); controller.abort(); };
   }, [form, entry, stop, target, underlyingDirection]);
 
   const alerts = [...buildLocalTradeAlerts(form, riskReward, readiness), ...evaluation.alerts];
   const status = statusFromAlerts(alerts);
   const warningGate = status === "warning" && !warningsAcknowledged;
-  const step1Valid = Boolean(form.symbol.trim() && form.market && form.direction && form.trade_horizon);
-  const step2Valid = Boolean(form.market_state && form.trade_thesis && form.entry_trigger && (form.market !== "options" || (form.option_type && form.option_expiration && parseDecimalInput(form.option_strike))));
-  const step2ContinueReason = form.market === "options" && !(form.option_type && form.option_expiration && parseDecimalInput(form.option_strike)) ? "Complete the option contract details before continuing." : "";
+  const step1Valid = Boolean(form.symbol.trim() && form.market && form.direction && form.trade_horizon && (form.market !== "options" || (form.option_type && form.option_expiration && parseDecimalInput(form.option_strike))));
+  const step2Valid = Boolean(form.market_state && form.trade_thesis && form.entry_trigger && form.location_decision && (form.trade_thesis !== "major_reversal" || form.reversal_confirmation));
+  const step2ContinueReason = !form.location_decision ? "Choose at least one key location or explicitly choose No key location."
+    : form.trade_thesis === "major_reversal" && !form.reversal_confirmation ? "Choose whether the major reversal is confirmed."
+    : "";
   const riskValid = Boolean(riskReward && riskReward.risk > 0 && Number.isFinite(riskReward.targetR));
   const createDisabled = busy || createPlanMutation.isPending || partialCreatedTradeId !== null || status === "blocked" || warningGate || !riskValid || positionSize === null || positionSize <= 0;
   const disabledReason = step === 1 && !form.symbol.trim() ? "Enter a symbol."
@@ -94,7 +98,7 @@ export function TradeChecklist() {
   async function recordPlanningAttempt(attempt: string) {
     if (status !== "blocked" && status !== "warning") return;
     try {
-      await evaluateRules({ status: "planned", trade_horizon: form.trade_horizon, market: form.market, direction: underlyingDirection, market_state: form.market_state, trade_thesis: form.trade_thesis, entry_trigger: form.entry_trigger, location_tags: form.location_tags, is_unconfirmed_reversal: form.is_unconfirmed_reversal, planned_entry: entry, stop_loss: stop, target_1: target, option_contract: canonicalOptionContract, record_attempt: true, planning_session_id: planningSessionId, idempotency_key: attempt });
+      await evaluateRules({ status: "planned", trade_horizon: form.trade_horizon, market: form.market, direction: underlyingDirection, market_state: form.market_state, trade_thesis: form.trade_thesis, entry_trigger: form.entry_trigger, location_tags: form.location_tags, location_decision: form.location_decision, reversal_confirmation: form.reversal_confirmation, is_unconfirmed_reversal: form.is_unconfirmed_reversal, planned_entry: entry, stop_loss: stop, target_1: target, option_contract: canonicalOptionContract, record_attempt: true, planning_session_id: planningSessionId, idempotency_key: attempt });
     } catch { /* audit failure does not change the discipline gate */ }
   }
 
@@ -112,7 +116,7 @@ export function TradeChecklist() {
     if (entry === null || stop === null || target === null || positionSize === null || positionSize <= 0) return;
     const payload: TradeCreatePayload = {
       symbol: form.symbol.trim().toUpperCase(), market: form.market, direction: form.direction, trade_horizon: form.trade_horizon,
-      ...legacyMirrors(form.market_state as Exclude<typeof form.market_state, "">, form.trade_thesis as Exclude<typeof form.trade_thesis, "">), market_state: form.market_state as Exclude<typeof form.market_state, "">, trade_thesis: form.trade_thesis as Exclude<typeof form.trade_thesis, "">, entry_trigger: form.entry_trigger as Exclude<typeof form.entry_trigger, "">, location_tags: form.location_tags, is_unconfirmed_reversal: form.is_unconfirmed_reversal, planned_entry: entry, stop_loss: stop, target_1: target,
+      ...legacyMirrors(form.market_state as Exclude<typeof form.market_state, "">, form.trade_thesis as Exclude<typeof form.trade_thesis, "">), market_state: form.market_state as Exclude<typeof form.market_state, "">, trade_thesis: form.trade_thesis as Exclude<typeof form.trade_thesis, "">, entry_trigger: form.entry_trigger as Exclude<typeof form.entry_trigger, "">, location_tags: form.location_tags, location_decision: form.location_decision!, reversal_confirmation: form.reversal_confirmation, is_unconfirmed_reversal: form.reversal_confirmation === "unconfirmed", planned_entry: entry, stop_loss: stop, target_1: target,
       target_2: parseDecimalInput(form.target_2), position_size: positionSize, runner_enabled: form.runner_enabled,
       notes: form.notes.trim() || null, option_contract: canonicalOptionContract, option_type: form.market === "options" ? form.option_type : null,
       option_expiration: form.market === "options" ? form.option_expiration : null, option_strike: form.market === "options" ? parseDecimalInput(form.option_strike) : null,
@@ -148,22 +152,24 @@ export function TradeChecklist() {
         <ChoiceGroup label="Market" choices={choices(["stocks", "options", "futures", "crypto", "forex", "other"]) as {value: TradeFormState["market"]; label: string}[]} value={form.market} onChange={(value) => update("market", value)} />
         <ChoiceGroup label={form.market === "options" ? "Action" : "Direction"} choices={form.market === "options" ? [{value:"long",label:"Buy"},{value:"short",label:"Sell"}] : [{value:"long",label:"Long"},{value:"short",label:"Short"}]} value={form.direction} onChange={(value) => update("direction", value)} />
         <ChoiceGroup label="Trade horizon" choices={[{value:"intraday",label:"Intraday"},{value:"swing",label:"Swing"},{value:"leap",label:"LEAP"},{value:"other",label:"Other"}]} value={form.trade_horizon} onChange={(value) => update("trade_horizon", value)} />
+        {form.market === "options" && <div className="option-planning-block"><div className="option-quote-toolbar"><div><strong>{form.symbol.trim().toUpperCase() || "Option"} contract</strong><small>Select your date and contract details below.</small></div><button type="button" className="secondary-button" disabled={busy || !form.symbol.trim()} onClick={() => void fetchPrice()}>{busy ? "Fetching…" : "Get strike suggestions"}</button></div><OptionContractSelector symbol={form.symbol} quote={quote} type={form.option_type} expiration={form.option_expiration} strike={form.option_strike} onChange={(values) => setForm((current) => ({ ...current, option_type: values.type ?? current.option_type, option_expiration: values.expiration ?? current.option_expiration, option_strike: values.strike ?? current.option_strike }))} /></div>}
       </section>}
       {step === 2 && <section>{planSummary}<PriceActionClassificationFlow
         marketState={form.market_state}
         tradeThesis={form.trade_thesis}
         entryTrigger={form.entry_trigger}
         locationTags={form.location_tags}
+        locationDecision={form.location_decision}
         onMarketStateChange={(value) => setForm((current) => ({ ...current, market_state: value, market_context: legacyMirrors(value, current.trade_thesis || "other").market_context }))}
-        onTradeThesisChange={(value) => setForm((current) => ({ ...current, trade_thesis: value, setup: legacyMirrors(current.market_state || "unclear", value).setup, is_unconfirmed_reversal: value === "major_reversal" ? current.is_unconfirmed_reversal : false }))}
+        onTradeThesisChange={(value) => setForm((current) => ({ ...current, trade_thesis: value, setup: legacyMirrors(current.market_state || "unclear", value).setup, reversal_confirmation: value === "major_reversal" ? current.reversal_confirmation : null, is_unconfirmed_reversal: value === "major_reversal" && current.reversal_confirmation === "unconfirmed" }))}
         onEntryTriggerChange={(value) => update("entry_trigger", value)}
-        onLocationTagsChange={(values) => update("location_tags", values)}
+        onLocationTagsChange={(values) => setForm((current) => ({ ...current, location_tags: values, location_decision: values.length ? "selected" : null }))}
+        onNoLocation={() => setForm((current) => ({ ...current, location_tags: [], location_decision: "none" }))}
         onBackToInstrument={() => setStep(1)}
         onContinue={() => setStep(3)}
         canContinue={step2Valid}
         continueDisabledReason={step2ContinueReason}
-        tradeThesisExtra={form.trade_thesis === "major_reversal" ? <label className="unconfirmed-reversal-control"><input type="checkbox" checked={form.is_unconfirmed_reversal} onChange={(event) => update("is_unconfirmed_reversal", event.target.checked)} /><span><strong>Unconfirmed / left-side reversal attempt</strong><small lang="zh">未确认的左侧反转尝试</small><em>Use this when entering before sufficient reversal confirmation.</em><em lang="zh">在反转确认尚不充分时提前入场，请启用此项。</em></span></label> : null}
-        optionPlanningContent={form.market === "options" ? <div className="option-planning-block"><div className="option-quote-toolbar"><div><strong>{form.symbol.trim().toUpperCase() || "Option"} contract</strong><small>Select your date and contract details below.</small></div><button type="button" className="secondary-button" disabled={busy || !form.symbol.trim()} onClick={() => void fetchPrice()}>{busy ? "Fetching…" : "Get strike suggestions"}</button></div><OptionContractSelector symbol={form.symbol} quote={quote} type={form.option_type} expiration={form.option_expiration} strike={form.option_strike} onChange={(values) => setForm((current) => ({ ...current, option_type: values.type ?? current.option_type, option_expiration: values.expiration ?? current.option_expiration, option_strike: values.strike ?? current.option_strike }))} /></div> : null}
+        tradeThesisExtra={form.trade_thesis === "major_reversal" ? <BilingualChoiceGroup label="Reversal confirmation" chineseLabel="反转确认" items={[{ value: "confirmed", english: "Confirmed reversal", chinese: "已确认反转" }, { value: "unconfirmed", english: "Unconfirmed / left-side reversal attempt", chinese: "未确认的左侧反转尝试" }]} value={form.reversal_confirmation} onChange={(value) => setForm((current) => ({ ...current, reversal_confirmation: value, is_unconfirmed_reversal: value === "unconfirmed" }))} /> : null}
       /></section>}
       {step === 3 && <section>
         {planSummary}

@@ -23,6 +23,8 @@ const readyEnoughForm: TradeFormState = {
   trade_thesis: "breakout",
   entry_trigger: "other",
   location_tags: [],
+  location_decision: "none",
+  reversal_confirmation: null,
   is_unconfirmed_reversal: false,
   planned_entry: "5000",
   stop_loss: "4990",

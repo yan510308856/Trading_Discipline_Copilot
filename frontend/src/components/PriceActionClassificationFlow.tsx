@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
-import type { EntryTrigger, LocationTag, MarketState, TradeThesis } from "../types";
+import type { EntryTrigger, LocationDecision, LocationTag, MarketState, TradeThesis } from "../types";
 import {
   entryTriggerOptions,
   findTaxonomyItem,
@@ -17,6 +17,7 @@ interface ClassificationValues {
   tradeThesis: TradeThesis | "";
   entryTrigger: EntryTrigger | "";
   locationTags: LocationTag[];
+  locationDecision?: LocationDecision | null;
 }
 
 interface ArmedSelection {
@@ -29,12 +30,12 @@ interface PriceActionClassificationFlowProps extends ClassificationValues {
   onTradeThesisChange: (value: TradeThesis) => void;
   onEntryTriggerChange: (value: EntryTrigger) => void;
   onLocationTagsChange: (values: LocationTag[]) => void;
+  onNoLocation: () => void;
   onBackToInstrument: () => void;
   onContinue: () => void;
   canContinue: boolean;
   continueDisabledReason?: string;
   tradeThesisExtra?: ReactNode;
-  optionPlanningContent?: ReactNode;
 }
 
 export const AUTO_ADVANCE_MS = 350;
@@ -76,18 +77,19 @@ export function PriceActionClassificationFlow({
   tradeThesis,
   entryTrigger,
   locationTags,
+  locationDecision,
   onMarketStateChange,
   onTradeThesisChange,
   onEntryTriggerChange,
   onLocationTagsChange,
+  onNoLocation,
   onBackToInstrument,
   onContinue,
   canContinue,
   continueDisabledReason,
   tradeThesisExtra,
-  optionPlanningContent,
 }: PriceActionClassificationFlowProps) {
-  const [stage, setStage] = useState<ClassificationStage>(() => firstIncompleteClassificationStage({ marketState, tradeThesis, entryTrigger, locationTags }));
+  const [stage, setStage] = useState<ClassificationStage>(() => firstIncompleteClassificationStage({ marketState, tradeThesis, entryTrigger, locationTags, locationDecision }));
   const [direction, setDirection] = useState<"forward" | "backward">("forward");
   const [isLeaving, setIsLeaving] = useState(false);
   const [confirmingStage, setConfirmingStage] = useState<ClassificationStage | null>(null);
@@ -251,9 +253,8 @@ export function PriceActionClassificationFlow({
       {stage === "location_tags" && <>
         <header><span>04 / 04</span><h4>Where is this setup occurring?</h4><p lang="zh">这个交易发生在什么关键位置？</p><small>Select every relevant location · 选择所有相关的关键位置</small><em>Optional · Multiple selections allowed<br /><span lang="zh">可选 · 可以多选</span></em></header>
         <BilingualMultiSelectChips label="Key Locations" chineseLabel="关键位置" items={locationTagOptions} values={locationTags} onChange={onLocationTagsChange} legendHidden />
-        <button type="button" className="no-location-button" aria-pressed={locationTags.length === 0} onClick={() => onLocationTagsChange([])}><span aria-hidden="true">{locationTags.length === 0 ? "✓" : "○"}</span><strong>No key location</strong><small lang="zh">无特别关键位置</small></button>
-        <p className="location-count" aria-live="polite"><strong>{locationTags.length === 0 ? "0 locations selected" : `${locationTags.length} ${locationTags.length === 1 ? "location" : "locations"} selected`}</strong><span lang="zh">{locationTags.length === 0 ? "未选择关键位置" : `已选择 ${locationTags.length} 个关键位置`}</span></p>
-        {optionPlanningContent}
+        <button type="button" className="no-location-button" aria-pressed={locationDecision === "none"} onClick={onNoLocation}><span aria-hidden="true">{locationDecision === "none" ? "✓" : "○"}</span><strong>No key location</strong><small lang="zh">无特别关键位置</small></button>
+        <p className="location-count" aria-live="polite"><strong>{locationDecision == null ? "Location decision required" : locationTags.length === 0 ? "No key location selected" : `${locationTags.length} ${locationTags.length === 1 ? "location" : "locations"} selected`}</strong><span lang="zh">{locationDecision == null ? "请选择关键位置或明确选择无关键位置" : locationTags.length === 0 ? "已选择无特别关键位置" : `已选择 ${locationTags.length} 个关键位置`}</span></p>
       </>}
 
       <footer className="classification-stage-actions">

@@ -61,3 +61,10 @@ Unrecorded readiness days are not inferred because no exchange calendar exists. 
 - Reconstruction of pre-audit runner actions
 - Broker execution-quality analytics
 - Option premium return, P&L, Greeks, or option-based R
+## Warning dismissals
+
+Dismissal is a presentation preference for one active open-trade warning
+occurrence. It does not erase the underlying rule match or alter historical
+discipline occurrence metrics. Analytics continue to use audited rule/lifecycle
+events and trade facts; dismissed Attention counts are current operational
+counts only.

@@ -45,6 +45,8 @@ class Trade(Base):
     trade_thesis: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
     entry_trigger: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
     location_tags: Mapped[list[str]] = mapped_column(JSON, default=list)
+    location_decision: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)
+    reversal_confirmation: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)
     is_unconfirmed_reversal: Mapped[bool] = mapped_column(Boolean, default=False)
     planned_entry: Mapped[float] = mapped_column(Float)
     actual_entry: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
@@ -93,6 +95,9 @@ class Trade(Base):
     )
     workflow_events: Mapped[list["WorkflowEvent"]] = relationship(
         back_populates="trade"
+    )
+    warning_dismissals: Mapped[list["WarningDismissal"]] = relationship(
+        back_populates="trade", cascade="all, delete-orphan"
     )
 
     @property
@@ -228,3 +233,23 @@ class WorkflowEvent(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
     trade: Mapped[Optional[Trade]] = relationship(back_populates="workflow_events")
+
+
+class WarningDismissal(Base):
+    __tablename__ = "warning_dismissals"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    dismissal_key: Mapped[str] = mapped_column(String(192), unique=True, index=True)
+    occurrence_key: Mapped[str] = mapped_column(String(192))
+    source_type: Mapped[str] = mapped_column(String(64))
+    source_id: Mapped[Optional[str]] = mapped_column(String(192), nullable=True)
+    trade_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("trades.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    rule_id: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    dismissed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+    trade: Mapped[Optional[Trade]] = relationship(back_populates="warning_dismissals")

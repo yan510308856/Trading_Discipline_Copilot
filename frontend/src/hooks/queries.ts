@@ -23,6 +23,8 @@ import {
   getHealth,
   sendTestEmail,
   updateDailyReadiness,
+  dismissWarning,
+  undoWarningDismissal,
 } from "../api";
 import type {
   DailyReadinessUpdatePayload,
@@ -120,6 +122,29 @@ export function useAttentionQuery(tradeHorizon?: TradeHorizon) {
     queryKey: queryKeys.attention(tradeHorizon),
     queryFn: () => getAttention(tradeHorizon),
     refetchInterval: 30_000,
+  });
+}
+
+export function useDismissWarningMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ dismissalKey, occurrenceKey }: { dismissalKey: string; occurrenceKey: string }) =>
+      dismissWarning(dismissalKey, occurrenceKey),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["attention"] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.openTradeAttention() });
+    },
+  });
+}
+
+export function useUndoWarningDismissalMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (dismissalKey: string) => undoWarningDismissal(dismissalKey),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["attention"] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.openTradeAttention() });
+    },
   });
 }
 

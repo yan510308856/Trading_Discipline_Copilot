@@ -966,7 +966,7 @@ Stage 6 起:
 推荐把 `engineering_workflow.md` 作为第三份核心文档，与 `product_design.md` 和 `codex_implementation_plan.md` 一起提供给 Codex。
 ## Stage 24 — Attention Center and Manage-to-Review
 
-`Rule Alerts` is renamed `Attention`. The Attention Center is not general notification history: it includes only active items that require a user decision or correction. Backend normalization combines trade rules, missing management facts, stale prices, failed alert emails, pending reviews, and notification configuration into one stable shape and deterministic priority order.
+`Rule Alerts` is renamed `Attention`. The Attention Center is not general notification history: it includes only active items that require a user decision or correction. Backend normalization combines trade rules, missing management facts, failed alert emails, pending reviews, and notification configuration into one stable shape and deterministic priority order. Stale price is informational metadata, not Attention.
 
 Attention does not show a navigation count and is not duplicated on Dashboard. Deep links preserve destination context after reload and select the exact open or closed trade. The workflow explicitly continues from Manage → Exit → Review, while Open Trades retains its local `RuleAlertPanel` for in-context management.
 
@@ -980,7 +980,18 @@ Outcome cards deliberately say Underlying R. Options continue to use underlying 
 
 ## Stage 27 — Price-action taxonomy
 
-Every new plan separately records market structure, trade thesis, entry trigger, key locations, and unconfirmed-reversal risk. These fields replace the logical use of the overloaded Setup & Context UI and appear bilingually in planning, management, and review. Legacy setup/context columns remain deprecated mirrors during the compatibility period.
+Every new plan separately records market structure, trade thesis, entry trigger, key locations, and reversal confirmation. New Trade is bilingual; planned and open trade cards are intentionally English-only. Legacy setup/context columns remain deprecated read-only mirrors during the compatibility period.
+
+## Stage 28 — Classification and warning integrity
+
+Key-location intent and major-reversal confirmation are explicit nullable domain
+decisions. Option contract planning belongs to Instrument & Horizon. The
+two-click, 350 ms classification confirmation is intentional.
+
+Open-trade and Attention warnings are dismissible by stable occurrence key with
+Undo. Blockers, reminders, and pre-trade warning gates are not dismissible.
+Dismissal changes presentation only. Rule suppression/dedupe is deterministic,
+and the shared JSON taxonomy contract prevents label/order drift.
 
 The taxonomy improves classification and rules; it does not predict structure automatically. Narrow Channel / 窄通道 is the approved term. Options remain underlying-R based, and Daily Readiness remains at the bottom of Dashboard.
 ## Stage 25 — Server-state consistency and workflow audit

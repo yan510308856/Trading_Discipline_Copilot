@@ -5,6 +5,7 @@ import type { Trade } from "../types";
 import { PriceActionClassification } from "../components/PriceActionClassification";
 import { BilingualChoiceGroup, BilingualMultiSelectChips } from "../components/ui/BilingualChoiceGroup";
 import { entryTriggerOptions, locationTagOptions, marketStateOptions, tradeThesisOptions } from "./priceActionTaxonomy";
+import taxonomy from "../../../shared/price_action_taxonomy.json";
 
 describe("price-action taxonomy", () => {
   it("has unique ordered values and complete bilingual labels", () => {
@@ -14,6 +15,13 @@ describe("price-action taxonomy", () => {
     }
     expect(marketStateOptions.find((item) => item.value === "narrow_channel")).toMatchObject({ english: "Narrow Channel", chinese: "窄通道" });
     expect(marketStateOptions.map((item) => item.value)).toEqual(["strong_trend", "narrow_channel", "broad_channel", "trading_range", "breakout_mode", "unclear"]);
+  });
+
+  it("keeps compile-time unions and rendered order aligned with the shared contract", () => {
+    expect(marketStateOptions.map((item) => item.value)).toEqual(taxonomy.market_state.map((item) => item.value));
+    expect(tradeThesisOptions.map((item) => item.value)).toEqual(taxonomy.trade_thesis.map((item) => item.value));
+    expect(entryTriggerOptions.map((item) => item.value)).toEqual(taxonomy.entry_trigger.map((item) => item.value));
+    expect(locationTagOptions.map((item) => item.value)).toEqual(taxonomy.location_tag.map((item) => item.value));
   });
 
   it("renders accessible single and multi-select bilingual choices", () => {

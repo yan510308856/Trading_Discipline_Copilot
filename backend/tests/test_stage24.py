@@ -61,7 +61,7 @@ def test_pending_review_and_failed_email_are_actionable(api_client: TestClient, 
     assert not any(item["source_type"] == "failed_email" for item in attention(api_client)["items"])
 
 
-def test_notification_misconfiguration_and_stale_price_appear(api_client: TestClient, database_session: Session, monkeypatch) -> None:
+def test_intentionally_disabled_notifications_and_stale_price_are_not_attention(api_client: TestClient, database_session: Session, monkeypatch) -> None:
     monkeypatch.setenv("PRICE_ALERT_MONITOR_ENABLED", "false")
     trade = models.Trade(**payload(), status="open", current_stop=95, current_price=101,
                          current_price_source="finnhub",
@@ -70,8 +70,8 @@ def test_notification_misconfiguration_and_stale_price_appear(api_client: TestCl
     database_session.add(trade)
     database_session.commit()
     sources = {item["source_type"] for item in attention(api_client)["items"]}
-    assert "notification_configuration" in sources
-    assert "stale_price" in sources
+    assert "notification_configuration" not in sources
+    assert "stale_price" not in sources
 
 
 def test_horizon_filter_shape_and_count_are_stable(api_client: TestClient, database_session: Session) -> None:
@@ -88,4 +88,6 @@ def test_horizon_filter_shape_and_count_are_stable(api_client: TestClient, datab
         "id", "source_type", "severity", "title", "message", "required_action",
         "trade_id", "symbol", "trade_horizon", "current_r", "detected_at",
         "destination_page", "destination_context", "time_sensitive",
+        "dismissible", "dismissal_key", "occurrence_key",
+        "source_id", "rule_id",
     }

@@ -148,6 +148,19 @@ export function getAttention(tradeHorizon?: TradeHorizon): Promise<AttentionResp
   return apiRequest<AttentionResponse>(`/attention${query}`);
 }
 
+export function dismissWarning(dismissalKey: string, occurrenceKey: string): Promise<{ dismissal_key: string; occurrence_key: string; dismissed_at: string }> {
+  return apiRequest("/warning-dismissals", {
+    method: "POST",
+    body: JSON.stringify({ dismissal_key: dismissalKey, occurrence_key: occurrenceKey }),
+  });
+}
+
+export function undoWarningDismissal(dismissalKey: string): Promise<void> {
+  return apiRequest(`/warning-dismissals/${encodeURIComponent(dismissalKey)}`, {
+    method: "DELETE",
+  });
+}
+
 export function evaluateRules(
   tradeDraft: Record<string, unknown>,
   signal?: AbortSignal,

@@ -1,39 +1,37 @@
 import type { EntryTrigger, LocationTag, MarketState, Trade, TradeThesis } from "../types";
+import taxonomy from "../../../shared/price_action_taxonomy.json";
 
 export interface BilingualTaxonomyItem<T extends string> {
   value: T; english: string; chinese: string; englishDescription?: string; chineseDescription?: string;
 }
 
-export const marketStateOptions: BilingualTaxonomyItem<MarketState>[] = [
-  ["strong_trend", "Strong Trend", "强趋势"], ["narrow_channel", "Narrow Channel", "窄通道"],
-  ["broad_channel", "Broad Channel", "宽通道"], ["trading_range", "Trading Range", "震荡区间"],
-  ["breakout_mode", "Breakout Mode", "突破模式"], ["unclear", "Unclear", "结构不清"],
-].map(([value, english, chinese]) => ({ value: value as MarketState, english, chinese }));
+interface ContractItem {
+  value: string;
+  english: string;
+  chinese: string;
+  order: number;
+  english_description?: string;
+  chinese_description?: string;
+}
 
-export const tradeThesisOptions: BilingualTaxonomyItem<TradeThesis>[] = [
-  { value: "pullback_continuation", english: "Pullback Continuation", chinese: "回调延续", englishDescription: "Trade with the existing trend after a retracement.", chineseDescription: "顺着已有趋势，在回调后等待趋势继续。" },
-  { value: "breakout", english: "Breakout", chinese: "突破", englishDescription: "Trade confirmed expansion beyond a meaningful boundary.", chineseDescription: "交易价格有效突破重要边界后的扩张。" },
-  { value: "breakout_pullback", english: "Breakout Pullback", chinese: "突破回踩" },
-  { value: "failed_breakout", english: "Failed Breakout", chinese: "突破失败" },
-  { value: "range_reversal", english: "Range Reversal", chinese: "区间边缘反转" },
-  { value: "major_reversal", english: "Major Trend Reversal", chinese: "主要趋势反转" },
-  { value: "other", english: "Other", chinese: "其他逻辑" },
-];
+function contractItems<T extends string>(items: ContractItem[]) {
+  return [...items]
+    .sort((left, right) => left.order - right.order)
+    .map((item) => ({
+      value: item.value as T,
+      english: item.english,
+      chinese: item.chinese,
+      ...(item.english_description ? {
+        englishDescription: item.english_description,
+        chineseDescription: item.chinese_description,
+      } : {}),
+    })) as BilingualTaxonomyItem<T>[];
+}
 
-export const entryTriggerOptions: BilingualTaxonomyItem<EntryTrigger>[] = [
-  ["h1_h2_l1_l2", "H1 / H2 / L1 / L2", "高一 / 高二 / 低一 / 低二"], ["second_entry", "Second Entry", "二次入场"],
-  ["wedge", "Wedge", "楔形"], ["double_top_bottom", "Double Top / Bottom", "双顶 / 双底"],
-  ["inside_bar_triangle", "Inside Bar / Triangle", "内包线 / 三角形"], ["strong_signal_bar", "Strong Signal Bar", "强信号K线"],
-  ["breakout_retest", "Breakout Retest", "突破回测"], ["other", "Other", "其他触发"],
-].map(([value, english, chinese]) => ({ value: value as EntryTrigger, english, chinese }));
-
-export const locationTagOptions: BilingualTaxonomyItem<LocationTag>[] = [
-  ["opening_range", "Opening Range", "开盘区间"], ["gap_open", "Gap Open", "跳空开盘"],
-  ["range_high", "Range High", "区间上沿"], ["range_low", "Range Low", "区间下沿"],
-  ["prior_day_high", "Prior Day High", "昨高"], ["prior_day_low", "Prior Day Low", "昨低"],
-  ["support", "Support", "支撑"], ["resistance", "Resistance", "阻力"],
-  ["pullback_zone", "Pullback Zone", "回调区域"], ["breakout_point", "Breakout Point", "突破位"],
-].map(([value, english, chinese]) => ({ value: value as LocationTag, english, chinese }));
+export const marketStateOptions = contractItems<MarketState>(taxonomy.market_state);
+export const tradeThesisOptions = contractItems<TradeThesis>(taxonomy.trade_thesis);
+export const entryTriggerOptions = contractItems<EntryTrigger>(taxonomy.entry_trigger);
+export const locationTagOptions = contractItems<LocationTag>(taxonomy.location_tag);
 
 export function findTaxonomyItem<T extends string>(items: BilingualTaxonomyItem<T>[], value: T | null | undefined) {
   return items.find((item) => item.value === value) ?? null;

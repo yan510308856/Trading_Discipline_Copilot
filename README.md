@@ -20,7 +20,9 @@ It is not a practice-mode simulator; blockers are part of the real workflow.
 - Planned and open trade lifecycle stored in SQLite.
 - Open-trade R tracking, stop management, partial-profit recording, and runners.
 - Durable price-threshold email alerts and execution-based automatic local closing.
-- Three-step click-first planning with structured option contract suggestions.
+- Three-step click-first planning with structured option contract suggestions in Instrument & Horizon.
+- Explicit key-location and major-reversal decisions.
+- One-click persistent dismissal with Undo for open-trade and Attention warnings; blockers are never dismissible.
 - Optional Finnhub quotes for open US stock positions; the API key stays server-side.
 - Post-trade discipline scoring with YAML-configured bonuses, penalties, and vetoes.
 - Persistent post-trade history with date and review-status filters.
@@ -153,15 +155,16 @@ Tests use isolated temporary SQLite databases and do not modify
 4. Classify the plan as **Intraday**, **Swing**, **LEAP**, or **Other**.
 5. Leave stop loss empty and confirm the plan is blocked.
 6. Enter a structural stop loss.
-7. Select the `breakout` setup without follow-through and inspect the warning.
-8. Complete the required fields and create the planned trade.
-9. Open **Open Trades** and mark the entry filled.
-10. Enter a current price that reaches at least `1R`.
-11. Confirm the partial-profit reminder appears.
-12. Record partial profit, activate the runner, and give it a protective stop.
-13. Record the exact remaining exit quantity to close the local trade automatically.
-14. Open **Post-Trade Review**, expand the trade, and save a review.
-15. Return to **Dashboard** and confirm the discipline score and R are included.
+7. Classify Market State, Trade Thesis, and Entry Trigger with two deliberate clicks per choice.
+8. Select a Breakout thesis without follow-through and inspect the warning gate.
+9. Explicitly select key locations or **No key location**, complete the required fields, and create the planned trade.
+10. Open **Open Trades** and mark the entry filled.
+11. Enter a current price that reaches at least `1R`.
+12. Confirm the partial-profit reminder appears.
+13. Record partial profit, activate the runner, and give it a protective stop.
+14. Record the exact remaining exit quantity to close the local trade automatically.
+15. Open **Post-Trade Review**, expand the trade, and save a review.
+16. Return to **Dashboard** and confirm the discipline score and R are included.
 
 Example long trade:
 
@@ -169,8 +172,10 @@ Example long trade:
 Symbol: ES
 Trade horizon: intraday
 Direction: long
-Setup: breakout
-Context: strong_trend
+Market State: Strong Trend
+Trade Thesis: Breakout
+Entry Trigger: Strong Signal Bar
+Key Location: Breakout Point
 Entry: 5000
 Stop: 4990
 Target 1: 5010
@@ -233,7 +238,7 @@ docker-compose.yml      Local two-container application
 - Discipline scoring: `backend/app/rules/discipline_scoring_rules.yaml`
 - Frontend API base: set `VITE_API_BASE_URL` when not using the default `/api`
 - Finnhub quote key: set `FINNHUB_API_KEY` in the root `.env`; automatic quotes
-  currently apply only to trades whose market is `stocks`.
+  use stock quotes for stocks and the underlying stock symbol for options.
 
 ## Known limitations
 
@@ -254,27 +259,4 @@ docker-compose.yml      Local two-container application
 - [Discipline analytics definitions](docs/discipline_analytics_definitions.md)
 - [Price action taxonomy](docs/price_action_taxonomy.md)
 
-## Stage 27: structured bilingual price action
-
-New plans classify Market State / 市场结构, Trade Thesis / 交易逻辑, Entry Trigger / 入场触发, and Key Locations / 关键位置 separately. English and Chinese terminology comes from one frontend taxonomy, and Open Trades shows both languages together. `setup` and `market_context` remain deprecated compatibility mirrors. Narrow Channel is always translated as 窄通道.
-
-## Stage 26: discipline effectiveness analytics
-
-**Discipline Analytics** follows Daily Summary and measures preparation, planning integrity, execution discipline, review timing, notification reliability, recurring issues, and outcome context. `GET /analytics/discipline` supports date, horizon, market, and setup filters. UTC date boundaries and null zero-denominator rates are documented explicitly.
-
-Options outcomes are labeled and calculated as **Underlying R**. No option premium return, option P&L, or option-based R is included.
-# Stage 23: operational trust and complete plans
-
-The Dashboard now reports whether the local price monitor is actually running, whether email delivery is fully configured, the last monitor cycle, and the latest persisted alert-email result. Open positions show price source and freshness; automatic quotes older than 120 seconds are marked stale. Runtime monitor timestamps are process-local and reset whenever the backend restarts.
-
-New trade plans require a positive position size so total planned risk can be calculated before creation. Options continue to use underlying entry, stop, target, current, and exit prices for every R calculation. The app does not calculate option-premium return, option P&L, or option-based R.
-# Stage 24: Attention and manage-to-review workflow
-
-Rule Alerts is now the operational **Attention Center**. It contains only active work: blockers, warnings, meaningful reminders, stale critical prices, failed alert emails, pending reviews, and notification configuration problems. Attention is intentionally opened as a dedicated page; navigation and Dashboard do not repeat its count or item list.
-
-Attention links retain trade context in the URL, for example `#open-trades?trade_id=123` and `#post-trade-review?trade_id=123`. Open trades now include inline runner-stop editing, one context-aware runner-state action, collapsed price-alert history, execution preview, and a direct review handoff after a full exit.
-# Stage 25: consistent server state and workflow audit
-
-Frontend server reads now belong to TanStack Query and server writes to mutation hooks. Component state is reserved for edit drafts, UI state, and derived presentation. Query defaults provide short general freshness, long-lived Rules Library data, periodic Attention and notification health refreshes, and mutation-driven invalidation without clearing cached content.
-
-The backend now records a lightweight append-only `WorkflowEvent` audit trail for meaningful readiness, planning, lifecycle, review, and email-delivery actions. A read-only development endpoint is available at `GET /workflow-events`; there is no analytics navigation page and this is not event sourcing.
+Current stage details and prior history are summarized in [CHANGELOG.md](CHANGELOG.md).

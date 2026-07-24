@@ -630,3 +630,13 @@ Analytics query keys include all filters. Relevant writes invalidate the `analyt
 ## Stage 27 taxonomy checks
 
 Treat taxonomy values as API contracts: define them once per layer, validate at boundaries, and test frontend/backend parity. Migration mappings must be conservative and self-contained. JSON multi-select values are ordered and deduplicated after validation; unsupported values fail cleanly. Test legacy payloads and rows separately from new UI requirements.
+## Stage 28 integrity checks
+
+When classification, warning, or rule semantics change:
+
+1. Upgrade a pre-Stage-28 SQLite fixture and verify conservative backfill.
+2. Run backend contract tests against `shared/price_action_taxonomy.json`.
+3. Run jsdom interaction tests with fake timers for the 350 ms confirmation.
+4. Verify stale metadata still renders but produces no Attention item.
+5. Verify dismissal, Undo, mutation failure recovery, blocker scope, and
+   pre-trade acknowledgement separately.
