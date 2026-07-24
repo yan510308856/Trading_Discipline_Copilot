@@ -57,6 +57,7 @@ rules:
     category: price_action
     stage: pre_trade
     severity: warning
+    dedupe_group: breakout_follow_through
     trigger:
       trade_thesis: breakout
     conditions:
@@ -155,7 +156,12 @@ rules:
     severity: warning
     trigger:
       trade_thesis: failed_breakout
-    conditions: []
+    conditions:
+      - field: location_tags
+        operator: contains_any
+        value:
+          - prior_day_high
+          - prior_day_low
     message: A failed-breakout setup at a key level needs explicit confirmation before another attempt.
     checklist:
       - Is this near yesterday's high or low?
@@ -171,7 +177,7 @@ rules:
     enabled: true
 
   - id: breakout_gap_no_retest_strength
-    name: A gap without a retest can signal breakout strength
+    name: Verify whether a gap open is holding
     category: price_action
     stage: pre_trade
     severity: reminder
@@ -180,12 +186,12 @@ rules:
       - field: location_tags
         operator: contains
         value: gap_open
-    message: A breakout gap that does not retest may be strong; plan the entry without chasing it.
+    message: A gap open can produce strong continuation or sharp rejection; verify whether the gap is holding before acting.
     checklist:
-      - Is the gap holding beyond the breakout point?
+      - Is the gap holding or being rejected?
       - Is there a structured entry and protected runner plan?
     next_actions:
-      - Plan the runner protection before entry.
+      - Verify the current structure before entry.
       - Avoid chasing if the stop would be structurally invalid.
     ui_hints: {}
     requires_acknowledgement: false
@@ -220,6 +226,9 @@ rules:
     category: risk_control
     stage: pre_trade
     severity: blocker
+    priority: 100
+    suppresses:
+      - strong_trend_unconfirmed_major_reversal
     trigger:
       status: planned
       market: options
@@ -227,9 +236,9 @@ rules:
       - field: trade_thesis
         operator: equals
         value: major_reversal
-      - field: is_unconfirmed_reversal
+      - field: reversal_confirmation
         operator: equals
-        value: true
+        value: unconfirmed
     message: You are attempting an unconfirmed reversal against the current structure with options.
     checklist:
       - Is this attempt happening before clear confirmation?
@@ -253,9 +262,9 @@ rules:
       market_state: strong_trend
       trade_thesis: major_reversal
     conditions:
-      - field: is_unconfirmed_reversal
+      - field: reversal_confirmation
         operator: equals
-        value: true
+        value: unconfirmed
     message: You are attempting an unconfirmed reversal against a strong trend.
     checklist:
       - Is there sufficient reversal confirmation?
@@ -276,6 +285,10 @@ rules:
     category: price_action
     stage: pre_trade
     severity: warning
+    priority: 100
+    dedupe_group: breakout_follow_through
+    suppresses:
+      - breakout_needs_follow_through
     trigger:
       market_state: breakout_mode
       trade_thesis: breakout
@@ -354,9 +367,9 @@ rules:
       - field: trade_thesis
         operator: equals
         value: major_reversal
-      - field: is_unconfirmed_reversal
+      - field: reversal_confirmation
         operator: equals
-        value: true
+        value: unconfirmed
     message: An unconfirmed stock reversal is allowed only with intentionally small size and a structural stop.
     checklist:
       - Is the position intentionally small?

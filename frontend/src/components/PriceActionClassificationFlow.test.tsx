@@ -24,10 +24,12 @@ function renderFlow(values: {
     tradeThesis={values.tradeThesis ?? ""}
     entryTrigger={values.entryTrigger ?? ""}
     locationTags={values.locationTags ?? []}
+    locationDecision={(values.locationTags?.length ?? 0) > 0 ? "selected" : null}
     onMarketStateChange={noop}
     onTradeThesisChange={noop}
     onEntryTriggerChange={noop}
     onLocationTagsChange={noop}
+    onNoLocation={noop}
     onBackToInstrument={noop}
     onContinue={noop}
     canContinue

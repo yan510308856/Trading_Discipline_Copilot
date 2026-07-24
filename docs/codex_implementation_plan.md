@@ -1280,3 +1280,13 @@ and a three-step option-aware planner. See `stage22_live_alerts_and_execution_wo
 - Replace flat New Trade classification with accessible bilingual controls.
 - Show compact bilingual facts in planned, open, and review workflows.
 - Extend trade and analytics filters without removing historical filters.
+## Stage 28 — Classification, warning, and rule integrity
+
+- Add nullable `location_decision` and `reversal_confirmation`.
+- Move unchanged option contract selection to Instrument & Horizon.
+- Persist validated warning occurrence dismissals with Undo.
+- Remove stale price from actionable warning paths.
+- Add rule priority, suppression, dedupe groups, and precise prior-day/gap rules.
+- Make the shared JSON taxonomy contract authoritative without weakening types.
+- Reject contradictory legacy classification patches.
+- Verify with migration, backend, jsdom interaction, build, and Docker config.

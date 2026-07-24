@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter
 
-from app.api import analytics, attention, daily_readiness, market_data, notifications, reviews, rules, summary, trades, workflow_events
+from app.api import analytics, attention, daily_readiness, market_data, notifications, reviews, rules, summary, trades, warning_dismissals, workflow_events
 
 
 router = APIRouter()
@@ -16,3 +16,4 @@ router.include_router(notifications.router)
 router.include_router(attention.router)
 router.include_router(workflow_events.router)
 router.include_router(analytics.router)
+router.include_router(warning_dismissals.router)

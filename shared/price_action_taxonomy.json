@@ -1,0 +1,41 @@
+{
+  "market_state": [
+    {"value": "strong_trend", "english": "Strong Trend", "chinese": "强趋势", "order": 1},
+    {"value": "narrow_channel", "english": "Narrow Channel", "chinese": "窄通道", "order": 2},
+    {"value": "broad_channel", "english": "Broad Channel", "chinese": "宽通道", "order": 3},
+    {"value": "trading_range", "english": "Trading Range", "chinese": "震荡区间", "order": 4},
+    {"value": "breakout_mode", "english": "Breakout Mode", "chinese": "突破模式", "order": 5},
+    {"value": "unclear", "english": "Unclear", "chinese": "结构不清", "order": 6}
+  ],
+  "trade_thesis": [
+    {"value": "pullback_continuation", "english": "Pullback Continuation", "chinese": "回调延续", "order": 1, "english_description": "Trade with the existing trend after a retracement.", "chinese_description": "顺着已有趋势，在回调后等待趋势继续。"},
+    {"value": "breakout", "english": "Breakout", "chinese": "突破", "order": 2, "english_description": "Trade confirmed expansion beyond a meaningful boundary.", "chinese_description": "交易价格有效突破重要边界后的扩张。"},
+    {"value": "breakout_pullback", "english": "Breakout Pullback", "chinese": "突破回踩", "order": 3},
+    {"value": "failed_breakout", "english": "Failed Breakout", "chinese": "突破失败", "order": 4},
+    {"value": "range_reversal", "english": "Range Reversal", "chinese": "区间边缘反转", "order": 5},
+    {"value": "major_reversal", "english": "Major Trend Reversal", "chinese": "主要趋势反转", "order": 6},
+    {"value": "other", "english": "Other", "chinese": "其他逻辑", "order": 7}
+  ],
+  "entry_trigger": [
+    {"value": "h1_h2_l1_l2", "english": "H1 / H2 / L1 / L2", "chinese": "高一 / 高二 / 低一 / 低二", "order": 1},
+    {"value": "second_entry", "english": "Second Entry", "chinese": "二次入场", "order": 2},
+    {"value": "wedge", "english": "Wedge", "chinese": "楔形", "order": 3},
+    {"value": "double_top_bottom", "english": "Double Top / Bottom", "chinese": "双顶 / 双底", "order": 4},
+    {"value": "inside_bar_triangle", "english": "Inside Bar / Triangle", "chinese": "内包线 / 三角形", "order": 5},
+    {"value": "strong_signal_bar", "english": "Strong Signal Bar", "chinese": "强信号K线", "order": 6},
+    {"value": "breakout_retest", "english": "Breakout Retest", "chinese": "突破回测", "order": 7},
+    {"value": "other", "english": "Other", "chinese": "其他触发", "order": 8}
+  ],
+  "location_tag": [
+    {"value": "opening_range", "english": "Opening Range", "chinese": "开盘区间", "order": 1},
+    {"value": "gap_open", "english": "Gap Open", "chinese": "跳空开盘", "order": 2},
+    {"value": "range_high", "english": "Range High", "chinese": "区间上沿", "order": 3},
+    {"value": "range_low", "english": "Range Low", "chinese": "区间下沿", "order": 4},
+    {"value": "prior_day_high", "english": "Prior Day High", "chinese": "昨高", "order": 5},
+    {"value": "prior_day_low", "english": "Prior Day Low", "chinese": "昨低", "order": 6},
+    {"value": "support", "english": "Support", "chinese": "支撑", "order": 7},
+    {"value": "resistance", "english": "Resistance", "chinese": "阻力", "order": 8},
+    {"value": "pullback_zone", "english": "Pullback Zone", "chinese": "回调区域", "order": 9},
+    {"value": "breakout_point", "english": "Breakout Point", "chinese": "突破位", "order": 10}
+  ]
+}

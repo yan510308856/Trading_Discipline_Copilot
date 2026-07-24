@@ -1,6 +1,6 @@
 # Price action taxonomy / 价格行为分类
 
-Stage 27 replaces the overloaded logical use of Setup and Market Context with five structured facts. The legacy columns remain unchanged as deprecated compatibility mirrors.
+Stage 28 keeps the Stage 27 taxonomy and adds explicit decision state. The legacy columns remain deprecated read-only compatibility mirrors.
 
 ## Why normalization matters
 
@@ -52,9 +52,15 @@ A wedge or double top/bottom describes how entry is triggered, not whether the t
 
 `opening_range / 开盘区间`, `gap_open / 跳空开盘`, `range_high / 区间上沿`, `range_low / 区间下沿`, `prior_day_high / 昨高`, `prior_day_low / 昨低`, `support / 支撑`, `resistance / 阻力`, `pullback_zone / 回调区域`, and `breakout_point / 突破位` form an ordered, duplicate-free JSON list. Opening Range and Gap Open describe where or when a trade occurs, not its thesis.
 
-## Unconfirmed reversal risk
+## Explicit decisions
 
-`is_unconfirmed_reversal` records an early, left-side reversal attempt. It is not a normal setup. Options are blocked; stocks require warning acknowledgement, intentionally small size, structural invalidation, and no averaging down.
+`location_decision=selected` requires one or more location tags.
+`location_decision=none` requires an empty list. Null means undecided or unknown
+legacy intent; empty tags alone never mean “none.”
+
+`reversal_confirmation=confirmed|unconfirmed` is required for Major Trend
+Reversal and null otherwise. `is_unconfirmed_reversal` is a deprecated mirror.
+Unconfirmed options are blocked; stocks require warning acknowledgement.
 
 ## Historical migration
 
@@ -64,7 +70,11 @@ A wedge or double top/bottom describes how entry is triggered, not whether the t
 - Wedge, double top/bottom, H1/H2/L1/L2, and inside bar/triangle map to `trade_thesis=other` plus the known trigger.
 - Left-side/bottom-pick values map to major reversal and set the risk flag.
 
-The original `setup` and `market_context` values are never overwritten by migration. New writes mirror the new source-of-truth fields back to legacy values for old consumers.
+The original `setup` and `market_context` values are never overwritten by migration. New structured writes mirror values for old readers, but direct legacy patches are rejected.
+
+Labels, translations, descriptions, and order come from
+`shared/price_action_taxonomy.json`; backend Literals and frontend unions remain
+strict and are contract-tested.
 
 ## Rule examples
 

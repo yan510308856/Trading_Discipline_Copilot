@@ -28,7 +28,7 @@ import {
   type HorizonFilterValue,
   horizonForApi,
 } from "./HorizonFilter";
-import { useOpenTradeMutation, usePatchTradeMutation, usePriceAlertEventsQuery, useRecordExitMutation } from "../hooks/queries";
+import { useDismissWarningMutation, useOpenTradeMutation, usePatchTradeMutation, usePriceAlertEventsQuery, useRecordExitMutation, useUndoWarningDismissalMutation } from "../hooks/queries";
 import { useQueryClient } from "@tanstack/react-query";
 import { contextFromHash, hashWithContext, positiveIntegerContext } from "../utils/navigation";
 import { frontendErrorMessage } from "../utils/apiError";
@@ -175,6 +175,8 @@ function TradeCard({ trade, onUpdated, defaultExpanded, onDeleted, onAutoClosed 
   const patchMutation = usePatchTradeMutation();
   const openMutation = useOpenTradeMutation();
   const exitMutation = useRecordExitMutation();
+  const dismissWarningMutation = useDismissWarningMutation();
+  const undoDismissalMutation = useUndoWarningDismissalMutation();
   const [actualEntry, setActualEntry] = useState(
     trade.actual_entry?.toString() ?? trade.planned_entry.toString(),
   );
@@ -202,6 +204,51 @@ function TradeCard({ trade, onUpdated, defaultExpanded, onDeleted, onAutoClosed 
   const [optionExitPrice, setOptionExitPrice] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState("");
+  const [undoDismissalKey, setUndoDismissalKey] = useState<string | null>(null);
+
+  async function dismissOpenWarning(alert: RuleAlert) {
+    if (!alert.dismissal_key || !alert.occurrence_key) return;
+    const prior = evaluation;
+    const nextAlerts = evaluation.alerts.filter((item) => item.dismissal_key !== alert.dismissal_key);
+    setEvaluation({
+      status: nextAlerts.some((item) => item.severity === "blocker") ? "blocked" : nextAlerts.length ? "warning" : "allowed",
+      alerts: nextAlerts,
+    });
+    setUndoDismissalKey(alert.dismissal_key);
+    try {
+      await dismissWarningMutation.mutateAsync({
+        dismissalKey: alert.dismissal_key,
+        occurrenceKey: alert.occurrence_key,
+      });
+    } catch {
+      setEvaluation(prior);
+      setUndoDismissalKey(null);
+      setError("Warning could not be dismissed.");
+    }
+  }
+
+  async function undoOpenWarning() {
+    if (!undoDismissalKey) return;
+    try {
+      await undoDismissalMutation.mutateAsync(undoDismissalKey);
+      setUndoDismissalKey(null);
+    } catch {
+      setError("Warning dismissal could not be undone.");
+      return;
+    }
+    try {
+      const restored = await evaluateRules({
+        trade_id: trade.id,
+        current_r: currentR,
+        partial_taken: trade.partial_taken,
+        runner_active: trade.runner_active,
+        runner_stop: numberOrNull(runnerStop),
+      });
+      setEvaluation(restored);
+    } catch {
+      setError("Warning was restored, but the rule panel could not refresh.");
+    }
+  }
 
   const parsedEntry = numberOrNull(actualEntry);
   const parsedPlannedOptionEntry = numberOrNull(plannedOptionEntry);
@@ -577,7 +624,9 @@ function TradeCard({ trade, onUpdated, defaultExpanded, onDeleted, onAutoClosed 
       <RuleAlertPanel
         status={evaluation.status}
         alerts={evaluation.alerts}
+        onDismiss={(alert) => void dismissOpenWarning(alert)}
       />
+      {undoDismissalKey && <div className="warning-undo" role="status"><span>Warning dismissed.</span><button type="button" onClick={() => void undoOpenWarning()}>Undo</button></div>}
 
       <section className="management-section">
         <h3>Trade notes</h3>

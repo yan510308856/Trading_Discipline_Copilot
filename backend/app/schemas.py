@@ -15,6 +15,8 @@ MarketState = Literal["strong_trend", "narrow_channel", "broad_channel", "tradin
 TradeThesis = Literal["pullback_continuation", "breakout", "breakout_pullback", "failed_breakout", "range_reversal", "major_reversal", "other"]
 EntryTrigger = Literal["h1_h2_l1_l2", "second_entry", "wedge", "double_top_bottom", "inside_bar_triangle", "strong_signal_bar", "breakout_retest", "other"]
 LocationTag = Literal["opening_range", "gap_open", "range_high", "range_low", "prior_day_high", "prior_day_low", "support", "resistance", "pullback_zone", "breakout_point"]
+LocationDecision = Literal["selected", "none"]
+ReversalConfirmation = Literal["confirmed", "unconfirmed"]
 TradeStatus = Literal["planned", "open", "closed", "cancelled"]
 FollowedPlan = Literal["yes", "partial", "no"]
 TradeClassification = Literal[
@@ -78,6 +80,8 @@ class TradeCreate(BaseModel):
     trade_thesis: TradeThesis
     entry_trigger: EntryTrigger
     location_tags: list[LocationTag] = Field(default_factory=list)
+    location_decision: LocationDecision
+    reversal_confirmation: Optional[ReversalConfirmation] = None
     is_unconfirmed_reversal: bool = False
     planned_entry: float
     actual_entry: Optional[float] = None
@@ -97,10 +101,20 @@ class TradeCreate(BaseModel):
             return value
         from app.services.price_action_taxonomy import add_legacy_mirrors, classification_from_legacy
         data = dict(value)
+        had_structured_classification = any(
+            field in data
+            for field in ("market_state", "trade_thesis", "entry_trigger", "location_tags")
+        )
         if not all(data.get(field) for field in ("market_state", "trade_thesis", "entry_trigger")):
             legacy = classification_from_legacy(data.get("setup"), data.get("market_context"))
             for field, mapped in legacy.items():
                 data.setdefault(field, mapped)
+        if data.get("location_tags") and data.get("location_decision") is None:
+            data["location_decision"] = "selected"
+        elif not had_structured_classification and data.get("location_decision") is None:
+            # Compatibility for pre-taxonomy clients. The current UI never uses
+            # this path and requires an explicit decision.
+            data["location_decision"] = "none"
         add_legacy_mirrors(data)
         return data
 
@@ -134,6 +148,17 @@ class TradeCreate(BaseModel):
 
     @model_validator(mode="after")
     def clear_option_contract_for_non_options(self) -> "TradeCreate":
+        if self.__class__.__name__ != "TradeCreate":
+            return self
+        if self.location_decision == "selected" and not self.location_tags:
+            raise ValueError("Selected key locations require at least one location tag.")
+        if self.location_decision == "none" and self.location_tags:
+            raise ValueError("No key location requires an empty location tag list.")
+        if self.trade_thesis == "major_reversal" and self.reversal_confirmation is None:
+            raise ValueError("Major reversals require explicit reversal confirmation.")
+        if self.trade_thesis != "major_reversal":
+            self.reversal_confirmation = None
+        self.is_unconfirmed_reversal = self.reversal_confirmation == "unconfirmed"
         if self.market != "options":
             self.option_contract = None
             self.option_type = None
@@ -154,6 +179,8 @@ class TradeRead(TradeCreate):
     market_state: Optional[MarketState] = None
     trade_thesis: Optional[TradeThesis] = None
     entry_trigger: Optional[EntryTrigger] = None
+    location_decision: Optional[LocationDecision] = None
+    reversal_confirmation: Optional[ReversalConfirmation] = None
     created_at: datetime
     updated_at: datetime
     opened_at: Optional[datetime]
@@ -195,6 +222,8 @@ class TradePatch(BaseModel):
     market_state: Optional[MarketState] = None
     trade_thesis: Optional[TradeThesis] = None
     entry_trigger: Optional[EntryTrigger] = None
+    location_decision: Optional[LocationDecision] = None
+    reversal_confirmation: Optional[ReversalConfirmation] = None
     location_tags: Optional[list[LocationTag]] = None
     is_unconfirmed_reversal: Optional[bool] = None
     planned_entry: Optional[float] = None
@@ -255,6 +284,10 @@ class TradePatch(BaseModel):
             "direction",
             "setup",
             "market_context",
+            "market_state",
+            "trade_thesis",
+            "entry_trigger",
+            "location_decision",
             "planned_entry",
             "stop_loss",
             "target_1",
@@ -370,6 +403,9 @@ class RuleAlert(BaseModel):
     next_actions: list[str] = Field(default_factory=list)
     ui_hints: dict[str, Any] = Field(default_factory=dict)
     requires_acknowledgement: bool = False
+    dismissible: bool = False
+    dismissal_key: Optional[str] = None
+    occurrence_key: Optional[str] = None
 
 
 class RuleDefinition(BaseModel):
@@ -385,6 +421,9 @@ class RuleDefinition(BaseModel):
     next_actions: list[str] = Field(default_factory=list)
     ui_hints: dict[str, Any] = Field(default_factory=dict)
     requires_acknowledgement: bool = False
+    priority: int = 0
+    dedupe_group: Optional[str] = None
+    suppresses: list[str] = Field(default_factory=list)
     avoid: str
     discipline_sentence: str
     enabled: bool
@@ -427,7 +466,7 @@ class AttentionItem(BaseModel):
     source_type: Literal[
         "trade_rule", "missing_position_size", "missing_stop",
         "runner_unprotected", "profit_milestone", "green_to_red",
-        "stale_price", "failed_email", "pending_review",
+        "failed_email", "pending_review",
         "notification_configuration",
     ]
     severity: Literal["blocker", "warning", "reminder"]
@@ -442,6 +481,11 @@ class AttentionItem(BaseModel):
     destination_page: Literal["dashboard", "open-trades", "post-trade-review"]
     destination_context: dict[str, str] = Field(default_factory=dict)
     time_sensitive: bool = False
+    dismissible: bool = False
+    dismissal_key: Optional[str] = None
+    occurrence_key: Optional[str] = None
+    source_id: Optional[str] = None
+    rule_id: Optional[str] = None
 
 
 class AttentionCounts(BaseModel):
@@ -454,6 +498,19 @@ class AttentionResponse(BaseModel):
     items: list[AttentionItem]
     actionable_count: int
     counts: AttentionCounts
+
+
+class WarningDismissalCreate(BaseModel):
+    dismissal_key: str = Field(min_length=1, max_length=192)
+    occurrence_key: str = Field(min_length=1, max_length=192)
+
+
+class WarningDismissalRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    dismissal_key: str
+    occurrence_key: str
+    dismissed_at: datetime
 
 
 class WorkflowEventRead(BaseModel):

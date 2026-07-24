@@ -1,11 +1,18 @@
-"""Canonical Stage 27 price-action values and legacy compatibility mapping."""
+"""Canonical price-action contract and legacy compatibility mapping."""
 
 from __future__ import annotations
 
-MARKET_STATES = ("strong_trend", "narrow_channel", "broad_channel", "trading_range", "breakout_mode", "unclear")
-TRADE_THESES = ("pullback_continuation", "breakout", "breakout_pullback", "failed_breakout", "range_reversal", "major_reversal", "other")
-ENTRY_TRIGGERS = ("h1_h2_l1_l2", "second_entry", "wedge", "double_top_bottom", "inside_bar_triangle", "strong_signal_bar", "breakout_retest", "other")
-LOCATION_TAGS = ("opening_range", "gap_open", "range_high", "range_low", "prior_day_high", "prior_day_low", "support", "resistance", "pullback_zone", "breakout_point")
+import json
+from pathlib import Path
+
+TAXONOMY_PATH = Path(__file__).parents[3] / "shared" / "price_action_taxonomy.json"
+with TAXONOMY_PATH.open(encoding="utf-8") as taxonomy_file:
+    TAXONOMY_CONTRACT = json.load(taxonomy_file)
+
+MARKET_STATES = tuple(item["value"] for item in TAXONOMY_CONTRACT["market_state"])
+TRADE_THESES = tuple(item["value"] for item in TAXONOMY_CONTRACT["trade_thesis"])
+ENTRY_TRIGGERS = tuple(item["value"] for item in TAXONOMY_CONTRACT["entry_trigger"])
+LOCATION_TAGS = tuple(item["value"] for item in TAXONOMY_CONTRACT["location_tag"])
 
 CONTEXT_TO_STATE = {
     "strong_trend": "strong_trend", "narrow_channel": "narrow_channel",
@@ -46,6 +53,8 @@ def classification_from_legacy(setup: str | None, context: str | None) -> dict:
         "trade_thesis": thesis,
         "entry_trigger": trigger,
         "location_tags": ordered_location_tags(tags),
+        "location_decision": "selected" if tags else None,
+        "reversal_confirmation": "unconfirmed" if setup in UNCONFIRMED_SETUPS else None,
         "is_unconfirmed_reversal": setup in UNCONFIRMED_SETUPS,
     }
 

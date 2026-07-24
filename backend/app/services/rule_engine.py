@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+import hashlib
+import json
 from pathlib import Path
 from typing import Any
 
@@ -105,7 +107,7 @@ class RuleEngine:
 
     def evaluate(self, trade: object) -> dict[str, Any]:
         trade_values = _trade_values(trade)
-        alerts = []
+        matched: list[tuple[dict[str, Any], dict[str, Any]]] = []
 
         for rule in self.rules:
             if not rule.get("enabled", True):
@@ -118,8 +120,8 @@ class RuleEngine:
             ):
                 continue
 
-            alerts.append(
-                {
+            matched.append(
+                (rule, {
                     "rule_id": rule["id"],
                     "severity": rule["severity"],
                     "message": rule["message"],
@@ -130,9 +132,35 @@ class RuleEngine:
                     "requires_acknowledgement": rule.get(
                         "requires_acknowledgement", False
                     ),
-                }
+                })
             )
 
+        matched_ids = {rule["id"] for rule, _ in matched}
+        suppressed_ids = {
+            suppressed
+            for rule, _ in matched
+            for suppressed in rule.get("suppresses", [])
+            if suppressed in matched_ids
+        }
+        candidates = [(rule, alert) for rule, alert in matched if rule["id"] not in suppressed_ids]
+        severity_rank = {"blocker": 3, "warning": 2, "reminder": 1}
+        grouped: dict[str, list[tuple[dict[str, Any], dict[str, Any]]]] = {}
+        ungrouped: list[tuple[dict[str, Any], dict[str, Any]]] = []
+        for candidate in candidates:
+            group = candidate[0].get("dedupe_group")
+            (grouped.setdefault(group, []) if group else ungrouped).append(candidate)
+        winners = ungrouped + [
+            sorted(
+                group_candidates,
+                key=lambda pair: (
+                    -severity_rank[pair[0]["severity"]],
+                    -pair[0].get("priority", 0),
+                    pair[0]["id"],
+                ),
+            )[0]
+            for group_candidates in grouped.values()
+        ]
+        alerts = [alert for _, alert in sorted(winners, key=lambda pair: pair[0]["id"])]
         severities = {alert["severity"] for alert in alerts}
         if "blocker" in severities:
             status = "blocked"
@@ -147,6 +175,8 @@ class RuleEngine:
 def evaluate_trade(trade: object) -> dict[str, Any]:
     """Evaluate a trade with the default price-action rules."""
     values = dict(_trade_values(trade))
+    if values.get("reversal_confirmation") is None and values.get("is_unconfirmed_reversal") is True:
+        values["reversal_confirmation"] = "unconfirmed"
     if not all(values.get(field) for field in ("market_state", "trade_thesis", "entry_trigger")):
         from app.services.price_action_taxonomy import classification_from_legacy
         mapped = classification_from_legacy(values.get("setup"), values.get("market_context"))
@@ -158,3 +188,57 @@ def evaluate_trade(trade: object) -> dict[str, Any]:
             mapped.pop("is_unconfirmed_reversal", None)
         values |= mapped
     return RuleEngine().evaluate(values)
+
+
+def rule_warning_identity(
+    trade: object, rule_id: str, *, trade_id: int, occurrence_token: str = "initial"
+) -> tuple[str, str]:
+    """Build identity only from facts used to match one YAML warning."""
+
+    values = dict(_trade_values(trade))
+    rule = next(rule for rule in load_rules() if rule["id"] == rule_id)
+    facts: dict[str, Any] = {
+        "trade_id": trade_id,
+        "rule_id": rule_id,
+        "severity": rule["severity"],
+        "occurrence_token": occurrence_token,
+        "trigger": {field: values.get(field) for field in sorted(rule.get("trigger", {}))},
+        "conditions": [],
+    }
+    for condition in rule.get("conditions", []):
+        condition_fact = {
+            "field": condition["field"],
+            "operator": condition["operator"],
+            "actual": values.get(condition["field"]),
+            "value": condition.get("value"),
+        }
+        if condition.get("compare_field"):
+            condition_fact["compare_field"] = condition["compare_field"]
+            condition_fact["compare_actual"] = values.get(condition["compare_field"])
+        facts["conditions"].append(condition_fact)
+    digest = hashlib.sha256(
+        json.dumps(facts, sort_keys=True, separators=(",", ":"), default=str).encode()
+    ).hexdigest()[:32]
+    return (
+        f"warning:rule:{trade_id}:{rule_id}:{digest}",
+        f"occurrence:rule:{trade_id}:{rule_id}:{digest}",
+    )
+
+
+def rule_occurrence_token(trade: object, rule_id: str) -> str:
+    """Return the latest audit event that changed a fact relevant to the rule."""
+
+    rule = next(rule for rule in load_rules() if rule["id"] == rule_id)
+    relevant_fields = set(rule.get("trigger", {}))
+    for condition in rule.get("conditions", []):
+        relevant_fields.add(condition["field"])
+        if condition.get("compare_field"):
+            relevant_fields.add(condition["compare_field"])
+    relevant_events = [
+        event
+        for event in getattr(trade, "workflow_events", [])
+        if relevant_fields.intersection(event.event_data.get("fields", []))
+    ]
+    if not relevant_events:
+        return "initial"
+    return max(event.occurred_at for event in relevant_events).isoformat()

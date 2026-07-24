@@ -58,7 +58,8 @@ def test_legacy_payload_remains_compatible(api_client: TestClient) -> None:
 def test_conservative_legacy_mapping() -> None:
     assert classification_from_legacy("wedge", "weak_trend") | {} == {
         "market_state": "broad_channel", "trade_thesis": "other", "entry_trigger": "wedge",
-        "location_tags": [], "is_unconfirmed_reversal": False,
+        "location_tags": [], "location_decision": None,
+        "reversal_confirmation": None, "is_unconfirmed_reversal": False,
     }
     assert classification_from_legacy("breakout", "narrow_channel")["market_state"] == "narrow_channel"
     assert classification_from_legacy("opening_range", "opening_range")["location_tags"] == ["opening_range"]

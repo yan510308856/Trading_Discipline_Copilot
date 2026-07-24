@@ -60,6 +60,9 @@ class RuleDefinitionModel(BaseModel):
     category: str = Field(min_length=1)
     stage: Stage
     severity: Severity
+    priority: int = Field(default=0, ge=-1000, le=1000)
+    dedupe_group: Optional[str] = None
+    suppresses: list[str] = Field(default_factory=list)
     trigger: dict[str, Any]
     conditions: list[RuleConditionModel]
     message: str = Field(min_length=1)
@@ -70,6 +73,12 @@ class RuleDefinitionModel(BaseModel):
     avoid: str = Field(min_length=1)
     discipline_sentence: str = Field(min_length=1)
     enabled: bool
+
+    @model_validator(mode="after")
+    def validate_suppression(self) -> "RuleDefinitionModel":
+        if self.id in self.suppresses:
+            raise ValueError("A rule cannot suppress itself")
+        return self
 
 
 class RuleDocumentModel(BaseModel):

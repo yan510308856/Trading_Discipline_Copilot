@@ -4,6 +4,7 @@ interface RuleAlertPanelProps {
   status?: RuleStatus;
   alerts?: RuleAlert[];
   isChecking?: boolean;
+  onDismiss?: (alert: RuleAlert) => void;
 }
 
 const statusCopy: Record<RuleStatus, string> = {
@@ -25,6 +26,7 @@ export function RuleAlertPanel({
   status = "allowed",
   alerts = [],
   isChecking = false,
+  onDismiss,
 }: RuleAlertPanelProps) {
   return (
     <section className="rule-panel" aria-live="polite">
@@ -59,6 +61,7 @@ export function RuleAlertPanel({
               <div className="alert-title-row">
                 <strong>{alert.message}</strong>
                 <span>{alert.severity}</span>
+                {onDismiss && alert.dismissible && alert.dismissal_key && alert.occurrence_key && <button type="button" className="dismiss-warning-button" aria-label="Dismiss warning" onClick={() => onDismiss(alert)}>×</button>}
               </div>
               {alert.checklist.length > 0 && (
                 <ul className="alert-checklist">

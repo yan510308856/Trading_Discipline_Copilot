@@ -47,7 +47,9 @@ def create_planned_trade(database: Session, trade_data: schemas.TradeCreate) -> 
         database, "plan_created", trade_id=trade.id,
         event_data={"market": trade.market, "horizon": trade.trade_horizon, "setup": trade.setup,
                     "market_state": trade.market_state, "trade_thesis": trade.trade_thesis,
-                    "entry_trigger": trade.entry_trigger, "location_tags": trade.location_tags},
+                    "entry_trigger": trade.entry_trigger, "location_tags": trade.location_tags,
+                    "location_decision": trade.location_decision,
+                    "reversal_confirmation": trade.reversal_confirmation},
     )
     database.commit()
     database.refresh(trade)
@@ -104,6 +106,16 @@ def update_trade(
     trade = get_trade(database, trade_id)
     updates = trade_data.model_dump(exclude_unset=True)
     if trade.status == "planned":
+        legacy_updates = set(updates) & {"setup", "market_context"}
+        if legacy_updates and all(
+            (trade.market_state, trade.trade_thesis, trade.entry_trigger)
+        ):
+            raise APIError(
+                409,
+                "LEGACY_CLASSIFICATION_READ_ONLY",
+                "Legacy setup and market_context are read-only mirrors; patch the structured classification fields.",
+                {"trade_id": trade.id, "fields": sorted(legacy_updates)},
+            )
         prospective = {field: getattr(trade, field) for field in (
             "symbol", "market", "option_contract", "option_type", "option_expiration", "option_strike", "option_entry_price"
         )}
@@ -115,6 +127,28 @@ def update_trade(
                 "trade_thesis": updates.get("trade_thesis", trade.trade_thesis),
             }
             updates.update(add_legacy_mirrors(merged_classification))
+        classification_fields = {
+            "market_state", "trade_thesis", "entry_trigger", "location_tags",
+            "location_decision", "reversal_confirmation",
+        }
+        if set(updates) & classification_fields:
+            thesis = updates.get("trade_thesis", trade.trade_thesis)
+            location_tags = updates.get("location_tags", trade.location_tags)
+            location_decision = updates.get("location_decision", trade.location_decision)
+            reversal_confirmation = updates.get(
+                "reversal_confirmation", trade.reversal_confirmation
+            )
+            if location_decision == "selected" and not location_tags:
+                raise APIError(422, "INVALID_LOCATION_DECISION", "Selected key locations require at least one location tag.", {})
+            if location_decision == "none" and location_tags:
+                raise APIError(422, "INVALID_LOCATION_DECISION", "No key location requires an empty location tag list.", {})
+            if thesis == "major_reversal" and reversal_confirmation is None:
+                raise APIError(422, "REVERSAL_CONFIRMATION_REQUIRED", "Major reversals require explicit confirmation.", {})
+            if thesis != "major_reversal":
+                updates["reversal_confirmation"] = None
+                updates["is_unconfirmed_reversal"] = False
+            elif "reversal_confirmation" in updates:
+                updates["is_unconfirmed_reversal"] = reversal_confirmation == "unconfirmed"
     management_fields = {
         "current_stop",
         "current_price",

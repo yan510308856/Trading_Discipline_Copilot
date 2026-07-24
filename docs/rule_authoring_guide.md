@@ -19,6 +19,9 @@ name: string
 category: string
 stage: pre_trade | in_trade | post_trade
 severity: blocker | warning | reminder
+priority: integer (optional, -1000..1000)
+dedupe_group: string (optional)
+suppresses: [rule_id] (optional)
 trigger: {}
 conditions: []
 message: string
@@ -107,9 +110,16 @@ and `contains_none` require list values and are intended for JSON fields such as
     - range_low
 ```
 
-Stage 27 rules should use `market_state`, `trade_thesis`, `entry_trigger`,
-`location_tags`, and `is_unconfirmed_reversal`. `setup` and `market_context`
+Stage 28 rules should use `market_state`, `trade_thesis`, `entry_trigger`,
+`location_tags`, `location_decision`, and `reversal_confirmation`. `setup`, `market_context`, and `is_unconfirmed_reversal`
 remain compatibility mirrors and are deprecated for new rules.
+
+## Deduplication and suppression
+
+Explicit `suppresses` is applied after matching. Within one `dedupe_group`, the
+engine keeps higher severity, then higher priority, then deterministic rule ID
+order. Use suppression only when two rules describe the same required action;
+do not hide distinct actions.
 
 ## Next Actions And UI Hints
 
@@ -135,8 +145,8 @@ ui_hints:
 Use `requires_acknowledgement: true` when the UI should require conscious
 warning acknowledgement before creating the plan.
 
-Do not use this stage to implement persistent warning acknowledgements. Stage 19
-validates the rule file only.
+Pre-trade acknowledgement remains separate from Stage 28 open-warning
+dismissal. A dismissal must never bypass plan acknowledgement.
 
 ## Required Tests
 

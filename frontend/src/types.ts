@@ -171,6 +171,8 @@ export type MarketState = "strong_trend" | "narrow_channel" | "broad_channel" | 
 export type TradeThesis = "pullback_continuation" | "breakout" | "breakout_pullback" | "failed_breakout" | "range_reversal" | "major_reversal" | "other";
 export type EntryTrigger = "h1_h2_l1_l2" | "second_entry" | "wedge" | "double_top_bottom" | "inside_bar_triangle" | "strong_signal_bar" | "breakout_retest" | "other";
 export type LocationTag = "opening_range" | "gap_open" | "range_high" | "range_low" | "prior_day_high" | "prior_day_low" | "support" | "resistance" | "pullback_zone" | "breakout_point";
+export type LocationDecision = "selected" | "none";
+export type ReversalConfirmation = "confirmed" | "unconfirmed";
 export type FollowedPlan = "yes" | "partial" | "no";
 export type RuleStatus = "allowed" | "warning" | "blocked";
 export type RuleSeverity = "blocker" | "warning" | "reminder";
@@ -210,6 +212,8 @@ export interface TradeFormState {
   trade_thesis: TradeThesis | "";
   entry_trigger: EntryTrigger | "";
   location_tags: LocationTag[];
+  location_decision: LocationDecision | null;
+  reversal_confirmation: ReversalConfirmation | null;
   is_unconfirmed_reversal: boolean;
   planned_entry: string;
   stop_loss: string;
@@ -241,6 +245,8 @@ export interface TradeCreatePayload {
   trade_thesis: TradeThesis;
   entry_trigger: EntryTrigger;
   location_tags: LocationTag[];
+  location_decision: LocationDecision;
+  reversal_confirmation: ReversalConfirmation | null;
   is_unconfirmed_reversal: boolean;
   planned_entry: number;
   stop_loss: number;
@@ -251,7 +257,7 @@ export interface TradeCreatePayload {
   notes: string | null;
 }
 
-export interface Trade extends Omit<TradeCreatePayload, "position_size"> {
+export interface Trade extends Omit<TradeCreatePayload, "position_size" | "location_decision"> {
   id: number;
   status: "planned" | "open" | "closed" | "cancelled";
   created_at: string;
@@ -264,6 +270,7 @@ export interface Trade extends Omit<TradeCreatePayload, "position_size"> {
   current_price_source: string | null;
   current_price_updated_at: string | null;
   position_size: number | null;
+  location_decision: LocationDecision | null;
   option_current_price: number | null;
   runner_active: boolean;
   runner_stop: number | null;
@@ -321,6 +328,8 @@ export interface TradePatchPayload {
   trade_thesis?: TradeThesis;
   entry_trigger?: EntryTrigger;
   location_tags?: LocationTag[];
+  location_decision?: LocationDecision;
+  reversal_confirmation?: ReversalConfirmation | null;
   is_unconfirmed_reversal?: boolean;
 }
 
@@ -399,6 +408,9 @@ export interface RuleAlert {
   next_actions?: string[];
   ui_hints?: Record<string, unknown>;
   requires_acknowledgement?: boolean;
+  dismissible?: boolean;
+  dismissal_key?: string | null;
+  occurrence_key?: string | null;
 }
 
 export interface RuleEvaluationResult {
@@ -424,7 +436,7 @@ export type AttentionSeverity = "blocker" | "warning" | "reminder";
 export type AttentionSourceType =
   | "trade_rule" | "missing_position_size" | "missing_stop"
   | "runner_unprotected" | "profit_milestone" | "green_to_red"
-  | "stale_price" | "failed_email" | "pending_review"
+  | "failed_email" | "pending_review"
   | "notification_configuration";
 
 export interface AttentionItem {
@@ -442,6 +454,9 @@ export interface AttentionItem {
   destination_page: "dashboard" | "open-trades" | "post-trade-review";
   destination_context: Record<string, string>;
   time_sensitive: boolean;
+  dismissible: boolean;
+  dismissal_key: string | null;
+  occurrence_key: string | null;
 }
 
 export interface AttentionResponse {
